@@ -8,7 +8,10 @@ const branch =
 
 export default defineConfig({
   branch,
-  clientId: process.env.NEXT_PUBLIC_TINA_CLIENT_ID || "",
+  // Client ID is not a secret; keeping a fallback here helps Tina Cloud detect
+  // the schema even when it evaluates this config without your CI env vars.
+  clientId:
+    process.env.NEXT_PUBLIC_TINA_CLIENT_ID || "5d26ee9f-4951-4b0c-9be0-9559c5f56f11",
   token: process.env.TINA_TOKEN || "",
   build: {
     outputFolder: "admin",
