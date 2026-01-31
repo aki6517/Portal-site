@@ -92,6 +92,12 @@ const callGemini = async ({
 
 const allowedPlatforms = new Set(["twitter", "instagram", "facebook"]);
 
+type Promotion = {
+  platform: string;
+  text: string;
+  hashtags: string[];
+};
+
 export async function POST(req: Request) {
   const supabase = createSupabaseServerClient();
   const {
@@ -225,7 +231,7 @@ JSONのみを出力し、説明文は不要です。
           hashtags,
         };
       })
-      .filter((entry) => entry && entry.text);
+      .filter((entry): entry is Promotion => Boolean(entry && entry.text));
 
     if (promotions.length === 0) {
       return NextResponse.json(
