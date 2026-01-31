@@ -1,12 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const ALLOWED_STATUS = new Set(["new", "read", "archived"]);
 
 export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -58,7 +59,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from("contact_messages")
     .update({ status })
-    .eq("id", params.id)
+    .eq("id", id)
     .select("id, status")
     .single();
 

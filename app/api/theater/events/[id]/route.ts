@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -34,9 +34,10 @@ const normalizeTags = (tags?: string[] | string | null) => {
 };
 
 export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -65,7 +66,7 @@ export async function GET(
   const { data: event, error } = await supabase
     .from("events")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("theater_id", member.theater_id)
     .single();
 
@@ -80,9 +81,10 @@ export async function GET(
 }
 
 export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -141,7 +143,7 @@ export async function PATCH(
   const { data: current, error: currentError } = await supabase
     .from("events")
     .select("id, category, slug")
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("theater_id", member.theater_id)
     .single();
 
@@ -179,7 +181,7 @@ export async function PATCH(
   const { data: updated, error: updateError } = await supabase
     .from("events")
     .update(update)
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("theater_id", member.theater_id)
     .select("id, category, slug, status")
     .single();
@@ -214,9 +216,10 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } }
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -245,7 +248,7 @@ export async function DELETE(
   const { error } = await supabase
     .from("events")
     .delete()
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("theater_id", member.theater_id);
 
   if (error) {
