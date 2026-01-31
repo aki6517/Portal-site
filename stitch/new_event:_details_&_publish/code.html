@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FUKUOKA STAGE - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&amp;family=Noto+Sans+JP:wght@400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#000000",
+                        secondary: "#FF4081", // Pink
+                        accent: "#00E5FF", // Cyan
+                        highlight: "#FFD700", // Yellow
+                        "background-light": "#FFFDF5",
+                        "background-dark": "#121212",
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#1E1E1E",
+                    },
+                    fontFamily: {
+                        display: ['"Dela Gothic One"', 'cursive'],
+                        body: ['"Noto Sans JP"', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'retro': '4px 4px 0px 0px #000000',
+                        'retro-hover': '6px 6px 0px 0px #000000',
+                        'retro-dark': '4px 4px 0px 0px #FFFFFF',
+                    },
+                    backgroundImage: {
+                        'dot-pattern': 'radial-gradient(#e5e7eb 1px, transparent 1px)',
+                        'dot-pattern-dark': 'radial-gradient(#333 1px, transparent 1px)',
+                    }
+                },
+            },
+        };
+    </script>
+<style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+        h1, h2, h3, .font-display {
+            font-family: 'Dela Gothic One', cursive;
+        }
+        .retro-card {
+            border: 2px solid black;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .dark .retro-card {
+            border: 2px solid white;
+        }textarea::-webkit-scrollbar {
+            width: 12px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-left: 2px solid black;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #000;
+            border: 2px solid black;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-gray-900 dark:text-gray-100 min-h-screen bg-[size:20px_20px] bg-dot-pattern dark:bg-dot-pattern-dark transition-colors duration-300">
+<nav class="sticky top-0 z-50 bg-surface-light dark:bg-surface-dark border-b-2 border-black dark:border-white px-6 py-4 flex justify-between items-center shadow-md">
+<div class="flex items-center gap-2">
+<div class="bg-primary text-white p-1 rounded-full">
+<span class="material-icons-outlined text-yellow-400">bolt</span>
+</div>
+<span class="font-display text-xl tracking-tighter">FUKUOKA STAGE <span class="text-xs font-sans font-normal opacity-70 ml-1">DASHBOARD</span></span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors">
+<span class="material-icons-outlined">notifications</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-accent border-2 border-black overflow-hidden">
+<img alt="User Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7GizNtGD3pYt0kL0UMILIE_iUEDJSzODcprvt1l3YCxJCWTgIxuCRY7F-gCGoJlHUdX26itBYgJZd1gy2cBmXJSwDsi9FYuotAsG-GZIWA22YM3lgqMqcbhawxHO7Jsf_qjXNif2UeUxhxE0Z2LEv6NvieFSjoEqAOLVJVCUWKR-7BlBmyHPd6-cXWICRFw9fndIlLGffGwx4tbNXs6qHrkklLubnFP_4JWIJFHa_fuX13Iqjgx7sczhpkvvB6RREwCGD5E-VmymI"/>
+</div>
+</div>
+</nav>
+<div class="max-w-5xl mx-auto px-4 py-8">
+<div class="mb-8">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+<div>
+<h1 class="text-3xl md:text-4xl mb-2">EVENT CREATION</h1>
+<p class="text-gray-600 dark:text-gray-400 font-bold">New Performance: "Dawn Coffee (夜明けのコーヒー)"</p>
+</div>
+<div class="flex items-center gap-2">
+<span class="bg-gray-200 dark:bg-zinc-800 px-3 py-1 rounded border border-black dark:border-gray-600 text-sm font-bold text-gray-500">Draft</span>
+<button class="bg-white dark:bg-zinc-800 text-black dark:text-white border-2 border-black dark:border-white px-4 py-2 rounded font-bold shadow-retro dark:shadow-retro-dark hover:translate-y-[-2px] hover:shadow-retro-hover transition-all text-sm">
+                        Preview
+                    </button>
+</div>
+</div>
+<div class="relative w-full h-12 flex items-center justify-between font-bold text-sm md:text-base">
+<div class="absolute top-1/2 left-0 w-full h-1 bg-gray-300 dark:bg-zinc-700 -z-10 -translate-y-1/2"></div>
+<div class="flex flex-col items-center gap-1 group cursor-pointer">
+<div class="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center border-2 border-black dark:border-white z-10">
+<span class="material-icons-outlined text-sm">check</span>
+</div>
+<span class="text-xs hidden md:block opacity-50">Basics</span>
+</div>
+<div class="flex flex-col items-center gap-1 group cursor-pointer">
+<div class="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center border-2 border-black dark:border-white z-10">
+<span class="material-icons-outlined text-sm">check</span>
+</div>
+<span class="text-xs hidden md:block opacity-50">Schedule</span>
+</div>
+<div class="flex flex-col items-center gap-1 group cursor-pointer">
+<div class="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center border-2 border-black dark:border-white z-10">
+<span class="material-icons-outlined text-sm">check</span>
+</div>
+<span class="text-xs hidden md:block opacity-50">Media</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="w-10 h-10 bg-accent text-black rounded-full flex items-center justify-center border-2 border-black z-10 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                        4
+                    </div>
+<span class="text-xs font-bold bg-white dark:bg-black px-1 z-10">Details &amp; Publish</span>
+</div>
+</div>
+</div>
+<form class="space-y-8" onsubmit="event.preventDefault();">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="md:col-span-2 space-y-8">
+<section class="bg-surface-light dark:bg-surface-dark border-2 border-black dark:border-gray-500 rounded-xl p-6 shadow-retro dark:shadow-none">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-icons-outlined bg-highlight text-black p-1 rounded border border-black">description</span>
+<h2 class="text-xl font-bold">Event Description</h2>
+</div>
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-bold mb-1">Catchphrase (Short)</label>
+<input class="w-full bg-white dark:bg-zinc-900 border-2 border-black dark:border-gray-600 rounded p-3 focus:outline-none focus:ring-2 focus:ring-accent font-bold" type="text" value="福岡の演劇シーンを、もっとポップに。"/>
+</div>
+<div>
+<label class="block text-sm font-bold mb-1">Full Introduction</label>
+<textarea class="w-full bg-white dark:bg-zinc-900 border-2 border-black dark:border-gray-600 rounded p-3 focus:outline-none focus:ring-2 focus:ring-accent resize-y text-sm leading-relaxed" placeholder="Write a compelling description of the performance..." rows="8">今週末、あなたの心揺さぶる1ステージを見つけよう。
+劇団〇〇が送る、心温まるヒューマンドラマ。
+ある冬の日の喫茶店を舞台に、偶然居合わせた5人の男女が織りなす物語。
+コーヒーの香りと共に、解きほぐされていくそれぞれの「秘密」。
+ラスト10分、あなたはきっと涙する。</textarea>
+</div>
+</div>
+</section>
+<section class="bg-surface-light dark:bg-surface-dark border-2 border-black dark:border-gray-500 rounded-xl p-6 shadow-retro dark:shadow-none relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+<span class="material-icons-outlined text-6xl rotate-12">groups</span>
+</div>
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-2">
+<span class="material-icons-outlined bg-secondary text-white p-1 rounded border border-black">face</span>
+<h2 class="text-xl font-bold">Cast &amp; Creative</h2>
+</div>
+<button class="text-xs font-bold border-b-2 border-black hover:text-accent transition-colors">Switch to JSON View</button>
+</div>
+<div class="space-y-4">
+<div class="flex gap-4 items-start bg-gray-50 dark:bg-zinc-800 p-4 rounded-lg border border-gray-300 dark:border-gray-600 group hover:border-black dark:hover:border-white transition-colors">
+<div class="cursor-move text-gray-400 pt-2">
+<span class="material-icons-outlined">drag_indicator</span>
+</div>
+<div class="w-16 h-16 bg-gray-200 rounded-full border border-black overflow-hidden flex-shrink-0">
+<img alt="Cast" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYL3o82yXDdxAfLX2ZhESE9zARcTJTijEWYM-dUKR9DYxlBEtPkl4zgZGqSfZ7b3n5Cgy3k2VuEYzSpGqsg6FUeMIYJYktyPGd6_3wJ3ODX78zW2u7wn-Edm-pfjHbV4FJS0-SrcU5MyETuIAlKvHRoHpoV-OVAtiFafdQbRnwGC1Cq-zOI1qTqUztRCgxaM_l-VUKDjExNjWYGtoJe8UMi9b5ODrLcb-6Rd-jbNHVu0ugq-KnRA_1i8w-prBGgkgThNpWZsyynnet"/>
+</div>
+<div class="flex-grow grid grid-cols-2 gap-4">
+<div>
+<label class="block text-xs font-bold text-gray-500 mb-1">Name</label>
+<input class="w-full bg-white dark:bg-zinc-900 border border-black rounded px-2 py-1 text-sm" type="text" value="田中 健"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-gray-500 mb-1">Role</label>
+<input class="w-full bg-white dark:bg-zinc-900 border border-black rounded px-2 py-1 text-sm" type="text" value="Master"/>
+</div>
+<div class="col-span-2">
+<label class="block text-xs font-bold text-gray-500 mb-1">Image URL</label>
+<input class="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-600" type="text" value="/assets/cast/tanaka_ken.jpg"/>
+</div>
+</div>
+<button class="text-gray-400 hover:text-red-500 pt-2">
+<span class="material-icons-outlined">delete</span>
+</button>
+</div>
+<div class="flex gap-4 items-start bg-gray-50 dark:bg-zinc-800 p-4 rounded-lg border border-gray-300 dark:border-gray-600 group hover:border-black dark:hover:border-white transition-colors">
+<div class="cursor-move text-gray-400 pt-2">
+<span class="material-icons-outlined">drag_indicator</span>
+</div>
+<div class="w-16 h-16 bg-gray-200 rounded-full border border-black overflow-hidden flex-shrink-0">
+<img alt="Cast" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnEOyh5AJIivfUT14XQJT7LyQcbm3AMOqSFBBVutrhihxf6Gh9Kzuus2p_gxklwIbMRqa7WtzCiGIxjzbhCGbOVszPCTNn86sfYn9tp00JkqbXHNfq66B5tIMGWMsBA3r4UK6KWbmpaow71xizWuModImx9H9mp79Q-WC7m_8D3wXSXUGDjrA46A8DV4KG9ECZkeMPE6_2FVMDebB_54dUXnBrM8ml_P9wOAY36BGoFGAc-Rj2_Oiuc0wByy27648Za06BLcrU5Pqy"/>
+</div>
+<div class="flex-grow grid grid-cols-2 gap-4">
+<div>
+<label class="block text-xs font-bold text-gray-500 mb-1">Name</label>
+<input class="w-full bg-white dark:bg-zinc-900 border border-black rounded px-2 py-1 text-sm" type="text" value="佐藤 愛"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-gray-500 mb-1">Role</label>
+<input class="w-full bg-white dark:bg-zinc-900 border border-black rounded px-2 py-1 text-sm" type="text" value="Customer A"/>
+</div>
+<div class="col-span-2">
+<label class="block text-xs font-bold text-gray-500 mb-1">Image URL</label>
+<input class="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-600" type="text" value="/assets/cast/sato_ai.jpg"/>
+</div>
+</div>
+<button class="text-gray-400 hover:text-red-500 pt-2">
+<span class="material-icons-outlined">delete</span>
+</button>
+</div>
+</div>
+<button class="w-full mt-4 border-2 border-dashed border-gray-400 dark:border-gray-600 rounded-lg p-3 text-gray-500 dark:text-gray-400 font-bold hover:bg-gray-50 dark:hover:bg-zinc-800 hover:border-black dark:hover:border-white transition-all flex items-center justify-center gap-2" type="button">
+<span class="material-icons-outlined">add_circle</span> Add Cast Member
+                        </button>
+</section>
+</div>
+<div class="md:col-span-1 space-y-8">
+<section class="bg-surface-light dark:bg-surface-dark border-2 border-black dark:border-gray-500 rounded-xl p-6 shadow-retro dark:shadow-none">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-icons-outlined bg-accent text-black p-1 rounded border border-black">local_offer</span>
+<h2 class="text-xl font-bold">Ticketing</h2>
+</div>
+<div class="space-y-4">
+<div>
+<label class="block text-xs font-bold mb-1 uppercase tracking-wide">General Price (¥)</label>
+<div class="relative">
+<input class="w-full bg-white dark:bg-zinc-900 border-2 border-black dark:border-gray-600 rounded p-2 pl-8 font-mono font-bold" type="number" value="3500"/>
+<span class="absolute left-3 top-2.5 text-gray-500">¥</span>
+</div>
+</div>
+<div>
+<label class="block text-xs font-bold mb-1 uppercase tracking-wide">Student Price (¥)</label>
+<div class="relative">
+<input class="w-full bg-white dark:bg-zinc-900 border-2 border-black dark:border-gray-600 rounded p-2 pl-8 font-mono font-bold" type="number" value="2000"/>
+<span class="absolute left-3 top-2.5 text-gray-500">¥</span>
+</div>
+</div>
+<hr class="border-gray-200 dark:border-zinc-700"/>
+<div>
+<label class="block text-xs font-bold mb-1 uppercase tracking-wide">Ticket URL</label>
+<div class="flex">
+<span class="inline-flex items-center px-3 rounded-l border-r-0 border-2 border-black bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 text-sm">
+<span class="material-icons-outlined text-sm">link</span>
+</span>
+<input class="w-full bg-white dark:bg-zinc-900 border-2 border-black dark:border-gray-600 rounded-r p-2 text-sm text-blue-600 dark:text-blue-400 underline" type="url" value="https://teket.jp/example"/>
+</div>
+</div>
+</div>
+<div class="mt-6">
+<label class="block text-xs font-bold mb-2 uppercase tracking-wide">Tags</label>
+<div class="flex flex-wrap gap-2">
+<label class="cursor-pointer">
+<input checked="" class="peer sr-only" type="checkbox"/>
+<span class="px-3 py-1 rounded-full border border-black bg-white text-xs font-bold peer-checked:bg-secondary peer-checked:text-white transition-colors">#HumanDrama</span>
+</label>
+<label class="cursor-pointer">
+<input checked="" class="peer sr-only" type="checkbox"/>
+<span class="px-3 py-1 rounded-full border border-black bg-white text-xs font-bold peer-checked:bg-secondary peer-checked:text-white transition-colors">#Cafe</span>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" type="checkbox"/>
+<span class="px-3 py-1 rounded-full border border-black bg-white text-xs font-bold peer-checked:bg-secondary peer-checked:text-white transition-colors">#Comedy</span>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" type="checkbox"/>
+<span class="px-3 py-1 rounded-full border border-black bg-white text-xs font-bold peer-checked:bg-secondary peer-checked:text-white transition-colors">#Suspense</span>
+</label>
+<button class="px-3 py-1 rounded-full border border-dashed border-gray-400 text-gray-400 text-xs font-bold hover:border-black hover:text-black transition-colors">+ Add</button>
+</div>
+</div>
+</section>
+<section class="bg-surface-light dark:bg-surface-dark border-2 border-black dark:border-gray-500 rounded-xl p-6 shadow-retro dark:shadow-none">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-icons-outlined bg-black text-white p-1 rounded border border-black">settings</span>
+<h2 class="text-xl font-bold">Publishing</h2>
+</div>
+<div class="mb-6">
+<label class="block text-xs font-bold mb-1 uppercase tracking-wide">URL Slug</label>
+<input class="w-full bg-white dark:bg-zinc-900 border-2 border-black dark:border-gray-600 rounded p-2 text-sm" type="text" value="dawn-coffee-2025"/>
+<div class="mt-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-400 rounded p-2 flex gap-2 items-start">
+<span class="material-icons-outlined text-yellow-600 dark:text-yellow-400 text-sm mt-0.5">warning</span>
+<p class="text-xs text-yellow-800 dark:text-yellow-200 leading-tight">
+                                    Changing the slug after publishing will create a <strong>301 Redirect</strong> automatically. Existing links will still work.
+                                </p>
+</div>
+</div>
+<div class="flex items-center justify-between bg-gray-100 dark:bg-zinc-800 p-4 rounded-lg border border-gray-200 dark:border-zinc-700">
+<div>
+<span class="block font-bold text-sm">Publish Status</span>
+<span class="text-xs text-gray-500 dark:text-gray-400">Visible to public</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-black dark:peer-focus:ring-white rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-500 border-2 border-black"></div>
+</label>
+</div>
+<p class="text-[10px] text-gray-400 mt-2 text-center">
+                            *Cannot publish while theater account is "Pending Review"
+                        </p>
+</section>
+</div>
+</div>
+<section class="mt-8 bg-gradient-to-r from-accent to-blue-400 dark:from-cyan-900 dark:to-blue-900 rounded-xl p-1 border-2 border-black">
+<div class="bg-white dark:bg-zinc-900 rounded-lg p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+<div class="flex-1">
+<h3 class="text-lg font-bold flex items-center gap-2">
+<span class="material-icons-outlined text-accent">campaign</span>
+                            Promote on SNS
+                        </h3>
+<p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Copy the pre-generated text below to share your new event instantly.</p>
+<div class="mt-3 bg-gray-100 dark:bg-zinc-800 p-3 rounded border border-gray-300 dark:border-gray-600 text-xs font-mono text-gray-600 dark:text-gray-300 line-clamp-2">
+                            【新作情報】劇団〇〇『夜明けのコーヒー』チケット販売開始！☕️ #福岡演劇 #FukuokaStage https://fukuoka-stage.com/events/dawn-coffee-2025
+                        </div>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center gap-2 bg-black text-white dark:bg-white dark:text-black px-4 py-2 rounded font-bold hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors shadow-md">
+<span class="material-icons-outlined text-sm">content_copy</span> Copy
+                        </button>
+<button class="flex items-center gap-2 bg-[#1DA1F2] text-white px-4 py-2 rounded font-bold hover:bg-[#0d8ddb] transition-colors shadow-md border border-black/10">
+                            X Post
+                        </button>
+</div>
+</div>
+</section>
+<div class="flex justify-between items-center pt-8 border-t-2 border-gray-200 dark:border-zinc-800 mt-8">
+<button class="font-bold text-gray-500 hover:text-black dark:hover:text-white flex items-center gap-2 transition-colors" type="button">
+<span class="material-icons-outlined">arrow_back</span> Back
+                </button>
+<div class="flex gap-4">
+<button class="px-6 py-3 rounded-lg font-bold text-gray-600 dark:text-gray-300 border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-all" type="button">
+                        Save Draft
+                    </button>
+<button class="px-8 py-3 rounded-lg bg-black dark:bg-white text-white dark:text-black font-display tracking-wide border-2 border-transparent hover:bg-secondary hover:text-white dark:hover:bg-secondary dark:hover:text-white shadow-[4px_4px_0px_0px_rgba(255,215,0,1)] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(255,215,0,1)] transition-all" type="submit">
+                        PUBLISH EVENT
+                    </button>
+</div>
+</div>
+</form>
+</div>
+<footer class="mt-20 border-t-2 border-black dark:border-white bg-white dark:bg-black py-10">
+<div class="max-w-5xl mx-auto px-4 flex flex-col items-center justify-center gap-4">
+<span class="font-display text-2xl tracking-tighter text-gray-300 dark:text-zinc-800">FUKUOKA STAGE</span>
+<p class="text-xs text-gray-400">© 2025 FUKUOKA STAGE. All rights reserved.</p>
+</div>
+</footer>
+
+</body></html>

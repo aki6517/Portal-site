@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Theater Dashboard | FUKUOKA STAGE</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&amp;family=Noto+Sans+JP:wght@400;500;700;900&amp;family=Zen+Kaku+Gothic+New:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#00E5FF", // Cyan from the reference image
+                        secondary: "#FF3366", // Pinkish Red from badges
+                        accent: "#FFCC00", // Yellow from stars/icons
+                        dark: "#1A1A1A", // Dark background
+                        "background-light": "#FFFDF5", // Creamy white from reference
+                        "background-dark": "#121212",
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#1E1E1E",
+                        "border-dark": "#2D2D2D",
+                        "border-light": "#1A1A1A", // Heavy black borders
+                    },
+                    fontFamily: {
+                        display: ['"Dela Gothic One"', 'sans-serif'],
+                        sans: ['"Zen Kaku Gothic New"', '"Noto Sans JP"', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'hard': '4px 4px 0px 0px #1A1A1A', // The retro hard shadow style
+                        'hard-sm': '2px 2px 0px 0px #1A1A1A',
+                        'hard-hover': '6px 6px 0px 0px #1A1A1A',
+                        'hard-active': '0px 0px 0px 0px #1A1A1A', // For "pressed" effect
+                        'hard-white': '4px 4px 0px 0px #FFFFFF',
+                    },
+                    backgroundImage: {
+                        'dot-pattern': 'radial-gradient(#E5E7EB 1px, transparent 1px)',
+                        'dot-pattern-dark': 'radial-gradient(#333333 1px, transparent 1px)',
+                    }
+                },
+            },
+        };
+    </script>
+<style>::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #CBD5E1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background-color: #4B5563;
+        }.btn-retro {
+            transition: all 0.1s ease-in-out;
+        }
+        .btn-retro:active {
+            transform: translate(4px, 4px);
+            box-shadow: 0px 0px 0px 0px #1A1A1A;
+        }
+        .dark .btn-retro:active {
+            box-shadow: 0px 0px 0px 0px #FFFFFF;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-sans text-gray-800 dark:text-gray-100 min-h-screen flex flex-col relative overflow-x-hidden">
+<div class="absolute inset-0 z-0 pointer-events-none bg-dot-pattern dark:bg-dot-pattern-dark bg-[size:20px_20px] opacity-50"></div>
+<nav class="sticky top-0 z-50 w-full bg-surface-light dark:bg-surface-dark border-b-4 border-border-light dark:border-gray-700">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-20 items-center">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<div class="bg-dark text-accent rounded-full p-1 border-2 border-dark dark:border-gray-200">
+<span class="material-icons-round text-2xl">bolt</span>
+</div>
+<span class="font-display text-2xl tracking-tighter uppercase text-dark dark:text-white">
+                            FUKUOKA STAGE
+                        </span>
+</div>
+<span class="hidden md:inline-block px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-xs font-bold border border-gray-300 dark:border-gray-600">THEATER DASHBOARD</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="relative p-2 text-gray-500 hover:text-dark dark:text-gray-400 dark:hover:text-white transition-colors">
+<span class="material-icons-round">notifications</span>
+<span class="absolute top-2 right-2 h-2 w-2 bg-secondary rounded-full border border-white"></span>
+</button>
+<div class="h-10 w-10 rounded-full bg-primary border-2 border-dark overflow-hidden shadow-hard-sm">
+<img alt="Profile" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAkEiVfSKAI1_C3wXL-IbIqizHnsFSh2I0eXYNZBa7VQQrnuKZ0-M46deUnXUpCyvOb5HLqv66tC3aIGV9U4mwZo4fkukkH9O2OJv3-CCJOxCLKuVh97qiUGU7HxLTEdWh1XULSzBor0UBGs9AXYOhQ2-afzqtkkt5GLiZ8MA4PeC-Dfp-4YPYcA7oexD3cbGTRJfbB18K3u9xGQtz_bpBLHUP9KF_MgGifPuZp60nEfgp1GWWVEtUy4oppQExDtVO1gUx8ziq4z3Ey"/>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<main class="relative z-10 flex-grow py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+<div>
+<h1 class="font-display text-4xl md:text-5xl text-dark dark:text-white mb-2 uppercase leading-none">
+                    Dashboard
+                </h1>
+<p class="text-gray-600 dark:text-gray-400 font-medium">劇団〇〇さんの公演管理パネルへようこそ。</p>
+</div>
+<button class="btn-retro bg-primary text-dark font-display text-lg px-8 py-3 rounded-xl border-2 border-dark shadow-hard hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-hard-hover flex items-center gap-2 group">
+<span class="material-icons-round group-hover:rotate-90 transition-transform">add</span>
+                新規公演を作成
+            </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+<div class="bg-surface-light dark:bg-surface-dark border-2 border-border-light dark:border-gray-600 rounded-xl p-6 shadow-hard relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+<div class="absolute -right-4 -top-4 bg-accent/20 w-24 h-24 rounded-full group-hover:scale-125 transition-transform"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-2 text-gray-600 dark:text-gray-400 font-bold uppercase text-sm tracking-wider">
+<span class="material-icons-round text-accent">public</span>
+                        公開中の公演
+                    </div>
+<div class="font-display text-5xl text-dark dark:text-white">
+                        03
+                    </div>
+<div class="text-xs text-gray-500 mt-2 font-mono">ACTIVE EVENTS</div>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark border-2 border-border-light dark:border-gray-600 rounded-xl p-6 shadow-hard relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+<div class="absolute -right-4 -top-4 bg-secondary/20 w-24 h-24 rounded-full group-hover:scale-125 transition-transform"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-2 text-gray-600 dark:text-gray-400 font-bold uppercase text-sm tracking-wider">
+<span class="material-icons-round text-secondary">edit_note</span>
+                        下書き
+                    </div>
+<div class="font-display text-5xl text-dark dark:text-white">
+                        02
+                    </div>
+<div class="text-xs text-gray-500 mt-2 font-mono">DRAFTS SAVED</div>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark border-2 border-border-light dark:border-gray-600 rounded-xl p-6 shadow-hard relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+<div class="absolute -right-4 -top-4 bg-primary/20 w-24 h-24 rounded-full group-hover:scale-125 transition-transform"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-2 text-gray-600 dark:text-gray-400 font-bold uppercase text-sm tracking-wider">
+<span class="material-icons-round text-primary">trending_up</span>
+                        30日間のPV
+                    </div>
+<div class="font-display text-5xl text-dark dark:text-white">
+                        1,240
+                    </div>
+<div class="text-xs text-green-500 mt-2 font-mono flex items-center gap-1">
+<span class="material-icons-round text-sm">arrow_upward</span> 12% vs last month
+                    </div>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-gray-800 p-4 rounded-xl border-2 border-dark dark:border-gray-600 shadow-hard-sm mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+<div class="relative w-full md:w-96">
+<span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-icons-round text-gray-400">search</span>
+</span>
+<input class="block w-full pl-10 pr-3 py-2 border-2 border-gray-200 dark:border-gray-600 rounded-lg leading-5 bg-gray-50 dark:bg-gray-900 placeholder-gray-500 focus:outline-none focus:bg-white focus:ring-0 focus:border-dark dark:focus:border-primary transition duration-150 ease-in-out sm:text-sm font-medium" placeholder="キーワード検索..." type="text"/>
+</div>
+<div class="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+<button class="whitespace-nowrap px-4 py-2 rounded-lg bg-dark text-white text-sm font-bold border-2 border-dark hover:bg-gray-800 transition">すべて</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-lg bg-transparent text-gray-600 dark:text-gray-300 text-sm font-bold border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition">公開中</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-lg bg-transparent text-gray-600 dark:text-gray-300 text-sm font-bold border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition">下書き</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-lg bg-transparent text-gray-600 dark:text-gray-300 text-sm font-bold border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition">終了</button>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark border-2 border-dark dark:border-gray-600 rounded-xl shadow-hard overflow-hidden">
+<div class="overflow-x-auto">
+<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+<thead class="bg-gray-50 dark:bg-gray-800">
+<tr>
+<th class="px-6 py-4 text-left text-xs font-black text-gray-500 dark:text-gray-300 uppercase tracking-wider font-display" scope="col">Status</th>
+<th class="px-6 py-4 text-left text-xs font-black text-gray-500 dark:text-gray-300 uppercase tracking-wider font-display" scope="col">Event Name</th>
+<th class="px-6 py-4 text-left text-xs font-black text-gray-500 dark:text-gray-300 uppercase tracking-wider font-display" scope="col">Date</th>
+<th class="px-6 py-4 text-left text-xs font-black text-gray-500 dark:text-gray-300 uppercase tracking-wider font-display" scope="col">Stats (PV)</th>
+<th class="px-6 py-4 text-right text-xs font-black text-gray-500 dark:text-gray-300 uppercase tracking-wider font-display" scope="col">Action</th>
+</tr>
+</thead>
+<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+<tr class="hover:bg-yellow-50 dark:hover:bg-gray-800 transition-colors">
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-primary text-dark border border-dark">
+                                    公開中
+                                </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center">
+<div class="flex-shrink-0 h-12 w-16 bg-gray-200 rounded-md border border-dark overflow-hidden">
+<img alt="夜明けのコーヒー" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1CQiRXna2onDSP2ViA0wMstv6wvGdcrUN2_KYnHNBgdgc7-tsxpacnW8JNG3RhpmzkZe9Is0m0w7DPhqvRMNrXExwYRlg0dcJthZrn_fDeSEBLL8HtBK25SA8RSdITVP6nFCMHPQUR4UFNyglYoWEm5cgBqeGj7wY-KnBMitkuZ4k_sWktvnqRRvgXjgdPfnfAU41jotG9ig-ysrOKLa10Vek6VK1vndjDe8qgQ8jRFBGmcz7HT1bq4nha7d8CDTKYMafwZ7jspKd"/>
+</div>
+<div class="ml-4">
+<div class="text-sm font-bold text-gray-900 dark:text-white">夜明けのコーヒー</div>
+<div class="text-xs text-gray-500 dark:text-gray-400">コメディ / 学生歓迎</div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 font-mono">
+                                2025.05.20 - 05.22
+                            </td>
+<td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white font-mono">
+                                842
+                            </td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<button class="text-gray-400 hover:text-dark dark:hover:text-white mx-2">
+<span class="material-icons-round text-lg">edit</span>
+</button>
+<button class="text-gray-400 hover:text-dark dark:hover:text-white mx-2">
+<span class="material-icons-round text-lg">content_copy</span>
+</button>
+<button class="text-gray-400 hover:text-secondary mx-2">
+<span class="material-icons-round text-lg">delete</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-yellow-50 dark:hover:bg-gray-800 transition-colors">
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-accent text-dark border border-dark">
+                                    公開中
+                                </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center">
+<div class="flex-shrink-0 h-12 w-16 bg-gray-200 rounded-md border border-dark overflow-hidden">
+<img alt="青とサイダー" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAPlsYP08dLIs3jr_9WeTLMJJZR0GmhyCQek-3XUz6oEN2TWaN16O_xnNlLF0i0AR5j1IE8wRPJ7LphMFO58mIzndzPL4Zeg1lJbdqG-Z400iRmwBtDU2xx0X-9bR6wOQNm7MP0Iu1GIRGGM7pHOmba2lDLHIY3wtMIbBNmY-jC2IZl4hD3MoCDpWuk0h7o5AnOilOO63RurU0jxQJ5slt85r_JQTl3jozxrN5015Ga3g-W8g0rNunjoHkqd4MQFpr6P5OWUPkH0uJF"/>
+</div>
+<div class="ml-4">
+<div class="text-sm font-bold text-gray-900 dark:text-white">青とサイダー</div>
+<div class="text-xs text-gray-500 dark:text-gray-400">青春 / 会話劇</div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 font-mono">
+                                2025.06.01
+                            </td>
+<td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white font-mono">
+                                320
+                            </td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<button class="text-gray-400 hover:text-dark dark:hover:text-white mx-2">
+<span class="material-icons-round text-lg">edit</span>
+</button>
+<button class="text-gray-400 hover:text-dark dark:hover:text-white mx-2">
+<span class="material-icons-round text-lg">content_copy</span>
+</button>
+<button class="text-gray-400 hover:text-secondary mx-2">
+<span class="material-icons-round text-lg">delete</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-yellow-50 dark:hover:bg-gray-800 transition-colors">
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-dark dark:border-gray-500">
+                                    下書き
+                                </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center">
+<div class="flex-shrink-0 h-12 w-16 bg-gray-100 rounded-md border border-dashed border-dark dark:border-gray-500 flex items-center justify-center">
+<span class="material-icons-round text-gray-400 text-sm">image</span>
+</div>
+<div class="ml-4">
+<div class="text-sm font-bold text-gray-900 dark:text-white">機械仕掛けのララバイ</div>
+<div class="text-xs text-gray-500 dark:text-gray-400">SF / 音楽劇</div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 font-mono">
+                                2025.06.10
+                            </td>
+<td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white font-mono">
+                                -
+                            </td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<button class="text-gray-400 hover:text-dark dark:hover:text-white mx-2">
+<span class="material-icons-round text-lg">edit</span>
+</button>
+<button class="text-gray-400 hover:text-dark dark:hover:text-white mx-2">
+<span class="material-icons-round text-lg">content_copy</span>
+</button>
+<button class="text-gray-400 hover:text-secondary mx-2">
+<span class="material-icons-round text-lg">delete</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-yellow-50 dark:hover:bg-gray-800 transition-colors">
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-dark dark:border-gray-500">
+                                    下書き
+                                </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center">
+<div class="flex-shrink-0 h-12 w-16 bg-gray-100 rounded-md border border-dashed border-dark dark:border-gray-500 flex items-center justify-center">
+<span class="material-icons-round text-gray-400 text-sm">image</span>
+</div>
+<div class="ml-4">
+<div class="text-sm font-bold text-gray-900 dark:text-white">新作コメディ（仮）</div>
+<div class="text-xs text-gray-500 dark:text-gray-400">未設定</div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 font-mono">
+                                未定
+                            </td>
+<td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white font-mono">
+                                -
+                            </td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<button class="text-gray-400 hover:text-dark dark:hover:text-white mx-2">
+<span class="material-icons-round text-lg">edit</span>
+</button>
+<button class="text-gray-400 hover:text-dark dark:hover:text-white mx-2">
+<span class="material-icons-round text-lg">content_copy</span>
+</button>
+<button class="text-gray-400 hover:text-secondary mx-2">
+<span class="material-icons-round text-lg">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="bg-gray-50 dark:bg-gray-800 px-6 py-4 border-t-2 border-dark dark:border-gray-600 flex items-center justify-between">
+<div class="text-sm text-gray-600 dark:text-gray-400">
+                    Showing <span class="font-bold">1</span> to <span class="font-bold">4</span> of <span class="font-bold">12</span> results
+                </div>
+<div class="flex gap-2">
+<button class="px-3 py-1 rounded border-2 border-transparent hover:border-dark dark:hover:border-gray-400 text-gray-600 dark:text-gray-400 text-sm font-bold transition">Prev</button>
+<button class="px-3 py-1 rounded bg-dark dark:bg-primary text-white dark:text-dark border-2 border-dark dark:border-primary text-sm font-bold shadow-hard-sm">1</button>
+<button class="px-3 py-1 rounded border-2 border-transparent hover:border-dark dark:hover:border-gray-400 text-gray-600 dark:text-gray-400 text-sm font-bold transition">2</button>
+<button class="px-3 py-1 rounded border-2 border-transparent hover:border-dark dark:hover:border-gray-400 text-gray-600 dark:text-gray-400 text-sm font-bold transition">3</button>
+<button class="px-3 py-1 rounded border-2 border-transparent hover:border-dark dark:hover:border-gray-400 text-gray-600 dark:text-gray-400 text-sm font-bold transition">Next</button>
+</div>
+</div>
+</div>
+</main>
+<footer class="bg-dark text-white py-12 border-t-4 border-primary mt-auto relative z-10">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+<div class="flex justify-center mb-6">
+<div class="bg-dark text-accent rounded-full p-2 border-2 border-white">
+<span class="material-icons-round text-3xl">bolt</span>
+</div>
+</div>
+<h2 class="font-display text-2xl mb-6 tracking-widest">FUKUOKA STAGE</h2>
+<div class="flex justify-center gap-8 mb-8 text-sm font-bold text-gray-400">
+<a class="hover:text-primary transition" href="#">ヘルプ</a>
+<a class="hover:text-primary transition" href="#">利用規約</a>
+<a class="hover:text-primary transition" href="#">プライバシーポリシー</a>
+<a class="hover:text-primary transition" href="#">お問い合わせ</a>
+</div>
+<p class="text-xs text-gray-600">© 2025 FUKUOKA STAGE.</p>
+</div>
+</footer>
+
+</body></html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Event Creation Dashboard - Fukuoka Stage</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&amp;family=Noto+Sans+JP:wght@400;500;700;900&amp;family=Zen+Maru+Gothic:wght@500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#FF2E63", // Pop Pink
+                        secondary: "#00E5FF", // Pop Cyan
+                        accent: "#FFD740", // Pop Yellow
+                        "background-light": "#FDFBF7",
+                        "background-dark": "#1A1A1A",
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#262626",
+                    },
+                    fontFamily: {
+                        display: ["'Montserrat'", "'Zen Maru Gothic'", "sans-serif"],
+                        body: ["'Noto Sans JP'", "sans-serif"],
+                    },
+                    boxShadow: {
+                        'pop': '6px 6px 0px 0px rgba(0,0,0,1)',
+                        'pop-hover': '3px 3px 0px 0px rgba(0,0,0,1)',
+                        'pop-sm': '3px 3px 0px 0px rgba(0,0,0,1)',
+                        'card': '8px 8px 0px 0px rgba(0,0,0,1)',
+                    },
+                    backgroundImage: {
+                        'dot-pattern': 'radial-gradient(#E2E8F0 1.5px, transparent 1.5px)',
+                        'dot-pattern-dark': 'radial-gradient(#404040 1.5px, transparent 1.5px)',
+                    }
+                },
+            },
+        };
+    </script>
+<style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+        .font-display {
+            font-family: 'Montserrat', 'Zen Maru Gothic', sans-serif;
+        }.bg-dots {
+            background-size: 24px 24px;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark bg-dots bg-dot-pattern dark:bg-dot-pattern-dark min-h-screen flex flex-col text-neutral-900 dark:text-white transition-colors duration-300">
+<nav class="sticky top-0 z-50 bg-white dark:bg-surface-dark border-b-4 border-black w-full px-6 py-4 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<div class="bg-black text-secondary p-1 rounded-full">
+<span class="material-icons-round text-2xl">bolt</span>
+</div>
+<span class="font-display font-black text-2xl tracking-tighter uppercase italic">FUKUOKA STAGE</span>
+<span class="bg-black text-white px-2 py-0.5 text-xs font-bold rounded ml-2 uppercase">Admin</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 font-bold hover:text-primary transition-colors">
+<span class="material-icons-round">help_outline</span>
+<span class="hidden sm:inline">Guide</span>
+</button>
+<div class="h-10 w-10 bg-primary border-2 border-black rounded-full overflow-hidden shadow-pop-sm">
+<img alt="User Profile" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4mlhrQWkr9ewPHyhNtonvQGnMbU4X_4ZCJDL1ciIicn_hBh40UQijs55TdrU-gGzxA3IrF1LXCRmQYkuAobQFexTEY0dqnNofntPwnQpN2jKBCJ9VL85-6tAoPiyw4eJcSrBHIuyuuMCN9M5B7CIXg1S7vYnlNkY01ZikfyMBKJUi1vvwTvvvrCxXnCXnpHDVMUJ9-oJ0Ocb0DXomYvBkqJbbMygYsECerBn4AvSc5VqQsJeFNSxcNV6q_bdp02NJMaXu1m-WEnor"/>
+</div>
+</div>
+</nav>
+<main class="flex-grow container mx-auto px-4 py-8 md:py-12 max-w-5xl">
+<header class="mb-10 text-center md:text-left">
+<h1 class="font-display font-black text-4xl md:text-5xl mb-2 text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary" style="-webkit-text-stroke: 1.5px black;">
+                NEW EVENT
+            </h1>
+<p class="text-neutral-600 dark:text-neutral-400 font-bold text-lg">Create a new performance page to share with the world.</p>
+</header>
+<div class="bg-surface-light dark:bg-surface-dark border-4 border-black rounded-[2rem] shadow-card p-6 md:p-10 relative overflow-hidden">
+<div class="flex items-center justify-between mb-12 relative z-10">
+<div class="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 dark:bg-neutral-700 -z-10"></div>
+<div class="absolute left-0 top-1/2 transform -translate-y-1/2 w-1/3 h-1 bg-primary -z-10"></div> 
+<div class="flex flex-col items-center gap-2">
+<div class="w-10 h-10 rounded-full bg-primary border-2 border-black flex items-center justify-center text-white font-bold shadow-pop-sm z-10">1</div>
+<span class="text-xs font-bold uppercase tracking-wider bg-white dark:bg-surface-dark px-2 border-2 border-black rounded-full">Media &amp; Basics</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-10 h-10 rounded-full bg-white dark:bg-neutral-600 border-2 border-black flex items-center justify-center text-black dark:text-neutral-300 font-bold z-10">2</div>
+<span class="text-xs font-bold uppercase tracking-wider text-neutral-400 bg-white dark:bg-surface-dark px-2">Details</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-10 h-10 rounded-full bg-white dark:bg-neutral-600 border-2 border-black flex items-center justify-center text-black dark:text-neutral-300 font-bold z-10">3</div>
+<span class="text-xs font-bold uppercase tracking-wider text-neutral-400 bg-white dark:bg-surface-dark px-2">Schedule</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-10 h-10 rounded-full bg-white dark:bg-neutral-600 border-2 border-black flex items-center justify-center text-black dark:text-neutral-300 font-bold z-10">4</div>
+<span class="text-xs font-bold uppercase tracking-wider text-neutral-400 bg-white dark:bg-surface-dark px-2">Review</span>
+</div>
+</div>
+<form action="#" class="space-y-12">
+<section>
+<div class="flex items-center gap-3 mb-6">
+<span class="bg-black text-primary px-3 py-1 rounded font-black font-display text-xl skew-x-[-10deg]">STEP 01</span>
+<h2 class="text-2xl font-bold font-display">Flyer &amp; Visuals</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+<div class="md:col-span-7">
+<div class="relative w-full h-80 border-4 border-dashed border-neutral-300 dark:border-neutral-600 rounded-2xl bg-gray-50 dark:bg-neutral-800 flex flex-col items-center justify-center hover:border-primary hover:bg-red-50 dark:hover:bg-neutral-700 transition-all cursor-pointer group">
+<input class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" type="file"/>
+<div class="bg-white dark:bg-neutral-700 p-4 rounded-full shadow-pop-sm border-2 border-black mb-4 group-hover:scale-110 transition-transform">
+<span class="material-icons-round text-4xl text-black dark:text-white">cloud_upload</span>
+</div>
+<p class="font-bold text-lg text-neutral-700 dark:text-neutral-300">Drag &amp; Drop Flyer Here</p>
+<p class="text-sm text-neutral-500 mt-1">or click to browse files (JPG, PNG, WEBP)</p>
+</div>
+</div>
+<div class="md:col-span-5 flex flex-col gap-4">
+<div class="bg-white dark:bg-neutral-800 border-2 border-black rounded-xl p-4 shadow-pop-sm h-full flex flex-col">
+<div class="flex justify-between items-center mb-3">
+<h3 class="font-bold text-sm uppercase tracking-wide">Analysis</h3>
+<span class="bg-accent text-black text-xs font-black px-2 py-1 border border-black rounded shadow-[2px_2px_0px_0px_#000]">AI CONFIDENCE: 92%</span>
+</div>
+<div class="flex-grow flex items-center justify-center bg-gray-100 dark:bg-neutral-900 rounded border border-neutral-200 dark:border-neutral-700 overflow-hidden relative">
+<img alt="Flyer Preview" class="object-cover w-full h-full opacity-50 blur-sm scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQdWjcEd2XTGo_OVnAJrYe5kqZyYlku7UMkAOn9WmnYNwyYljSuDTL-40R1sU-ZOIhxwfl_XI8XF0BtOsUWL826ozCk5xJjrInE9NTYvjeJzxSf5zGk_BYhZKscy-i76yqbwF6YXxy6pxFlU7DDGDLFdxP3uDtgSa7ZYQoM9x5vmc4bVpekRNxKx0KFWBWfq7Qy2KSy6sG9hxSjj7YFMYv3W6GoQ_tgcghobX1HiHRzftqGdkAbqp4I-u1ojpb81cpxBXX-OtsE5AJ"/>
+<div class="absolute inset-0 flex items-center justify-center bg-black/20">
+<p class="text-white font-bold drop-shadow-md">Flyer Preview</p>
+</div>
+</div>
+<div class="mt-4 space-y-2">
+<div class="flex items-center gap-2 text-sm text-green-600 font-bold">
+<span class="material-icons-round text-base">check_circle</span>
+                                        Date detected: 2024.05.20
+                                    </div>
+<div class="flex items-center gap-2 text-sm text-green-600 font-bold">
+<span class="material-icons-round text-base">check_circle</span>
+                                        Venue: Fukuoka City Theater
+                                    </div>
+<button class="text-xs underline text-neutral-500 hover:text-black dark:hover:text-white text-right w-full mt-1" type="button">Edit Scanned Data</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<hr class="border-t-2 border-dashed border-neutral-300 dark:border-neutral-700"/>
+<section>
+<div class="flex items-center gap-3 mb-6">
+<span class="bg-black text-secondary px-3 py-1 rounded font-black font-display text-xl skew-x-[-10deg]">STEP 02</span>
+<h2 class="text-2xl font-bold font-display">Basic Information</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="col-span-1 md:col-span-2">
+<label class="block font-bold mb-2 text-lg" for="title">Event Title <span class="text-primary">*</span></label>
+<input class="w-full bg-white dark:bg-neutral-800 border-2 border-black rounded-lg p-4 font-bold text-lg focus:ring-4 focus:ring-primary/30 focus:border-black outline-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] focus:shadow-pop-sm transition-all placeholder-neutral-400" id="title" placeholder="e.g., FUKUOKA THEATER LIFE - The Beginning" type="text"/>
+</div>
+<div class="col-span-1">
+<label class="block font-bold mb-2" for="category">Category <span class="text-primary">*</span></label>
+<div class="relative">
+<select class="w-full bg-white dark:bg-neutral-800 border-2 border-black rounded-lg p-4 font-bold appearance-none focus:ring-4 focus:ring-secondary/30 focus:border-black outline-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] focus:shadow-pop-sm transition-all cursor-pointer" id="category">
+<option disabled="" selected="" value="">Select a category...</option>
+<option value="theater">🎭 Theater (演劇)</option>
+<option value="musical">🎤 Musical (ミュージカル)</option>
+<option value="dance">💃 Dance (ダンス)</option>
+<option value="comedy">🤣 Comedy (コメディ)</option>
+<option value="traditional">👺 Traditional (古典・時代劇)</option>
+</select>
+<div class="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
+<span class="material-icons-round text-2xl">expand_more</span>
+</div>
+</div>
+</div>
+<div class="col-span-1">
+<label class="block font-bold mb-2" for="slug">URL Slug <span class="text-primary">*</span></label>
+<div class="flex items-stretch">
+<span class="bg-gray-200 dark:bg-neutral-700 border-2 border-black border-r-0 rounded-l-lg px-4 flex items-center font-mono text-sm text-neutral-600 dark:text-neutral-400 font-bold">/events/</span>
+<input class="flex-grow bg-white dark:bg-neutral-800 border-2 border-black rounded-r-lg p-4 font-mono font-bold focus:ring-4 focus:ring-secondary/30 focus:border-black outline-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] focus:shadow-pop-sm transition-all" id="slug" placeholder="my-awesome-event" type="text"/>
+</div>
+<p class="mt-2 text-xs font-mono text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
+<span class="material-icons-round text-sm">visibility</span>
+                                Preview: <span class="text-primary hover:underline cursor-pointer">fukuoka-stage.com/events/theater/my-awesome-event</span>
+</p>
+</div>
+<div class="col-span-1 md:col-span-2">
+<label class="block font-bold mb-2" for="catchphrase">Catchphrase</label>
+<input class="w-full bg-white dark:bg-neutral-800 border-2 border-black rounded-lg p-4 font-bold focus:ring-4 focus:ring-primary/30 focus:border-black outline-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] focus:shadow-pop-sm transition-all" id="catchphrase" placeholder="Make the audience feel something new." type="text"/>
+</div>
+</div>
+</section>
+<div class="flex flex-col-reverse md:flex-row justify-between items-center pt-8 border-t-4 border-black gap-4">
+<button class="w-full md:w-auto px-8 py-4 font-bold rounded-xl border-2 border-transparent hover:border-black hover:bg-gray-100 dark:hover:bg-neutral-700 text-neutral-500 transition-all" type="button">
+                        Save as Draft
+                    </button>
+<button class="w-full md:w-auto px-10 py-4 bg-primary text-white text-lg font-black tracking-wide rounded-xl border-2 border-black shadow-pop hover:translate-y-[2px] hover:translate-x-[2px] hover:shadow-pop-hover active:translate-y-[4px] active:translate-x-[4px] active:shadow-none transition-all flex items-center justify-center gap-2 group" type="submit">
+                        NEXT STEP
+                        <span class="material-icons-round group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</form>
+</div>
+<div class="mt-8 text-center flex justify-center gap-6 text-sm font-bold text-neutral-400">
+<a class="hover:text-black dark:hover:text-white transition-colors" href="#">Help Center</a>
+<a class="hover:text-black dark:hover:text-white transition-colors" href="#">Image Guidelines</a>
+<a class="hover:text-black dark:hover:text-white transition-colors" href="#">Terms of Service</a>
+</div>
+</main>
+<div class="fixed top-1/4 left-10 w-16 h-16 bg-accent border-2 border-black rounded-full opacity-20 hidden xl:block -z-10 animate-bounce" style="animation-duration: 3s;"></div>
+<div class="fixed bottom-1/4 right-10 w-24 h-24 bg-secondary border-2 border-black opacity-20 hidden xl:block -z-10 rotate-12"></div>
+<script>
+        const titleInput = document.getElementById('title');
+        const slugInput = document.getElementById('slug');
+        const categorySelect = document.getElementById('category');
+        const previewText = document.querySelector('.text-primary.hover\\:underline');
+        function updateSlug() {
+            const title = titleInput.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+            if (!slugInput.dataset.touched) {
+                slugInput.value = title;
+            }
+            updatePreview();
+        }
+        function updatePreview() {
+            const cat = categorySelect.value || 'category';
+            const slug = slugInput.value || 'slug';
+            previewText.textContent = `fukuoka-stage.com/events/${cat}/${slug}`;
+        }
+        titleInput.addEventListener('input', updateSlug);
+        slugInput.addEventListener('input', () => {
+            slugInput.dataset.touched = true;
+            updatePreview();
+        });
+        categorySelect.addEventListener('change', updatePreview);
+    </script>
+
+</body></html>

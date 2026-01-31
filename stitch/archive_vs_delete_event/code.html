@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Event Management - Archive vs Delete | FUKUOKA STAGE</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&amp;family=Poppins:wght@400;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#00E0D1", // Bright Cyan from "THEATER" text
+              secondary: "#FFD600", // Yellow from the lightning icon
+              danger: "#FF2E63", // Pop Pink/Red for danger actions
+              dark: "#1A1A1A", // Dark charcoal for text/borders
+              "background-light": "#FFFEF5", // Creamy background
+              "background-dark": "#121212", // Dark mode background
+              "surface-light": "#FFFFFF",
+              "surface-dark": "#1E1E1E",
+              "border-light": "#1A1A1A", // Thick black borders
+              "border-dark": "#444444",
+            },
+            fontFamily: {
+              display: ["'Poppins'", "'Noto Sans JP'", "sans-serif"],
+              body: ["'Noto Sans JP'", "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "12px",
+              'xl': "16px",
+              '2xl': "24px",
+            },
+            boxShadow: {
+              'pop': '4px 4px 0px 0px #1A1A1A', // Retro pop shadow
+              'pop-hover': '2px 2px 0px 0px #1A1A1A',
+              'pop-dark': '4px 4px 0px 0px #00E0D1',
+            }
+          },
+        },
+      };
+    </script>
+<style>
+        body {
+            background-image: radial-gradient(#E5E5E5 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .dark body {
+            background-image: radial-gradient(#333 1px, transparent 1px);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-dark dark:text-gray-100 font-body min-h-screen flex flex-col">
+<nav class="sticky top-0 z-50 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm border-b-2 border-border-light dark:border-border-dark px-6 py-4">
+<div class="max-w-7xl mx-auto flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="bg-dark text-secondary p-1 rounded-full">
+<span class="material-symbols-rounded">bolt</span>
+</div>
+<span class="font-display font-black text-xl tracking-tighter uppercase">Fukuoka Stage</span>
+<span class="bg-primary text-dark text-xs font-bold px-2 py-0.5 rounded-full border border-dark">Dashboard</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex items-center gap-4 text-sm font-bold">
+<a class="hover:text-primary transition-colors" href="#">イベント管理</a>
+<a class="hover:text-primary transition-colors" href="#">チケット販売</a>
+<a class="hover:text-primary transition-colors" href="#">アナリティクス</a>
+</div>
+<button class="bg-dark dark:bg-white text-white dark:text-dark px-4 py-2 rounded-lg font-bold hover:opacity-90 transition-opacity text-sm">
+                    ログアウト
+                </button>
+</div>
+</div>
+</nav>
+<main class="flex-grow p-6 md:p-12 max-w-7xl mx-auto w-full">
+<div class="mb-12">
+<div class="flex items-center gap-2 text-sm font-bold text-gray-500 dark:text-gray-400 mb-2">
+<a class="hover:underline" href="#">ダッシュボード</a>
+<span class="material-symbols-rounded text-base">chevron_right</span>
+<span>イベント管理</span>
+<span class="material-symbols-rounded text-base">chevron_right</span>
+<span class="text-dark dark:text-white">夜明けのコーヒー</span>
+</div>
+<h1 class="text-4xl md:text-5xl font-display font-black uppercase mb-4 tracking-tight">
+                Delete Event
+            </h1>
+<p class="text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-2xl">
+                イベントの削除・アーカイブを行います。目的に応じて適切なアクションを選択してください。
+            </p>
+</div>
+<div class="grid md:grid-cols-2 gap-8 lg:gap-16 items-start">
+<div class="bg-surface-light dark:bg-surface-dark border-2 border-border-light dark:border-border-dark rounded-2xl p-8 shadow-pop dark:shadow-[4px_4px_0px_0px_#444] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+<div class="absolute top-0 left-0 w-full h-2 bg-secondary"></div>
+<div class="flex items-start justify-between mb-6">
+<div class="bg-secondary/20 p-3 rounded-xl border border-secondary text-yellow-700 dark:text-yellow-400">
+<span class="material-symbols-rounded text-3xl">inventory_2</span>
+</div>
+<span class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Recommended</span>
+</div>
+<h2 class="text-2xl font-black font-display mb-2">アーカイブ（非公開）</h2>
+<p class="text-gray-600 dark:text-gray-400 mb-6 text-sm leading-relaxed">
+                    イベントを一般公開から取り下げますが、データは保持されます。<br/>
+                    後からいつでも再公開（Publish）することが可能です。
+                </p>
+<ul class="space-y-3 mb-8">
+<li class="flex items-center gap-3 text-sm">
+<span class="material-symbols-rounded text-green-500">check_circle</span>
+<span>検索結果や一覧に表示されなくなります</span>
+</li>
+<li class="flex items-center gap-3 text-sm">
+<span class="material-symbols-rounded text-green-500">check_circle</span>
+<span>チケット販売ページはアクセス不可になります</span>
+</li>
+<li class="flex items-center gap-3 text-sm">
+<span class="material-symbols-rounded text-green-500">check_circle</span>
+<span><strong class="font-bold">データは完全に残ります</strong></span>
+</li>
+</ul>
+<button class="w-full bg-surface-light dark:bg-surface-dark border-2 border-border-light dark:border-gray-500 text-dark dark:text-white font-bold py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-[2px_2px_0px_0px_#ccc] active:shadow-none active:translate-y-[2px]" onclick="document.getElementById('archive-modal').showModal()">
+                    イベントをアーカイブする
+                </button>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark border-2 border-border-light dark:border-border-dark rounded-2xl p-8 shadow-pop dark:shadow-[4px_4px_0px_0px_#444] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+<div class="absolute top-0 left-0 w-full h-2 bg-danger"></div>
+<div class="flex items-start justify-between mb-6">
+<div class="bg-danger/10 p-3 rounded-xl border border-danger text-danger">
+<span class="material-symbols-rounded text-3xl">delete_forever</span>
+</div>
+<span class="bg-danger/10 text-danger text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Danger Zone</span>
+</div>
+<h2 class="text-2xl font-black font-display mb-2 text-danger">完全削除</h2>
+<p class="text-gray-600 dark:text-gray-400 mb-6 text-sm leading-relaxed">
+                    イベントデータをデータベースから完全に消去します。<br/>
+<strong class="text-danger">この操作は取り消すことができません。</strong>
+</p>
+<ul class="space-y-3 mb-8">
+<li class="flex items-center gap-3 text-sm">
+<span class="material-symbols-rounded text-danger">warning</span>
+<span>すべての画像・テキストデータが削除されます</span>
+</li>
+<li class="flex items-center gap-3 text-sm">
+<span class="material-symbols-rounded text-danger">warning</span>
+<span>チケット購入履歴との紐付けが失われる可能性があります</span>
+</li>
+<li class="flex items-center gap-3 text-sm">
+<span class="material-symbols-rounded text-danger">warning</span>
+<span><strong class="font-bold">復元は不可能です</strong></span>
+</li>
+</ul>
+<button class="w-full bg-danger text-white border-2 border-danger font-bold py-3 rounded-xl hover:bg-red-600 hover:border-red-600 transition-colors shadow-pop active:shadow-none active:translate-y-[2px]" onclick="document.getElementById('delete-modal').showModal()">
+                    イベントを削除する
+                </button>
+</div>
+</div>
+</main>
+<footer class="bg-dark text-white py-12 px-6 mt-12 border-t-8 border-primary">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
+<div class="flex flex-col items-center md:items-start gap-4">
+<div class="flex items-center gap-2">
+<div class="bg-secondary text-dark p-1 rounded-full">
+<span class="material-symbols-rounded">bolt</span>
+</div>
+<span class="font-display font-black text-2xl tracking-tighter uppercase">Fukuoka Stage</span>
+</div>
+<p class="text-gray-400 text-sm">福岡の演劇シーンを、もっとポップに。</p>
+</div>
+<div class="flex gap-8 text-sm font-bold text-gray-300">
+<a class="hover:text-primary transition-colors" href="#">公演一覧</a>
+<a class="hover:text-primary transition-colors" href="#">今週末のイベント</a>
+<a class="hover:text-primary transition-colors" href="#">劇団登録</a>
+</div>
+<div class="text-xs text-gray-500 font-mono">
+                © 2025 FUKUOKA STAGE.
+            </div>
+</div>
+</footer>
+<dialog class="backdrop:bg-dark/80 backdrop:backdrop-blur-sm p-0 rounded-2xl bg-transparent open:animate-fade-in" id="archive-modal">
+<div class="bg-background-light dark:bg-surface-dark border-2 border-border-light dark:border-border-dark p-8 rounded-2xl max-w-md w-full shadow-2xl m-4">
+<div class="flex justify-center mb-6">
+<div class="bg-secondary/20 p-4 rounded-full border-2 border-secondary text-yellow-700 dark:text-yellow-400">
+<span class="material-symbols-rounded text-4xl">inventory_2</span>
+</div>
+</div>
+<h3 class="text-2xl font-black text-center mb-2 font-display">イベントをアーカイブしますか？</h3>
+<p class="text-gray-600 dark:text-gray-300 text-center mb-8 text-sm">
+                「夜明けのコーヒー」は非公開になりますが、ダッシュボードからいつでも再公開できます。
+            </p>
+<div class="flex flex-col gap-3">
+<form method="dialog">
+<button class="w-full bg-dark dark:bg-primary dark:text-dark text-white font-bold py-3 rounded-xl shadow-pop hover:translate-y-[-2px] active:translate-y-[0px] transition-transform">
+                        はい、アーカイブします
+                    </button>
+</form>
+<form method="dialog">
+<button class="w-full bg-transparent text-gray-500 font-bold py-3 hover:text-dark dark:hover:text-white transition-colors">
+                        キャンセル
+                    </button>
+</form>
+</div>
+</div>
+</dialog>
+<dialog class="backdrop:bg-dark/90 backdrop:backdrop-blur-sm p-0 rounded-2xl bg-transparent" id="delete-modal">
+<div class="bg-background-light dark:bg-surface-dark border-2 border-border-light dark:border-border-dark p-8 rounded-2xl max-w-md w-full shadow-2xl m-4 border-t-[10px] border-t-danger">
+<div class="flex justify-between items-start mb-6">
+<h3 class="text-2xl font-black font-display text-danger">完全削除の確認</h3>
+<form method="dialog">
+<button class="text-gray-400 hover:text-dark dark:hover:text-white">
+<span class="material-symbols-rounded">close</span>
+</button>
+</form>
+</div>
+<div class="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 p-4 rounded-lg mb-6 flex gap-3">
+<span class="material-symbols-rounded text-danger flex-shrink-0">error</span>
+<p class="text-sm text-danger font-medium">
+                    この操作は取り消せません。イベント「夜明けのコーヒー」に関連するすべてのデータが永久に失われます。
+                </p>
+</div>
+<div class="mb-6">
+<label class="block text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">
+                    確認のため、以下に <span class="select-all font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded">yoake-coffee</span> と入力してください。
+                </label>
+<input class="w-full bg-white dark:bg-black border-2 border-gray-300 dark:border-gray-600 rounded-lg p-3 focus:ring-0 focus:border-danger font-mono text-sm shadow-inner transition-colors" placeholder="yoake-coffee" type="text"/>
+</div>
+<div class="flex flex-col gap-3">
+<button class="w-full bg-danger text-white font-bold py-3 rounded-xl shadow-pop hover:bg-red-600 active:shadow-none active:translate-y-[2px] transition-all flex items-center justify-center gap-2 group">
+<span class="material-symbols-rounded group-hover:animate-pulse">delete</span>
+                    イベントを完全削除
+                </button>
+<form method="dialog">
+<button class="w-full bg-transparent text-gray-500 font-bold py-3 hover:text-dark dark:hover:text-white transition-colors">
+                        キャンセル
+                    </button>
+</form>
+</div>
+</div>
+</dialog>
+
+</body></html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Login - FUKUOKA STAGE</title>
+<meta content="Theater Company Login for FUKUOKA STAGE" name="description"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&amp;family=Zen+Kaku+Gothic+New:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#facc15", // Yellow bolt color
+                        secondary: "#06b6d4", // Cyan
+                        accent: "#f43f5e", // Pink
+                        "background-light": "#fffbf5",
+                        "background-dark": "#18181b",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#27272a",
+                    },
+                    fontFamily: {
+                        display: ['"Dela Gothic One"', 'cursive'],
+                        body: ['"Zen Kaku Gothic New"', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'retro': '4px 4px 0px 0px #000000',
+                        'retro-dark': '4px 4px 0px 0px #ffffff',
+                        'retro-hover': '2px 2px 0px 0px #000000',
+                        'retro-hover-dark': '2px 2px 0px 0px #ffffff',
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.75rem", // rounded-xl feel
+                    },
+                },
+            },
+        };
+    </script>
+<style>.bg-dots-light {
+            background-color: #fffbf5;
+            background-image: radial-gradient(#d1d5db 2px, transparent 2px);
+            background-size: 24px 24px;
+        }
+        .dark .bg-dots-dark {
+            background-color: #18181b;
+            background-image: radial-gradient(#3f3f46 2px, transparent 2px);
+            background-size: 24px 24px;
+        }.retro-transition {
+            transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-dots-light dark:bg-dots-dark text-gray-900 dark:text-gray-100 font-body min-h-screen flex flex-col antialiased">
+<header class="w-full py-6 px-4 md:px-8 border-b-2 border-transparent">
+<div class="max-w-7xl mx-auto flex justify-between items-center">
+<a class="group flex items-center gap-2 retro-transition hover:-translate-y-0.5" href="#">
+<div class="bg-black dark:bg-white text-primary rounded-full w-10 h-10 flex items-center justify-center border-2 border-black dark:border-white shadow-[2px_2px_0px_0px_rgba(0,0,0,0.2)]">
+<span class="material-icons-outlined text-2xl">bolt</span>
+</div>
+<div class="flex flex-col">
+<span class="font-display text-xl md:text-2xl leading-none uppercase text-black dark:text-white">Fukuoka</span>
+<span class="font-display text-xl md:text-2xl leading-none uppercase text-black dark:text-white">Stage</span>
+</div>
+</a>
+<a class="hidden md:block font-bold text-sm tracking-wide border-b-2 border-black dark:border-white pb-0.5 hover:text-secondary dark:hover:text-primary transition-colors" href="#">
+                BACK TO PORTAL
+            </a>
+</div>
+</header>
+<main class="flex-grow flex items-center justify-center p-4">
+<div class="w-full max-w-md">
+<div class="bg-surface-light dark:bg-surface-dark border-2 border-black dark:border-white rounded-xl shadow-retro dark:shadow-retro-dark p-6 md:p-10 relative overflow-hidden">
+<div class="absolute top-0 left-0 right-0 h-3 flex">
+<div class="w-1/3 bg-secondary"></div>
+<div class="w-1/3 bg-primary"></div>
+<div class="w-1/3 bg-accent"></div>
+</div>
+<div class="mt-4 mb-8 text-center">
+<div class="inline-block bg-accent text-white text-[10px] font-bold px-3 py-1 rounded-full border-2 border-black dark:border-white mb-3 shadow-[2px_2px_0px_0px_#000] dark:shadow-[2px_2px_0px_0px_#fff]">
+                        THEATER COMPANY ACCESS
+                    </div>
+<h1 class="font-display text-3xl md:text-4xl uppercase leading-tight mb-2">
+                        Member<br/><span class="text-secondary dark:text-primary">Login</span>
+</h1>
+<p class="text-gray-600 dark:text-gray-400 text-sm font-medium">
+                        Welcome back! Manage your performances and connect with the audience.
+                    </p>
+</div>
+<button class="w-full flex items-center justify-center gap-3 bg-white dark:bg-gray-800 text-black dark:text-white border-2 border-black dark:border-white rounded-lg py-3.5 px-4 font-bold text-sm md:text-base retro-transition shadow-retro dark:shadow-retro-dark hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-retro-hover dark:hover:shadow-retro-hover-dark active:shadow-none active:translate-x-[4px] active:translate-y-[4px]">
+<img alt="Google G Logo" class="w-5 h-5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAg93M8b56AW40_KBylK9GpJquOtS8ETVy_hB5bGM1pO38WB-pevXQHPLPyN1dPLDwXFuIYWokuEonLxU3rrhFnnaqZEXg0LcFYA8_PnXV0ergVd5eEu7qZdKkd4odVmC8F_M4u9hcQ6AmeKFiRRi1frjWEPH4zGXM7ktJ81aEzexJf34cnJg7jrwFNy3lQT-mo88d-8K5RRD-n9j9L_NUByArlOZaE-z7lVPHuYOViiXkizgD2Kbd29S2I0ICjwxaeAp_L7RWUJ6c2"/>
+<span>Sign in with Google</span>
+</button>
+<div class="relative flex py-6 items-center">
+<div class="flex-grow border-t-2 border-gray-200 dark:border-gray-600"></div>
+<span class="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 font-display text-xs uppercase tracking-widest">OR</span>
+<div class="flex-grow border-t-2 border-gray-200 dark:border-gray-600"></div>
+</div>
+<form action="#" class="space-y-5" method="POST">
+<div class="space-y-2">
+<label class="block font-bold text-sm uppercase tracking-wider pl-1" for="email">
+                            Email Address
+                        </label>
+<div class="relative group">
+<input class="w-full bg-gray-50 dark:bg-gray-900 border-2 border-black dark:border-gray-400 rounded-lg py-3 px-4 pl-11 outline-none focus:ring-0 focus:border-secondary dark:focus:border-primary transition-colors placeholder-gray-400 dark:placeholder-gray-600 font-medium text-gray-900 dark:text-white" id="email" name="email" placeholder="name@theater-company.com" required="" type="email"/>
+<span class="absolute left-3.5 top-3.5 text-gray-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors">
+<span class="material-icons-outlined text-xl">email</span>
+</span>
+</div>
+</div>
+<button class="w-full bg-black dark:bg-white text-white dark:text-black border-2 border-black dark:border-white rounded-lg py-3.5 px-4 font-display uppercase tracking-widest text-lg retro-transition shadow-retro dark:shadow-[4px_4px_0px_0px_rgba(100,100,100,1)] hover:bg-gray-800 dark:hover:bg-gray-200 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-retro-hover dark:hover:shadow-[2px_2px_0px_0px_rgba(100,100,100,1)] active:shadow-none active:translate-x-[4px] active:translate-y-[4px]" type="submit">
+                        Send Magic Link
+                    </button>
+</form>
+<div class="mt-8 bg-primary/10 dark:bg-primary/5 border-2 border-black dark:border-gray-500 rounded-lg p-4 relative">
+<div class="absolute -top-3 -right-3 bg-primary text-black border-2 border-black rounded-full w-8 h-8 flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] z-10">
+<span class="material-icons-outlined text-lg">priority_high</span>
+</div>
+<h3 class="font-display text-sm mb-2 uppercase text-black dark:text-white">Did not receive the link?</h3>
+<ul class="text-xs space-y-1.5 text-gray-700 dark:text-gray-300 font-medium">
+<li class="flex items-start gap-2">
+<span class="material-icons-outlined text-sm mt-0.5 text-secondary">check_circle</span>
+<span>Check your <strong>Spam</strong> or <strong>Junk</strong> folder.</span>
+</li>
+<li class="flex items-start gap-2">
+<span class="material-icons-outlined text-sm mt-0.5 text-secondary">check_circle</span>
+<span>Links expire in <strong>15 minutes</strong> for security.</span>
+</li>
+</ul>
+</div>
+</div>
+<div class="text-center mt-6">
+<p class="text-sm font-bold text-gray-600 dark:text-gray-400">
+                    New to Fukuoka Stage? 
+                    <a class="text-black dark:text-white underline decoration-2 decoration-primary hover:text-secondary dark:hover:text-primary transition-colors" href="#">
+                        Register your company
+                    </a>
+</p>
+</div>
+</div>
+</main>
+<footer class="py-8 text-center border-t-2 border-transparent">
+<div class="flex flex-col items-center gap-2">
+<div class="bg-black dark:bg-white w-8 h-1 rounded-full mb-2"></div>
+<p class="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                © 2025 Fukuoka Stage.
+            </p>
+<div class="flex gap-4 text-xs font-medium text-gray-500 underline">
+<a class="hover:text-black dark:hover:text-white" href="#">Privacy Policy</a>
+<a class="hover:text-black dark:hover:text-white" href="#">Terms of Service</a>
+<a class="hover:text-black dark:hover:text-white" href="#">Contact</a>
+</div>
+</div>
+</footer>
+<script>
+        // Simple script to handle system preference on load
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+
+</body></html>
