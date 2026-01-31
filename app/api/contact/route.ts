@@ -226,7 +226,7 @@ export async function POST(req: Request) {
     body: JSON.stringify({
       from: contactFrom,
       to: contactTo,
-      subject: `【Fukuoka Stage】お問い合わせ: ${name}`,
+      subject: `【福岡アクトポータル】お問い合わせ: ${name}`,
       text: emailText,
     }),
   });

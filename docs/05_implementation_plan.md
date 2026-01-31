@@ -6,7 +6,7 @@
 
 ## 1. 目的
 
-福岡演劇公演ポータル「FUKUOKA STAGE」を、要件定義（`docs/01_requirements.md`）・アーキテクチャ（`docs/02_architecture.md`）・DB（`docs/03_database.md`）・API（`docs/04_api.md`）に整合する形でMVP実装する。
+福岡演劇公演ポータル「福岡アクトポータル」を、要件定義（`docs/01_requirements.md`）・アーキテクチャ（`docs/02_architecture.md`）・DB（`docs/03_database.md`）・API（`docs/04_api.md`）に整合する形でMVP実装する。
 
 ---
 

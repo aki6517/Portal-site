@@ -61,7 +61,7 @@
 ### 3.1 グローバルナビゲーション（ヘッダー）
 
 ```
-[ロゴ] FUKUOKA STAGE
+[ロゴ] 福岡アクトポータル
   ├─ 公演を探す (/events/)
   ├─ カレンダー (/calendar/)
   ├─ ブログ (/blog/)
@@ -169,7 +169,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const event = await getEventByCategorySlug(params.category, params.slug);
 
   return {
-    title: `${event.title} | FUKUOKA STAGE`,
+    title: `${event.title} | 福岡アクトポータル`,
     description:
       event.description
       || `${event.company}による公演「${event.title}」の詳細。開催日時、会場、料金、チケット予約はこちら。`,

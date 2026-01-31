@@ -127,7 +127,7 @@ RECAPTCHA_SECRET_KEY=xxx...
 # Contact (Resend)
 RESEND_API_KEY=re_...
 CONTACT_TO_EMAIL=contact@example.com
-CONTACT_FROM_EMAIL=Fukuoka Stage <no-reply@example.com>
+CONTACT_FROM_EMAIL=福岡アクトポータル <no-reply@example.com>
 
 # TinaCMS
 TINA_TOKEN=xxx...
@@ -336,7 +336,7 @@ Vercel Dashboard → **Settings** → **Environment Variables**:
 | `RECAPTCHA_SECRET_KEY` | `xxx...` | Production, Preview |
 | `RESEND_API_KEY` | `re_...` | Production, Preview |
 | `CONTACT_TO_EMAIL` | `contact@example.com` | Production, Preview |
-| `CONTACT_FROM_EMAIL` | `Fukuoka Stage <no-reply@example.com>` | Production, Preview |
+| `CONTACT_FROM_EMAIL` | `福岡アクトポータル <no-reply@example.com>` | Production, Preview |
 | `TINA_TOKEN` | `xxx...` | Production, Preview |
 | `NEXT_PUBLIC_TINA_CLIENT_ID` | `xxx...` | Production, Preview |
 | `NEXT_PUBLIC_SITE_URL` | `https://fukuoka-stage.com` | Production |
@@ -409,7 +409,7 @@ Vercel Dashboard → **Settings** → **Environment Variables**:
 #### Step 1: プロパティ作成
 1. [Google Analytics](https://analytics.google.com/) にアクセス
 2. 「プロパティを作成」
-   - **プロパティ名**: `FUKUOKA STAGE`
+   - **プロパティ名**: `福岡アクトポータル`
    - **タイムゾーン**: 日本
    - **通貨**: JPY（日本円）
 

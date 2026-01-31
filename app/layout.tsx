@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FUKUOKA STAGE - 福岡演劇公演ポータル",
+  title: "福岡アクトポータル - 福岡演劇公演ポータル",
   description:
     "福岡の演劇公演情報を一元管理。今の気分で公演を探せるポータルサイト。",
 };
@@ -33,7 +33,7 @@ export default function RootLayout({
           <header className="border-b border-zinc-200">
             <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
               <Link href="/" className="text-sm font-bold tracking-wide">
-                FUKUOKA STAGE
+                福岡アクトポータル
               </Link>
               <nav className="flex items-center gap-4 text-sm">
                 <Link href="/events" className="hover:underline">
@@ -45,13 +45,16 @@ export default function RootLayout({
                 <Link href="/register" className="hover:underline">
                   劇団の方へ
                 </Link>
+                <Link href="/admin/contact" className="hover:underline">
+                  管理者
+                </Link>
               </nav>
             </div>
           </header>
           <main>{children}</main>
           <footer className="border-t border-zinc-200">
             <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 text-xs text-zinc-600">
-              <span>© 2026 FUKUOKA STAGE</span>
+              <span>© 2026 福岡アクトポータル</span>
               <div className="flex items-center gap-4">
                 <Link href="/about" className="hover:underline">
                   運営者情報
