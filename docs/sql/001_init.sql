@@ -400,6 +400,13 @@ ON contact_messages FOR SELECT
 TO authenticated
 USING (is_admin());
 
+DROP POLICY IF EXISTS "Admins can update contact messages" ON contact_messages;
+CREATE POLICY "Admins can update contact messages"
+ON contact_messages FOR UPDATE
+TO authenticated
+USING (is_admin())
+WITH CHECK (is_admin());
+
 DROP POLICY IF EXISTS "Service role can manage contact messages" ON contact_messages;
 CREATE POLICY "Service role can manage contact messages"
 ON contact_messages FOR ALL

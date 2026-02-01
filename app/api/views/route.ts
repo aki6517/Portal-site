@@ -6,6 +6,35 @@ type ViewPayload = {
   slug?: string;
 };
 
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 60;
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+const getClientIp = (req: Request) => {
+  const forwarded = req.headers.get("x-forwarded-for") ?? "";
+  return (
+    forwarded.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown"
+  );
+};
+
+const checkRateLimit = (key: string) => {
+  const now = Date.now();
+  const existing = rateLimitStore.get(key);
+  if (!existing || existing.resetAt <= now) {
+    rateLimitStore.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { ok: true, retryAfter: 0 };
+  }
+  if (existing.count >= RATE_LIMIT_MAX) {
+    const retryAfter = Math.ceil((existing.resetAt - now) / 1000);
+    return { ok: false, retryAfter };
+  }
+  existing.count += 1;
+  rateLimitStore.set(key, existing);
+  return { ok: true, retryAfter: 0 };
+};
+
 const getJstDateString = () => {
   const date = new Date();
   return new Intl.DateTimeFormat("en-CA", {
@@ -39,6 +68,21 @@ export async function POST(req: Request) {
         },
       },
       { status: 400 }
+    );
+  }
+
+  const ip = getClientIp(req);
+  const rateKey = `${ip}:${category}/${slug}`;
+  const limit = checkRateLimit(rateKey);
+  if (!limit.ok) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "RATE_LIMITED",
+          message: "Too many requests",
+        },
+      },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
     );
   }
 
