@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import NextImage from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
 const CATEGORY_OPTIONS = [
@@ -418,7 +418,7 @@ export default function EventForm({
           />
         </div>
         {flyerPreview && (
-          <Image
+          <NextImage
             src={flyerPreview}
             alt="flyer preview"
             width={800}
