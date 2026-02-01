@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# tina (auto-generated, may include secrets)
+/tina/__generated__
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

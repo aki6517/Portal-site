@@ -62,7 +62,7 @@ const fetchEventsForMonth = async (month: string) => {
   const start = new Date(year, monthNum - 1, 1, 0, 0, 0);
   const end = new Date(year, monthNum, 0, 23, 59, 59);
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("events")
     .select("id, title, category, slug, start_date, end_date")

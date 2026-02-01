@@ -24,7 +24,7 @@ export default async function AdminContactPage({
 }: {
   searchParams?: { status?: string };
 }) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

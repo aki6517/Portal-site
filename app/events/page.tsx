@@ -15,7 +15,7 @@ const formatDate = (value?: string | null) => {
 };
 
 const getCategories = async () => {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("categories")
     .select("id, name, icon, color")
@@ -24,7 +24,7 @@ const getCategories = async () => {
 };
 
 const getEvents = async () => {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("events")
     .select(

@@ -47,7 +47,7 @@ const getTrendingEvents = async () => {
       .filter(Boolean) as TrendingEvent[];
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("events")
     .select("id, title, category, slug, start_date")
