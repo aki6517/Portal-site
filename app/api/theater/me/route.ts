@@ -32,6 +32,8 @@ export async function GET() {
   }
 
   let resolvedMember = member;
+  let pendingInvite: { id: string; theater_id: string } | null = null;
+  let joinedFromInvite = false;
 
   if (!resolvedMember && user.email) {
     const { data: invite } = await service
@@ -42,6 +44,7 @@ export async function GET() {
       .maybeSingle();
 
     if (invite) {
+      pendingInvite = { id: invite.id, theater_id: invite.theater_id };
       const { count: memberCount } = await service
         .from("theater_members")
         .select("*", { count: "exact", head: true })
@@ -70,12 +73,15 @@ export async function GET() {
           .eq("id", invite.id);
 
         resolvedMember = insertedMember ?? null;
+        joinedFromInvite = !!insertedMember;
       }
     }
   }
 
   if (!resolvedMember) {
-    return NextResponse.json({ data: { theater: null, member: null } });
+    return NextResponse.json({
+      data: { theater: null, member: null, pendingInvite },
+    });
   }
 
   const { data: theater, error: theaterError } = await supabase
@@ -119,6 +125,8 @@ export async function GET() {
         totalAllowed: 2,
       },
       invites: invites ?? [],
+      joinedFromInvite,
+      pendingInvite,
     },
   });
 }

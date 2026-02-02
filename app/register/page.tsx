@@ -13,6 +13,8 @@ type MeResponse = {
       totalAllowed: number;
     };
     invites?: { id: string; email: string; status: string; created_at: string }[];
+    joinedFromInvite?: boolean;
+    pendingInvite?: { id: string; theater_id: string } | null;
   };
   error?: { code: string; message: string };
 };
@@ -250,17 +252,22 @@ export default function RegisterPage() {
       </div>
 
       {authState === "loggedIn" && me?.theater && (
-        <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm">
-          <div className="font-medium">ログイン済み</div>
-          <div className="mt-1 text-zinc-600">
-            劇団: {me.theater.name} / ステータス:{" "}
-            {getTheaterStatusCopy(me.theater.status).label}
+      <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm">
+        <div className="font-medium">ログイン済み</div>
+        <div className="mt-1 text-zinc-600">
+          劇団: {me.theater.name} / ステータス:{" "}
+          {getTheaterStatusCopy(me.theater.status).label}
+        </div>
+        {me.joinedFromInvite && (
+          <div className="mt-2 rounded-md bg-green-50 px-3 py-2 text-xs text-green-700">
+            招待メールで登録されました。劇団メンバーとして有効になりました。
           </div>
-          {me.stats && (
-            <div className="mt-1 text-xs text-zinc-600">
-              登録メール数（メンバー + 招待）: {totalInUse}/
-              {me.stats.totalAllowed ?? 2}
-            </div>
+        )}
+        {me.stats && (
+          <div className="mt-1 text-xs text-zinc-600">
+            登録メール数（メンバー + 招待）: {totalInUse}/
+            {me.stats.totalAllowed ?? 2}
+          </div>
           )}
           <a
             href="/theater"
@@ -363,6 +370,13 @@ export default function RegisterPage() {
           {message && (
             <p className="text-xs text-red-600">エラー: {message}</p>
           )}
+        </div>
+      )}
+
+      {authState === "loggedIn" && !me?.theater && me?.pendingInvite && (
+        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          追加済みのメールでログインしました。劇団メンバー登録を有効化しています…
+          もしこのまま進まない場合は、ページを再読み込みするか、もう一度ログインしてください。
         </div>
       )}
 
