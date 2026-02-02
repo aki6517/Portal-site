@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type OnboardPayload = {
   name?: string;
@@ -56,7 +57,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data: existingMember, error: memberError } = await supabase
+  const service = createSupabaseServiceClient();
+
+  const { data: existingMember, error: memberError } = await service
     .from("theater_members")
     .select("theater_id, role")
     .eq("user_id", user.id)
@@ -87,7 +90,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data: theater, error: theaterError } = await supabase
+  const { data: theater, error: theaterError } = await service
     .from("theaters")
     .insert({
       name,
@@ -115,14 +118,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const { error: linkError } = await supabase.from("theater_members").insert({
+  const { error: linkError } = await service.from("theater_members").insert({
     theater_id: theater.id,
     user_id: user.id,
     role: "owner",
   });
 
   if (linkError) {
-    await supabase.from("theaters").delete().eq("id", theater.id);
+    await service.from("theaters").delete().eq("id", theater.id);
     return NextResponse.json(
       {
         error: {
