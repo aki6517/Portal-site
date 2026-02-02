@@ -69,6 +69,11 @@ export default function RegisterPage() {
   >("idle");
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
   const [inviteRemoveId, setInviteRemoveId] = useState<string | null>(null);
+  const [members, setMembers] = useState<
+    { user_id: string; role: string; email: string }[]
+  >([]);
+  const [memberRemoveId, setMemberRemoveId] = useState<string | null>(null);
+  const [inviteRemoveId, setInviteRemoveId] = useState<string | null>(null);
   const [onboardForm, setOnboardForm] = useState({
     name: "",
     contact_email: "",
@@ -122,6 +127,19 @@ export default function RegisterPage() {
         }
         const json = (await res.json()) as MeResponse;
         setMe(json.data ?? null);
+        if (json.data?.member?.role === "owner") {
+          const membersRes = await fetch("/api/theater/members", {
+            cache: "no-store",
+          });
+          if (membersRes.ok) {
+            const membersJson = (await membersRes.json()) as {
+              data?: { members: { user_id: string; role: string; email: string }[] };
+            };
+            setMembers(membersJson.data?.members ?? []);
+          }
+        } else {
+          setMembers([]);
+        }
         setMeCheckStatus("ok");
       } catch {
         setMeCheckStatus("error");
@@ -214,9 +232,83 @@ export default function RegisterPage() {
       const refreshed = await fetch("/api/theater/me", { cache: "no-store" });
       const refreshedJson = (await refreshed.json()) as MeResponse;
       setMe(refreshedJson.data ?? null);
+      if (refreshedJson.data?.member?.role === "owner") {
+        const membersRes = await fetch("/api/theater/members", {
+          cache: "no-store",
+        });
+        if (membersRes.ok) {
+          const membersJson = (await membersRes.json()) as {
+            data?: { members: { user_id: string; role: string; email: string }[] };
+          };
+          setMembers(membersJson.data?.members ?? []);
+        }
+      } else {
+        setMembers([]);
+      }
     } catch {
       // ignore
     }
+  };
+
+  const removeInvite = async (inviteId: string) => {
+    setInviteRemoveId(inviteId);
+    setInviteMessage(null);
+    const res = await fetch("/api/theater/invite", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inviteId }),
+    });
+    const json = (await res.json()) as { error?: { message: string } };
+    if (!res.ok) {
+      setInviteStatus("error");
+      setInviteMessage(json.error?.message ?? "招待の削除に失敗しました");
+      setInviteRemoveId(null);
+      return;
+    }
+    setInviteStatus("sent");
+    setInviteMessage("招待を削除しました。");
+    setInviteRemoveId(null);
+    try {
+      const refreshed = await fetch("/api/theater/me", { cache: "no-store" });
+      const refreshedJson = (await refreshed.json()) as MeResponse;
+      setMe(refreshedJson.data ?? null);
+    } catch {}
+  };
+
+  const removeMember = async (userId: string) => {
+    setMemberRemoveId(userId);
+    setInviteMessage(null);
+    const res = await fetch("/api/theater/members", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    const json = (await res.json()) as { error?: { message: string } };
+    if (!res.ok) {
+      setInviteStatus("error");
+      setInviteMessage(json.error?.message ?? "メンバーの削除に失敗しました");
+      setMemberRemoveId(null);
+      return;
+    }
+    setInviteStatus("sent");
+    setInviteMessage("メンバーを削除しました。");
+    setMemberRemoveId(null);
+    try {
+      const refreshed = await fetch("/api/theater/me", { cache: "no-store" });
+      const refreshedJson = (await refreshed.json()) as MeResponse;
+      setMe(refreshedJson.data ?? null);
+      if (refreshedJson.data?.member?.role === "owner") {
+        const membersRes = await fetch("/api/theater/members", {
+          cache: "no-store",
+        });
+        if (membersRes.ok) {
+          const membersJson = (await membersRes.json()) as {
+            data?: { members: { user_id: string; role: string; email: string }[] };
+          };
+          setMembers(membersJson.data?.members ?? []);
+        }
+      }
+    } catch {}
   };
 
   const removeInvite = async (inviteId: string) => {
@@ -359,6 +451,7 @@ export default function RegisterPage() {
             )}
             <p className="mt-2 text-xs text-zinc-500">
               追加されたメールでログインすると自動的にこの劇団に紐づきます。
+              招待メールは送られません。ログインできない場合はここから削除→再追加してください。
             </p>
             {me.invites && me.invites.length > 0 && (
               <div className="mt-3 space-y-1 text-xs text-zinc-600">
@@ -385,6 +478,33 @@ export default function RegisterPage() {
                         </button>
                       )}
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {members.length > 0 && (
+              <div className="mt-4 space-y-2 text-xs text-zinc-600">
+                <div className="font-semibold text-zinc-700">現在のメンバー</div>
+                {members.map((m) => (
+                  <div
+                    key={m.user_id}
+                    className="flex items-center justify-between rounded-md border border-zinc-200 bg-white px-3 py-2"
+                  >
+                    <div>
+                      <div className="font-medium">{m.email}</div>
+                      <div className="text-[11px] text-zinc-500">
+                        役割: {m.role}
+                      </div>
+                    </div>
+                    {m.role !== "owner" && (
+                      <button
+                        onClick={() => removeMember(m.user_id)}
+                        disabled={memberRemoveId === m.user_id}
+                        className="text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        {memberRemoveId === m.user_id ? "削除中..." : "削除"}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
