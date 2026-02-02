@@ -482,33 +482,36 @@ export default function RegisterPage() {
                 ))}
               </div>
             )}
-            {members.length > 0 && (
-              <div className="mt-4 space-y-2 text-xs text-zinc-600">
-                <div className="font-semibold text-zinc-700">現在のメンバー</div>
-                {members.map((m) => (
-                  <div
-                    key={m.user_id}
-                    className="flex items-center justify-between rounded-md border border-zinc-200 bg-white px-3 py-2"
-                  >
-                    <div>
-                      <div className="font-medium">{m.email}</div>
-                      <div className="text-[11px] text-zinc-500">
-                        役割: {m.role}
-                      </div>
+            <div className="mt-4 space-y-2 text-xs text-zinc-600">
+              <div className="font-semibold text-zinc-700">現在のメンバー</div>
+              {members.length === 0 && (
+                <div className="rounded-md border border-dashed border-zinc-200 bg-white px-3 py-2 text-[12px] text-zinc-500">
+                  まだメンバーは登録されていません。
+                </div>
+              )}
+              {members.map((m) => (
+                <div
+                  key={m.user_id}
+                  className="flex items-center justify-between rounded-md border border-zinc-200 bg-white px-3 py-2"
+                >
+                  <div>
+                    <div className="font-medium">{m.email}</div>
+                    <div className="text-[11px] text-zinc-500">
+                      役割: {m.role}
                     </div>
-                    {m.role !== "owner" && (
-                      <button
-                        onClick={() => removeMember(m.user_id)}
-                        disabled={memberRemoveId === m.user_id}
-                        className="text-red-600 hover:underline disabled:opacity-50"
-                      >
-                        {memberRemoveId === m.user_id ? "削除中..." : "削除"}
-                      </button>
-                    )}
                   </div>
-                ))}
-              </div>
-            )}
+                  {m.role !== "owner" && (
+                    <button
+                      onClick={() => removeMember(m.user_id)}
+                      disabled={memberRemoveId === m.user_id}
+                      className="text-red-600 hover:underline disabled:opacity-50"
+                    >
+                      {memberRemoveId === m.user_id ? "削除中..." : "削除"}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
