@@ -125,6 +125,42 @@ export default async function Home() {
           )}
         </div>
       </section>
+
+      <section className="mt-12 rounded-2xl border border-zinc-200 bg-white p-8">
+        <div className="grid gap-6 md:grid-cols-[1.2fr_1fr] md:items-center">
+          <div>
+            <h2 className="text-xl font-semibold">劇団の方へ</h2>
+            <p className="mt-2 text-sm text-zinc-600">
+              ログイン → 劇団情報入力 → 公演管理の順で進めます。
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3 text-sm">
+              <Link
+                href="/register"
+                className="rounded-full border border-zinc-900 bg-zinc-900 px-4 py-2 text-white"
+              >
+                ログイン / 登録
+              </Link>
+              <Link
+                href="/theater"
+                className="rounded-full border border-zinc-200 px-4 py-2 hover:bg-zinc-50"
+              >
+                管理画面へ
+              </Link>
+            </div>
+          </div>
+          <ol className="space-y-3 text-sm text-zinc-700">
+            <li className="rounded-lg border border-zinc-200 px-4 py-3">
+              1. Google かメールリンクでログイン
+            </li>
+            <li className="rounded-lg border border-zinc-200 px-4 py-3">
+              2. 劇団情報を入力（承認後に公開可能）
+            </li>
+            <li className="rounded-lg border border-zinc-200 px-4 py-3">
+              3. 公演を作成・編集・公開
+            </li>
+          </ol>
+        </div>
+      </section>
     </div>
   );
 }

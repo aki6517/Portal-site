@@ -308,6 +308,27 @@ export default async function EventDetailPage({
           </div>
         </div>
       )}
+
+      <div className="mt-10 rounded-2xl border border-zinc-200 bg-zinc-50 p-6">
+        <h2 className="text-lg font-semibold">公演を掲載したい劇団の方へ</h2>
+        <p className="mt-2 text-sm text-zinc-600">
+          ログイン後に劇団情報を入力すると、公演の作成・編集ができます。
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3 text-sm">
+          <Link
+            href="/register"
+            className="rounded-full border border-zinc-900 bg-zinc-900 px-4 py-2 text-white"
+          >
+            ログイン / 登録
+          </Link>
+          <Link
+            href="/theater"
+            className="rounded-full border border-zinc-200 px-4 py-2 hover:bg-white"
+          >
+            管理画面へ
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
