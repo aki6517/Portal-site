@@ -23,6 +23,10 @@ export default function RegisterPage() {
   const [onboardMessage, setOnboardMessage] = useState<string | null>(null);
   const [onboarding, setOnboarding] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [meCheckStatus, setMeCheckStatus] = useState<
+    "idle" | "checking" | "ok" | "error"
+  >("idle");
+  const [meCheckMessage, setMeCheckMessage] = useState<string | null>(null);
   const [onboardForm, setOnboardForm] = useState({
     name: "",
     contact_email: "",
@@ -34,23 +38,56 @@ export default function RegisterPage() {
   });
 
   useEffect(() => {
-    const fetchMe = async () => {
+    const refreshAuth = async () => {
+      setMeCheckStatus("checking");
+      setMeCheckMessage(null);
+      setAuthState("loading");
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      setUserEmail(user?.email ?? null);
-      const res = await fetch("/api/theater/me", { cache: "no-store" });
-      if (res.status === 401) {
+
+      if (!user) {
+        setUserEmail(null);
+        setMe(null);
         setAuthState("loggedOut");
+        setMeCheckStatus("ok");
         return;
       }
-      if (res.ok) {
+
+      setUserEmail(user.email ?? null);
+      setAuthState("loggedIn");
+
+      try {
+        const res = await fetch("/api/theater/me", { cache: "no-store" });
+        if (res.status === 401) {
+          setMe(null);
+          setMeCheckStatus("error");
+          setMeCheckMessage(
+            "ログイン状態はありますが、サーバー側でセッションが確認できません。ログアウト→再ログイン後に再度お試しください。"
+          );
+          return;
+        }
+        if (!res.ok) {
+          const json = (await res.json().catch(() => null)) as
+            | MeResponse
+            | null;
+          setMeCheckStatus("error");
+          setMeCheckMessage(
+            json?.error?.message ?? "ログイン状態の確認に失敗しました。"
+          );
+          return;
+        }
         const json = (await res.json()) as MeResponse;
         setMe(json.data ?? null);
-        setAuthState("loggedIn");
+        setMeCheckStatus("ok");
+      } catch {
+        setMeCheckStatus("error");
+        setMeCheckMessage("ネットワークエラーで確認に失敗しました。");
       }
     };
-    fetchMe();
+
+    refreshAuth();
   }, []);
 
   const signInWithGoogle = async () => {
@@ -129,13 +166,19 @@ export default function RegisterPage() {
         {userEmail && (
           <div className="mt-1 text-zinc-600">メール: {userEmail}</div>
         )}
-        {authState === "loggedIn" && (
+        {meCheckStatus === "checking" && (
+          <div className="mt-1 text-xs text-zinc-500">
+            サーバー側の状態を確認しています...
+          </div>
+        )}
+        {meCheckStatus === "error" && meCheckMessage && (
+          <div className="mt-2 text-xs text-red-600">{meCheckMessage}</div>
+        )}
+        {userEmail && (
           <button
             onClick={async () => {
               await supabase.auth.signOut();
-              setAuthState("loggedOut");
-              setMe(null);
-              setUserEmail(null);
+              location.href = "/register";
             }}
             className="mt-3 rounded-md border border-zinc-200 px-3 py-1 text-xs hover:bg-white"
           >
