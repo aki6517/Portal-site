@@ -7,6 +7,12 @@ type MeResponse = {
   data?: {
     theater: { id: string; name: string; status: string } | null;
     member: { role: string } | null;
+    stats?: {
+      memberCount: number;
+      inviteCount: number;
+      totalAllowed: number;
+    };
+    invites?: { id: string; email: string; status: string; created_at: string }[];
   };
   error?: { code: string; message: string };
 };
@@ -186,7 +192,22 @@ export default function RegisterPage() {
     setInviteStatus("sent");
     setInviteMessage("招待メールを追加しました。");
     setInviteEmail("");
+
+    // re-fetch latest state (counts and invites)
+    try {
+      const refreshed = await fetch("/api/theater/me", { cache: "no-store" });
+      const refreshedJson = (await refreshed.json()) as MeResponse;
+      setMe(refreshedJson.data ?? null);
+    } catch {
+      // ignore
+    }
   };
+
+  const totalInUse =
+    (me?.stats?.memberCount ?? 0) + (me?.stats?.inviteCount ?? 0);
+  const limitReached =
+    me?.stats?.totalAllowed !== undefined &&
+    totalInUse >= me.stats.totalAllowed;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -235,6 +256,12 @@ export default function RegisterPage() {
             劇団: {me.theater.name} / ステータス:{" "}
             {getTheaterStatusCopy(me.theater.status).label}
           </div>
+          {me.stats && (
+            <div className="mt-1 text-xs text-zinc-600">
+              登録メール数（メンバー + 招待）: {totalInUse}/
+              {me.stats.totalAllowed ?? 2}
+            </div>
+          )}
           <a
             href="/theater"
             className="mt-3 inline-block text-sm font-medium text-zinc-900 underline"
@@ -246,21 +273,32 @@ export default function RegisterPage() {
             <p className="mt-1 text-xs text-zinc-600">
               この劇団にログインできるメールは最大2件までです。
             </p>
+            {me.stats && (
+              <p className="mt-1 text-xs text-zinc-500">
+                現在: {totalInUse}/{me.stats.totalAllowed ?? 2}
+              </p>
+            )}
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <input
                 className="flex-1 rounded-md border border-zinc-200 px-3 py-2 text-sm"
                 placeholder="追加するメールアドレス"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
+                disabled={limitReached}
               />
               <button
                 onClick={submitInvite}
-                disabled={!inviteEmail || inviteStatus === "loading"}
+                disabled={!inviteEmail || inviteStatus === "loading" || limitReached}
                 className="rounded-md border border-zinc-900 bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
                 {inviteStatus === "loading" ? "追加中..." : "追加する"}
               </button>
             </div>
+            {limitReached && (
+              <p className="mt-2 text-xs text-red-600">
+                上限に達しています。既存の招待を消化（ログイン）するか、運営にて手動で調整してください。
+              </p>
+            )}
             {inviteMessage && (
               <p
                 className={`mt-2 text-xs ${
@@ -273,6 +311,19 @@ export default function RegisterPage() {
             <p className="mt-2 text-xs text-zinc-500">
               追加されたメールでログインすると自動的にこの劇団に紐づきます。
             </p>
+            {me.invites && me.invites.length > 0 && (
+              <div className="mt-3 space-y-1 text-xs text-zinc-600">
+                <div className="font-semibold text-zinc-700">招待の状況</div>
+                {me.invites.map((inv) => (
+                  <div key={inv.id} className="rounded-md border border-zinc-200 bg-white px-3 py-2">
+                    <div className="font-medium">{inv.email}</div>
+                    <div className="text-[11px] text-zinc-500">
+                      ステータス: {inv.status}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

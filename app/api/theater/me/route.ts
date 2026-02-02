@@ -91,5 +91,34 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json({ data: { theater, member: resolvedMember } });
+  const [{ count: memberCount }, { count: inviteCount }] = await Promise.all([
+    service
+      .from("theater_members")
+      .select("*", { count: "exact", head: true })
+      .eq("theater_id", resolvedMember.theater_id),
+    service
+      .from("theater_invites")
+      .select("*", { count: "exact", head: true })
+      .eq("theater_id", resolvedMember.theater_id)
+      .eq("status", "pending"),
+  ]);
+
+  const { data: invites } = await service
+    .from("theater_invites")
+    .select("id, email, status, created_at")
+    .eq("theater_id", resolvedMember.theater_id)
+    .order("created_at", { ascending: false });
+
+  return NextResponse.json({
+    data: {
+      theater,
+      member: resolvedMember,
+      stats: {
+        memberCount: memberCount ?? 0,
+        inviteCount: inviteCount ?? 0,
+        totalAllowed: 2,
+      },
+      invites: invites ?? [],
+    },
+  });
 }
