@@ -97,7 +97,7 @@ inserted_events AS (
     image_url,
     flyer_url,
     ticket_url,
-    cast,
+    "cast",
     status
   )
   VALUES
@@ -201,7 +201,7 @@ inserted_events AS (
     image_url = EXCLUDED.image_url,
     flyer_url = EXCLUDED.flyer_url,
     ticket_url = EXCLUDED.ticket_url,
-    cast = EXCLUDED.cast,
+      "cast" = EXCLUDED."cast",
     status = EXCLUDED.status
   RETURNING id
 )

@@ -22,6 +22,7 @@ export default function RegisterPage() {
   >("loading");
   const [onboardMessage, setOnboardMessage] = useState<string | null>(null);
   const [onboarding, setOnboarding] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [onboardForm, setOnboardForm] = useState({
     name: "",
     contact_email: "",
@@ -34,6 +35,10 @@ export default function RegisterPage() {
 
   useEffect(() => {
     const fetchMe = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUserEmail(user?.email ?? null);
       const res = await fetch("/api/theater/me", { cache: "no-store" });
       if (res.status === 401) {
         setAuthState("loggedOut");
@@ -90,7 +95,14 @@ export default function RegisterPage() {
       error?: { code: string; message: string };
     };
     if (!res.ok) {
-      setOnboardMessage(json.error?.message ?? "登録に失敗しました");
+      const detail = json.error?.message ?? "登録に失敗しました";
+      if (detail.includes("row-level security")) {
+        setOnboardMessage(
+          "ログイン状態が正しく反映されていない可能性があります。ログアウト→再ログイン後に再度お試しください。"
+        );
+      } else {
+        setOnboardMessage(detail);
+      }
       setOnboarding(false);
       return;
     }
@@ -104,6 +116,33 @@ export default function RegisterPage() {
       <p className="mt-2 text-sm text-zinc-600">
         Google OAuth または メールリンクでログインできます。
       </p>
+
+      <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm">
+        <div className="font-medium">
+          状態:{" "}
+          {authState === "loggedIn"
+            ? "ログイン中"
+            : authState === "loggedOut"
+            ? "ログアウト中"
+            : "確認中"}
+        </div>
+        {userEmail && (
+          <div className="mt-1 text-zinc-600">メール: {userEmail}</div>
+        )}
+        {authState === "loggedIn" && (
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              setAuthState("loggedOut");
+              setMe(null);
+              setUserEmail(null);
+            }}
+            className="mt-3 rounded-md border border-zinc-200 px-3 py-1 text-xs hover:bg-white"
+          >
+            ログアウト
+          </button>
+        )}
+      </div>
 
       {authState === "loggedIn" && me?.theater && (
         <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm">
