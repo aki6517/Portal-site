@@ -22,9 +22,9 @@ const getTheaterStatusCopy = (status: string) => {
   switch (status) {
     case "pending":
       return {
-        label: "運営確認中",
+        label: "登録処理中",
         detail:
-          "運営が内容を確認しています。公演は「下書き」の作成・編集はできますが、公開はできません。",
+          "登録は完了していますが、反映に時間がかかっている可能性があります。数分待っても変わらない場合はお問い合わせください。",
       };
     case "approved":
       return {

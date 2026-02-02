@@ -59,6 +59,36 @@ export async function POST(req: Request) {
 
   const service = createSupabaseServiceClient();
 
+  const { data: existingTheater, error: theaterCheckError } = await service
+    .from("theaters")
+    .select("id")
+    .ilike("name", name)
+    .maybeSingle();
+
+  if (theaterCheckError) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "DB_ERROR",
+          message: theaterCheckError.message,
+        },
+      },
+      { status: 500 }
+    );
+  }
+
+  if (existingTheater) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "THEATER_NAME_EXISTS",
+          message: "同じ名前の劇団が既に登録されています",
+        },
+      },
+      { status: 409 }
+    );
+  }
+
   const { data: existingMember, error: memberError } = await service
     .from("theater_members")
     .select("theater_id, role")
@@ -101,7 +131,7 @@ export async function POST(req: Request) {
       sns_facebook_url: payload.sns_facebook_url ?? null,
       description: payload.description ?? null,
       logo_url: payload.logo_url ?? null,
-      status: "pending",
+      status: "approved",
     })
     .select("id, status")
     .single();

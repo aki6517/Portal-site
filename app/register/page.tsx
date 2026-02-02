@@ -42,6 +42,11 @@ export default function RegisterPage() {
     "idle" | "checking" | "ok" | "error"
   >("idle");
   const [meCheckMessage, setMeCheckMessage] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteStatus, setInviteStatus] = useState<
+    "idle" | "loading" | "sent" | "error"
+  >("idle");
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
   const [onboardForm, setOnboardForm] = useState({
     name: "",
     contact_email: "",
@@ -158,8 +163,29 @@ export default function RegisterPage() {
       setOnboarding(false);
       return;
     }
-    setOnboardMessage("劇団情報を送信しました。承認をお待ちください。");
+    setOnboardMessage("劇団情報を送信しました。すぐに公演を作成できます。");
     setOnboarding(false);
+  };
+
+  const submitInvite = async () => {
+    setInviteStatus("loading");
+    setInviteMessage(null);
+    const res = await fetch("/api/theater/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: inviteEmail }),
+    });
+    const json = (await res.json()) as {
+      error?: { message: string };
+    };
+    if (!res.ok) {
+      setInviteStatus("error");
+      setInviteMessage(json.error?.message ?? "招待に失敗しました");
+      return;
+    }
+    setInviteStatus("sent");
+    setInviteMessage("招待メールを追加しました。");
+    setInviteEmail("");
   };
 
   return (
@@ -215,6 +241,39 @@ export default function RegisterPage() {
           >
             劇団ダッシュボードへ
           </a>
+          <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-4">
+            <div className="text-sm font-semibold">2人目のメールを追加</div>
+            <p className="mt-1 text-xs text-zinc-600">
+              この劇団にログインできるメールは最大2件までです。
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                className="flex-1 rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                placeholder="追加するメールアドレス"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+              />
+              <button
+                onClick={submitInvite}
+                disabled={!inviteEmail || inviteStatus === "loading"}
+                className="rounded-md border border-zinc-900 bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {inviteStatus === "loading" ? "追加中..." : "追加する"}
+              </button>
+            </div>
+            {inviteMessage && (
+              <p
+                className={`mt-2 text-xs ${
+                  inviteStatus === "error" ? "text-red-600" : "text-green-600"
+                }`}
+              >
+                {inviteMessage}
+              </p>
+            )}
+            <p className="mt-2 text-xs text-zinc-500">
+              追加されたメールでログインすると自動的にこの劇団に紐づきます。
+            </p>
+          </div>
         </div>
       )}
 
@@ -260,7 +319,7 @@ export default function RegisterPage() {
         <div className="mt-8 rounded-lg border border-zinc-200 p-4">
           <h2 className="text-lg font-semibold">劇団情報の登録</h2>
           <p className="mt-1 text-sm text-zinc-600">
-            承認後に公演の公開が可能になります。
+            登録後すぐに公演の作成・公開ができます。
           </p>
           <div className="mt-4 space-y-3 text-sm">
             <input

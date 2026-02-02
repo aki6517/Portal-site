@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export async function GET() {
   const supabase = await createSupabaseServerClient();
@@ -15,7 +16,9 @@ export async function GET() {
     );
   }
 
-  const { data: member, error: memberError } = await supabase
+  const service = createSupabaseServiceClient();
+
+  const { data: member, error: memberError } = await service
     .from("theater_members")
     .select("theater_id, role")
     .eq("user_id", user.id)
@@ -28,14 +31,57 @@ export async function GET() {
     );
   }
 
-  if (!member) {
+  let resolvedMember = member;
+
+  if (!resolvedMember && user.email) {
+    const { data: invite } = await service
+      .from("theater_invites")
+      .select("id, theater_id, status")
+      .ilike("email", user.email)
+      .eq("status", "pending")
+      .maybeSingle();
+
+    if (invite) {
+      const { count: memberCount } = await service
+        .from("theater_members")
+        .select("*", { count: "exact", head: true })
+        .eq("theater_id", invite.theater_id);
+      const { count: inviteCount } = await service
+        .from("theater_invites")
+        .select("*", { count: "exact", head: true })
+        .eq("theater_id", invite.theater_id)
+        .eq("status", "pending");
+
+      const total = (memberCount ?? 0) + (inviteCount ?? 0);
+      if (total <= 2) {
+        const { data: insertedMember } = await service
+          .from("theater_members")
+          .insert({
+            theater_id: invite.theater_id,
+            user_id: user.id,
+            role: "editor",
+          })
+          .select("theater_id, role")
+          .maybeSingle();
+
+        await service
+          .from("theater_invites")
+          .update({ status: "accepted" })
+          .eq("id", invite.id);
+
+        resolvedMember = insertedMember ?? null;
+      }
+    }
+  }
+
+  if (!resolvedMember) {
     return NextResponse.json({ data: { theater: null, member: null } });
   }
 
   const { data: theater, error: theaterError } = await supabase
     .from("theaters")
     .select("id, name, status")
-    .eq("id", member.theater_id)
+    .eq("id", resolvedMember.theater_id)
     .single();
 
   if (theaterError) {
@@ -45,5 +91,5 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json({ data: { theater, member } });
+  return NextResponse.json({ data: { theater, member: resolvedMember } });
 }
