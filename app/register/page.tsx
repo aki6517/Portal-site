@@ -73,7 +73,6 @@ export default function RegisterPage() {
     { user_id: string; role: string; email: string }[]
   >([]);
   const [memberRemoveId, setMemberRemoveId] = useState<string | null>(null);
-  const [inviteRemoveId, setInviteRemoveId] = useState<string | null>(null);
   const [onboardForm, setOnboardForm] = useState({
     name: "",
     contact_email: "",
@@ -311,33 +310,6 @@ export default function RegisterPage() {
     } catch {}
   };
 
-  const removeInvite = async (inviteId: string) => {
-    setInviteRemoveId(inviteId);
-    setInviteMessage(null);
-    const res = await fetch("/api/theater/invite", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inviteId }),
-    });
-    const json = (await res.json()) as { error?: { message: string } };
-    if (!res.ok) {
-      setInviteStatus("error");
-      setInviteMessage(json.error?.message ?? "招待の削除に失敗しました");
-      setInviteRemoveId(null);
-      return;
-    }
-    setInviteStatus("sent");
-    setInviteMessage("招待を削除しました。");
-    setInviteRemoveId(null);
-
-    try {
-      const refreshed = await fetch("/api/theater/me", { cache: "no-store" });
-      const refreshedJson = (await refreshed.json()) as MeResponse;
-      setMe(refreshedJson.data ?? null);
-    } catch {
-      // ignore
-    }
-  };
 
   const totalInUse =
     (me?.stats?.memberCount ?? 0) + (me?.stats?.inviteCount ?? 0);
