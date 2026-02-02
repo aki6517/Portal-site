@@ -4,7 +4,32 @@ BEGIN;
 -- 劇団登録は承認不要: 既定ステータスを approved にする
 -- ------------------------------------------------------------
 ALTER TABLE theaters ALTER COLUMN status SET DEFAULT 'approved';
+
+-- 既存スキーマでは「status変更は admin/service_role のみ」というトリガーがあるため、
+-- そのまま UPDATE すると弾かれることがあります。ここでは一時的にトリガーを無効化して更新します。
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_trigger
+    WHERE tgname = 'trg_prevent_theater_status_update'
+  ) THEN
+    EXECUTE 'ALTER TABLE theaters DISABLE TRIGGER trg_prevent_theater_status_update';
+  END IF;
+END $$;
+
 UPDATE theaters SET status = 'approved' WHERE status = 'pending';
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_trigger
+    WHERE tgname = 'trg_prevent_theater_status_update'
+  ) THEN
+    EXECUTE 'ALTER TABLE theaters ENABLE TRIGGER trg_prevent_theater_status_update';
+  END IF;
+END $$;
 
 -- 登録時ポリシーを更新（approvedのみ許可）
 DROP POLICY IF EXISTS "Authenticated users can create theater as pending" ON theaters;
