@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type InvitePayload = {
   email?: string;
+  inviteId?: string;
 };
 
 const isValidEmail = (value: string) =>
@@ -114,4 +115,72 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ data: { email } }, { status: 201 });
+}
+
+export async function DELETE(req: Request) {
+  let payload: InvitePayload;
+  try {
+    payload = (await req.json()) as InvitePayload;
+  } catch {
+    return NextResponse.json(
+      { error: { code: "INVALID_JSON", message: "Request body is invalid" } },
+      { status: 400 }
+    );
+  }
+
+  const inviteId = payload.inviteId;
+  if (!inviteId) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "inviteId is required" } },
+      { status: 400 }
+    );
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "Login required" } },
+      { status: 401 }
+    );
+  }
+
+  const service = createSupabaseServiceClient();
+  const { data: member } = await service
+    .from("theater_members")
+    .select("theater_id, role")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!member || member.role !== "owner") {
+    return NextResponse.json(
+      {
+        error: { code: "FORBIDDEN", message: "Owner only" },
+      },
+      { status: 403 }
+    );
+  }
+
+  const { error: delError } = await service
+    .from("theater_invites")
+    .delete()
+    .eq("id", inviteId)
+    .eq("theater_id", member.theater_id);
+
+  if (delError) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "DB_ERROR",
+          message: delError.message,
+        },
+      },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ data: { deleted: true } }, { status: 200 });
 }

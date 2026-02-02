@@ -34,6 +34,19 @@ const getTheaterStatusCopy = (status: string) => {
   }
 };
 
+const getInviteStatusCopy = (status: string) => {
+  switch (status) {
+    case "pending":
+      return { label: "未確認", tone: "text-amber-700", bg: "bg-amber-50" };
+    case "accepted":
+      return { label: "確認済み", tone: "text-green-700", bg: "bg-green-50" };
+    case "revoked":
+      return { label: "無効", tone: "text-zinc-600", bg: "bg-zinc-100" };
+    default:
+      return { label: status, tone: "text-zinc-700", bg: "bg-zinc-50" };
+  }
+};
+
 export default function RegisterPage() {
   const supabase = createSupabaseBrowserClient();
   const [email, setEmail] = useState("");
@@ -55,6 +68,7 @@ export default function RegisterPage() {
     "idle" | "loading" | "sent" | "error"
   >("idle");
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+  const [inviteRemoveId, setInviteRemoveId] = useState<string | null>(null);
   const [onboardForm, setOnboardForm] = useState({
     name: "",
     contact_email: "",
@@ -205,6 +219,34 @@ export default function RegisterPage() {
     }
   };
 
+  const removeInvite = async (inviteId: string) => {
+    setInviteRemoveId(inviteId);
+    setInviteMessage(null);
+    const res = await fetch("/api/theater/invite", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inviteId }),
+    });
+    const json = (await res.json()) as { error?: { message: string } };
+    if (!res.ok) {
+      setInviteStatus("error");
+      setInviteMessage(json.error?.message ?? "招待の削除に失敗しました");
+      setInviteRemoveId(null);
+      return;
+    }
+    setInviteStatus("sent");
+    setInviteMessage("招待を削除しました。");
+    setInviteRemoveId(null);
+
+    try {
+      const refreshed = await fetch("/api/theater/me", { cache: "no-store" });
+      const refreshedJson = (await refreshed.json()) as MeResponse;
+      setMe(refreshedJson.data ?? null);
+    } catch {
+      // ignore
+    }
+  };
+
   const totalInUse =
     (me?.stats?.memberCount ?? 0) + (me?.stats?.inviteCount ?? 0);
   const limitReached =
@@ -322,10 +364,26 @@ export default function RegisterPage() {
               <div className="mt-3 space-y-1 text-xs text-zinc-600">
                 <div className="font-semibold text-zinc-700">招待の状況</div>
                 {me.invites.map((inv) => (
-                  <div key={inv.id} className="rounded-md border border-zinc-200 bg-white px-3 py-2">
+                  <div
+                    key={inv.id}
+                    className="rounded-md border border-zinc-200 bg-white px-3 py-2"
+                  >
                     <div className="font-medium">{inv.email}</div>
-                    <div className="text-[11px] text-zinc-500">
-                      ステータス: {inv.status}
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded px-2 py-1 ${getInviteStatusCopy(inv.status).bg} ${getInviteStatusCopy(inv.status).tone}`}
+                      >
+                        {getInviteStatusCopy(inv.status).label}
+                      </span>
+                      {inv.status === "pending" && (
+                        <button
+                          onClick={() => removeInvite(inv.id)}
+                          disabled={inviteRemoveId === inv.id}
+                          className="text-red-600 hover:underline disabled:opacity-50"
+                        >
+                          {inviteRemoveId === inv.id ? "削除中..." : "削除"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
