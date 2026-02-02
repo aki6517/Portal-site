@@ -18,6 +18,38 @@ type EventRow = {
   start_date: string;
 };
 
+const getTheaterStatusCopy = (status: string) => {
+  switch (status) {
+    case "pending":
+      return {
+        label: "運営確認中",
+        detail:
+          "運営が内容を確認しています。公演は「下書き」の作成・編集はできますが、公開はできません。",
+      };
+    case "approved":
+      return {
+        label: "承認済み",
+        detail: "公演の公開ができます。",
+      };
+    case "rejected":
+      return {
+        label: "差し戻し",
+        detail: "申請が差し戻されています。内容を修正して再度登録してください。",
+      };
+    case "suspended":
+      return {
+        label: "停止中",
+        detail:
+          "運営により一時停止されています。公開・編集が制限されている可能性があります。",
+      };
+    default:
+      return {
+        label: status,
+        detail: "ステータスを確認してください。",
+      };
+  }
+};
+
 export default function TheaterDashboardPage() {
   const supabase = createSupabaseBrowserClient();
   const [me, setMe] = useState<MeData | null>(null);
@@ -186,11 +218,16 @@ export default function TheaterDashboardPage() {
     );
   }
 
+  const theaterStatus = getTheaterStatusCopy(theater.status);
+
   return (
     <div className="space-y-6">
       {theater.status !== "approved" && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          劇団は現在「{theater.status}」です。公開はできませんが下書きの作成・編集は可能です。
+          <div className="font-medium">
+            劇団ステータス: {theaterStatus.label}
+          </div>
+          <div className="mt-1 text-amber-900/90">{theaterStatus.detail}</div>
         </div>
       )}
       <div className="rounded-xl border border-zinc-200 p-6">

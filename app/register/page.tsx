@@ -11,6 +11,21 @@ type MeResponse = {
   error?: { code: string; message: string };
 };
 
+const getTheaterStatusCopy = (status: string) => {
+  switch (status) {
+    case "pending":
+      return { label: "運営確認中" };
+    case "approved":
+      return { label: "承認済み" };
+    case "rejected":
+      return { label: "差し戻し" };
+    case "suspended":
+      return { label: "停止中" };
+    default:
+      return { label: status };
+  }
+};
+
 export default function RegisterPage() {
   const supabase = createSupabaseBrowserClient();
   const [email, setEmail] = useState("");
@@ -191,7 +206,8 @@ export default function RegisterPage() {
         <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm">
           <div className="font-medium">ログイン済み</div>
           <div className="mt-1 text-zinc-600">
-            劇団: {me.theater.name} / 状態: {me.theater.status}
+            劇団: {me.theater.name} / ステータス:{" "}
+            {getTheaterStatusCopy(me.theater.status).label}
           </div>
           <a
             href="/theater"
