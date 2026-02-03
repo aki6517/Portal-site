@@ -21,6 +21,7 @@ type EventUpdatePayload = {
   flyer_url?: string | null;
   ticket_url?: string | null;
   cast?: unknown[] | null;
+  ai_confidence?: number | null;
   status?: "draft" | "published" | "archived";
 };
 
@@ -176,6 +177,8 @@ export async function PATCH(
   if ("flyer_url" in payload) update.flyer_url = payload.flyer_url ?? null;
   if ("ticket_url" in payload) update.ticket_url = payload.ticket_url ?? null;
   if ("cast" in payload) update["cast"] = payload.cast ?? [];
+  if ("ai_confidence" in payload)
+    update.ai_confidence = payload.ai_confidence ?? null;
   if (payload.status) update.status = payload.status;
 
   const { data: updated, error: updateError } = await supabase

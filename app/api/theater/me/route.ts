@@ -57,7 +57,7 @@ export async function GET() {
 
       const total = (memberCount ?? 0) + (inviteCount ?? 0);
       if (total <= 2) {
-        const { data: insertedMember } = await service
+        const { data: insertedMember, error: insertError } = await service
           .from("theater_members")
           .insert({
             theater_id: invite.theater_id,
@@ -67,13 +67,14 @@ export async function GET() {
           .select("theater_id, role")
           .maybeSingle();
 
-        await service
-          .from("theater_invites")
-          .update({ status: "accepted" })
-          .eq("id", invite.id);
-
-        resolvedMember = insertedMember ?? null;
-        joinedFromInvite = !!insertedMember;
+        if (!insertError && insertedMember) {
+          await service
+            .from("theater_invites")
+            .update({ status: "accepted" })
+            .eq("id", invite.id);
+          resolvedMember = insertedMember;
+          joinedFromInvite = true;
+        }
       }
     }
   }

@@ -103,6 +103,17 @@ export async function POST(req: Request) {
     .single();
 
   if (inviteError) {
+    if (inviteError.code === "23505") {
+      return NextResponse.json(
+        {
+          error: {
+            code: "ALREADY_EXISTS",
+            message: "このメールはすでに追加されています",
+          },
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       {
         error: {

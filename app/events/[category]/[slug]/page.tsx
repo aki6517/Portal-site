@@ -25,7 +25,38 @@ type EventRecord = {
   cast: { name?: string; role?: string; image_url?: string }[] | null;
 };
 
+type RelatedEvent = {
+  id: string;
+  category: string;
+  slug: string;
+  title: string;
+  start_date: string;
+  venue: string | null;
+  flyer_url: string | null;
+  image_url: string | null;
+};
+
 const SITE_NAME = "福岡アクトポータル";
+
+const getSiteUrl = () => {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, "");
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) return `https://${vercelUrl}`;
+  return "http://localhost:3000";
+};
+
+const CATEGORY_COPY: Record<string, { label: string; icon: string }> = {
+  comedy: { label: "コメディ", icon: "😂" },
+  conversation: { label: "会話劇", icon: "💬" },
+  musical: { label: "ミュージカル", icon: "🎵" },
+  classic: { label: "古典・時代劇", icon: "🏯" },
+  dance: { label: "ダンス", icon: "💃" },
+  student: { label: "学生演劇", icon: "🎓" },
+  conte: { label: "コント", icon: "🎭" },
+  experimental: { label: "実験的", icon: "🔬" },
+  other: { label: "その他", icon: "📌" },
+};
 
 const formatDate = (value?: string | null) => {
   if (!value) return "";
@@ -50,6 +81,21 @@ const getEvent = async (category: string, slug: string) => {
 
   if (error || !data) return null;
   return data;
+};
+
+const getRelatedEvents = async (category: string, excludeId: string) => {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("events")
+    .select("id, category, slug, title, start_date, venue, flyer_url, image_url")
+    .eq("category", category)
+    .eq("status", "published")
+    .neq("id", excludeId)
+    .order("start_date", { ascending: true })
+    .limit(3)
+    .returns<RelatedEvent[]>();
+
+  return data ?? [];
 };
 
 const tryRedirect = async (category: string, slug: string) => {
@@ -103,10 +149,16 @@ export default async function EventDetailPage({
     notFound();
   }
 
+  const categoryCopy = CATEGORY_COPY[event.category] ?? {
+    label: event.category,
+    icon: "🎟️",
+  };
+  const siteUrl = getSiteUrl();
   const start = formatDate(event.start_date);
   const end = formatDate(event.end_date);
   const dateLabel = end ? `${start} 〜 ${end}` : start;
   const image = event.flyer_url || event.image_url;
+  const related = await getRelatedEvents(event.category, event.id);
 
   const startIso = event.start_date;
   const endIso = event.end_date ?? event.start_date;
@@ -115,25 +167,25 @@ export default async function EventDetailPage({
       "@type": "ListItem",
       position: 1,
       name: "トップ",
-      item: "https://portal.galapagos-dynamos.com/",
+      item: `${siteUrl}/`,
     },
     {
       "@type": "ListItem",
       position: 2,
       name: "公演一覧",
-      item: "https://portal.galapagos-dynamos.com/events/",
+      item: `${siteUrl}/events/`,
     },
     {
       "@type": "ListItem",
       position: 3,
-      name: event.category,
-      item: `https://portal.galapagos-dynamos.com/events/${event.category}/`,
+      name: categoryCopy.label,
+      item: `${siteUrl}/events/${event.category}/`,
     },
     {
       "@type": "ListItem",
       position: 4,
       name: event.title,
-      item: `https://portal.galapagos-dynamos.com/events/${event.category}/${event.slug}`,
+      item: `${siteUrl}/events/${event.category}/${event.slug}`,
     },
   ];
 
@@ -165,7 +217,7 @@ export default async function EventDetailPage({
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
+    <div className="mx-auto max-w-6xl px-4 py-10">
       <ViewCounter category={event.category} slug={event.slug} />
       <script
         type="application/ld+json"
@@ -176,42 +228,60 @@ export default async function EventDetailPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
-      <nav className="text-xs text-zinc-500">
+      <nav className="text-xs">
         <ol className="flex flex-wrap items-center gap-2">
           <li>
-            <Link href="/" className="hover:underline">
+            <Link href="/" className="badge-retro bg-surface">
               トップ
             </Link>
           </li>
-          <li>/</li>
           <li>
-            <Link href="/events" className="hover:underline">
+            <span className="px-1 text-zinc-500">→</span>
+          </li>
+          <li>
+            <Link href="/events" className="badge-retro bg-surface">
               公演一覧
             </Link>
           </li>
-          <li>/</li>
+          <li>
+            <span className="px-1 text-zinc-500">→</span>
+          </li>
           <li>
             <Link
               href={`/events/${event.category}`}
-              className="hover:underline"
+              className="badge-retro bg-surface"
             >
-              {event.category}
+              <span aria-hidden>{categoryCopy.icon}</span>
+              {categoryCopy.label}
             </Link>
           </li>
-          <li>/</li>
-          <li className="text-zinc-800">{event.title}</li>
+          <li>
+            <span className="px-1 text-zinc-500">→</span>
+          </li>
+          <li className="badge-retro bg-primary">{event.title}</li>
         </ol>
       </nav>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-[1.2fr_1fr]">
-        <div>
-          <p className="text-xs text-zinc-500">
-            {event.category} / {event.slug}
-          </p>
-          <h1 className="mt-2 text-3xl font-bold">{event.title}</h1>
-          <p className="mt-2 text-sm text-zinc-600">{event.company}</p>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="card-retro p-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="badge-retro bg-secondary">
+              <span aria-hidden>{categoryCopy.icon}</span>
+              {categoryCopy.label}
+            </span>
+            <span className="badge-retro bg-surface-muted">
+              <span className="font-mono">/{event.category}/{event.slug}</span>
+            </span>
+          </div>
 
-          <div className="mt-4 space-y-2 text-sm text-zinc-700">
+          <h1 className="mt-4 font-display text-3xl font-black leading-tight md:text-4xl">
+            {event.title}
+          </h1>
+          <p className="mt-2 text-sm font-semibold text-zinc-800">
+            {event.company}
+          </p>
+
+          <div className="mt-5 grid gap-3 text-sm">
             <div>
               <span className="font-semibold">開催日時:</span> {dateLabel}
             </div>
@@ -238,7 +308,7 @@ export default async function EventDetailPage({
               <div>
                 <span className="font-semibold">チケット:</span>{" "}
                 <a
-                  className="text-zinc-900 underline"
+                  className="link-retro"
                   href={event.ticket_url}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -254,7 +324,7 @@ export default async function EventDetailPage({
               {event.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-600"
+                  className="badge-retro bg-surface-muted"
                 >
                   #{tag}
                 </span>
@@ -263,7 +333,7 @@ export default async function EventDetailPage({
           )}
         </div>
 
-        <div>
+        <div className="card-retro overflow-hidden">
           {image ? (
             <Image
               src={image}
@@ -271,10 +341,10 @@ export default async function EventDetailPage({
               width={800}
               height={1000}
               unoptimized
-              className="w-full rounded-xl border border-zinc-200 object-cover"
+              className="h-full w-full bg-surface object-cover"
             />
           ) : (
-            <div className="flex h-80 items-center justify-center rounded-xl border border-dashed border-zinc-200 text-sm text-zinc-400">
+            <div className="flex h-80 items-center justify-center bg-surface text-sm text-zinc-600">
               画像は未登録です
             </div>
           )}
@@ -282,26 +352,26 @@ export default async function EventDetailPage({
       </div>
 
       {event.description && (
-        <div className="mt-10 rounded-xl border border-zinc-200 bg-white p-6">
-          <h2 className="text-lg font-semibold">あらすじ</h2>
-          <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-700">
+        <div className="card-retro mt-10 p-6">
+          <h2 className="font-display text-xl font-black">あらすじ</h2>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-zinc-800">
             {event.description}
           </p>
         </div>
       )}
 
       {event.cast && event.cast.length > 0 && (
-        <div className="mt-8 rounded-xl border border-zinc-200 bg-white p-6">
-          <h2 className="text-lg font-semibold">キャスト</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="card-retro mt-8 p-6">
+          <h2 className="font-display text-xl font-black">キャスト</h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {event.cast.map((member, index) => (
               <div
                 key={`${member.name ?? "cast"}-${index}`}
-                className="rounded-md border border-zinc-200 p-3 text-sm"
+                className="rounded-xl border-2 border-ink bg-surface p-4 shadow-hard-sm"
               >
-                <div className="font-medium">{member.name ?? "名称未設定"}</div>
+                <div className="font-bold">{member.name ?? "名称未設定"}</div>
                 {member.role && (
-                  <div className="text-xs text-zinc-500">{member.role}</div>
+                  <div className="mt-1 text-xs text-zinc-700">{member.role}</div>
                 )}
               </div>
             ))}
@@ -309,21 +379,61 @@ export default async function EventDetailPage({
         </div>
       )}
 
-      <div className="mt-10 rounded-2xl border border-zinc-200 bg-zinc-50 p-6">
-        <h2 className="text-lg font-semibold">公演を掲載したい劇団の方へ</h2>
-        <p className="mt-2 text-sm text-zinc-600">
+      {related.length > 0 && (
+        <div className="mt-10">
+          <h2 className="font-display text-xl font-black">関連の公演</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            {related.map((item) => {
+              const thumb = item.flyer_url || item.image_url;
+              return (
+                <Link
+                  key={item.id}
+                  href={`/events/${item.category}/${item.slug}`}
+                  className="card-retro block overflow-hidden transition-transform hover:-translate-y-0.5"
+                >
+                  <div className="aspect-[4/3] bg-surface-muted">
+                    {thumb ? (
+                      <Image
+                        src={thumb}
+                        alt={item.title}
+                        width={800}
+                        height={600}
+                        unoptimized
+                        className="h-full w-full object-cover"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="p-4">
+                    <div className="text-sm font-black">{item.title}</div>
+                    <div className="mt-1 text-xs text-zinc-700">
+                      {formatDate(item.start_date)}
+                      {item.venue ? ` / ${item.venue}` : ""}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="card-retro mt-10 bg-secondary p-6">
+        <h2 className="font-display text-xl font-black">
+          公演を掲載したい劇団の方へ
+        </h2>
+        <p className="mt-2 text-sm text-zinc-800">
           ログイン後に劇団情報を入力すると、公演の作成・編集ができます。
         </p>
         <div className="mt-4 flex flex-wrap gap-3 text-sm">
           <Link
             href="/register"
-            className="rounded-full border border-zinc-900 bg-zinc-900 px-4 py-2 text-white"
+            className="btn-retro btn-ink"
           >
             ログイン / 登録
           </Link>
           <Link
             href="/theater"
-            className="rounded-full border border-zinc-200 px-4 py-2 hover:bg-white"
+            className="btn-retro btn-surface"
           >
             管理画面へ
           </Link>

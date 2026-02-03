@@ -1,26 +1,279 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand (from stitch/prototype) */
+  --paper: #fffbf5;
+  --ink: #1a1a1a;
+  --primary: #00e0ff;
+  --accent: #ff2e63;
+  --secondary: #ffd700;
+  --pop-pink: #ff4785;
+  --pop-blue: #26cdff;
+  --pop-yellow: #ffcf00;
+  --pop-green: #00d1b2;
+  --pop-purple: #9b5de5;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-muted: #f4f1e6;
+
+  /* Shadows (retro “hard” shadow) */
+  --shadow-hard: 4px 4px 0px 0px var(--ink);
+  --shadow-hard-sm: 2px 2px 0px 0px var(--ink);
+  --shadow-hard-lg: 8px 8px 0px 0px var(--ink);
+  --shadow-hard-pink: 4px 4px 0px 0px var(--pop-pink);
+  --shadow-hard-blue: 4px 4px 0px 0px var(--pop-blue);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-pop-pink: var(--pop-pink);
+  --color-pop-blue: var(--pop-blue);
+  --color-pop-yellow: var(--pop-yellow);
+  --color-pop-green: var(--pop-green);
+  --color-pop-purple: var(--pop-purple);
+  --font-sans: var(--font-zen-sans);
+  --font-display: var(--font-dela-display);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    background-image: radial-gradient(#e5e5e5 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  ::selection {
+    background: rgba(0, 224, 255, 0.5);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .font-display {
+    font-family:
+      var(--font-display),
+      var(--font-sans),
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
+  }
+
+  .bg-paper {
+    background-color: var(--paper);
+  }
+  .bg-surface {
+    background-color: var(--surface);
+  }
+  .bg-surface-muted {
+    background-color: var(--surface-muted);
+  }
+  .bg-ink {
+    background-color: var(--ink);
+  }
+  .bg-primary {
+    background-color: var(--primary);
+  }
+  .bg-accent {
+    background-color: var(--accent);
+  }
+  .bg-secondary {
+    background-color: var(--secondary);
+  }
+  .bg-pop-pink {
+    background-color: var(--pop-pink);
+  }
+  .bg-pop-blue {
+    background-color: var(--pop-blue);
+  }
+  .bg-pop-yellow {
+    background-color: var(--pop-yellow);
+  }
+  .bg-pop-green {
+    background-color: var(--pop-green);
+  }
+  .bg-pop-purple {
+    background-color: var(--pop-purple);
+  }
+
+  .text-ink {
+    color: var(--ink);
+  }
+  .text-pop-pink {
+    color: var(--pop-pink);
+  }
+  .text-pop-blue {
+    color: var(--pop-blue);
+  }
+  .text-pop-yellow {
+    color: var(--pop-yellow);
+  }
+  .text-pop-green {
+    color: var(--pop-green);
+  }
+  .text-pop-purple {
+    color: var(--pop-purple);
+  }
+  .border-ink {
+    border-color: var(--ink);
+  }
+  .border-pop-pink {
+    border-color: var(--pop-pink);
+  }
+  .border-pop-blue {
+    border-color: var(--pop-blue);
+  }
+  .border-pop-yellow {
+    border-color: var(--pop-yellow);
+  }
+  .border-pop-green {
+    border-color: var(--pop-green);
+  }
+  .border-pop-purple {
+    border-color: var(--pop-purple);
+  }
+
+  .shadow-hard {
+    box-shadow: var(--shadow-hard);
+  }
+  .shadow-hard-sm {
+    box-shadow: var(--shadow-hard-sm);
+  }
+  .shadow-hard-lg {
+    box-shadow: var(--shadow-hard-lg);
+  }
+  .shadow-hard-pink {
+    box-shadow: var(--shadow-hard-pink);
+  }
+  .shadow-hard-blue {
+    box-shadow: var(--shadow-hard-blue);
+  }
+  .hover-shadow-hard:hover {
+    box-shadow: var(--shadow-hard);
+  }
+  .hover-shadow-hard-lg:hover {
+    box-shadow: var(--shadow-hard-lg);
+  }
+
+  .card-retro {
+    background-color: var(--surface);
+    border-width: 2px;
+    border-color: var(--ink);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-hard);
+  }
+
+  .btn-retro {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-width: 2px;
+    border-color: var(--ink);
+    border-radius: 0.75rem;
+    padding: 0.6rem 1rem;
+    font-weight: 800;
+    transition:
+      transform 120ms ease,
+      box-shadow 120ms ease,
+      background-color 120ms ease,
+      color 120ms ease;
+    box-shadow: var(--shadow-hard-sm);
+  }
+  .btn-retro:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: var(--shadow-hard);
+  }
+  .btn-retro:active {
+    transform: translate(0px, 0px);
+    box-shadow: none;
+  }
+
+  .btn-ink {
+    background-color: var(--ink);
+    color: white;
+  }
+  .btn-ink:hover {
+    background-color: var(--primary);
+    color: var(--ink);
+  }
+
+  .btn-surface {
+    background-color: var(--surface);
+    color: var(--ink);
+  }
+  .btn-surface:hover {
+    background-color: var(--surface-muted);
+  }
+
+  .nav-link-retro {
+    border-radius: 0.75rem;
+    padding: 0.35rem 0.55rem;
+    transition: background-color 120ms ease;
+  }
+  .nav-link-retro:hover {
+    background-color: var(--surface-muted);
+  }
+
+  .badge-retro {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-width: 2px;
+    border-color: var(--ink);
+    border-radius: 9999px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 800;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+
+  .input-retro {
+    width: 100%;
+    border-width: 2px;
+    border-color: var(--ink);
+    border-radius: 0.75rem;
+    padding: 0.6rem 0.8rem;
+    background-color: var(--surface);
+    box-shadow: var(--shadow-hard-sm);
+    font-size: 0.95rem;
+  }
+
+  .textarea-retro {
+    width: 100%;
+    border-width: 2px;
+    border-color: var(--ink);
+    border-radius: 0.75rem;
+    padding: 0.6rem 0.8rem;
+    background-color: var(--surface);
+    box-shadow: var(--shadow-hard-sm);
+    font-size: 0.95rem;
+    min-height: 7rem;
+  }
+
+  .link-retro {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-weight: 800;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

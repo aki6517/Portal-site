@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type EventPayload = {
   category?: string;
@@ -20,6 +21,7 @@ type EventPayload = {
   flyer_url?: string | null;
   ticket_url?: string | null;
   cast?: unknown[] | null;
+  ai_confidence?: number | null;
   status?: "draft" | "published" | "archived";
 };
 
@@ -80,7 +82,33 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json({ data: { events } });
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !events || events.length === 0) {
+    return NextResponse.json({ data: { events } });
+  }
+
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
+  const sinceDate = since.toISOString().slice(0, 10);
+  const eventIds = events.map((event) => event.id);
+  const service = createSupabaseServiceClient();
+  const { data: viewsRows } = await service
+    .from("event_views_daily")
+    .select("event_id, views")
+    .gte("view_date", sinceDate)
+    .in("event_id", eventIds);
+
+  const viewsMap = new Map<string, number>();
+  (viewsRows ?? []).forEach((row) => {
+    const total = viewsMap.get(row.event_id) ?? 0;
+    viewsMap.set(row.event_id, total + (row.views ?? 0));
+  });
+
+  const eventsWithViews = events.map((event) => ({
+    ...event,
+    views_30: viewsMap.get(event.id) ?? 0,
+  }));
+
+  return NextResponse.json({ data: { events: eventsWithViews } });
 }
 
 export async function POST(req: Request) {
@@ -196,6 +224,8 @@ export async function POST(req: Request) {
       flyer_url: payload.flyer_url ?? null,
       ticket_url: payload.ticket_url ?? null,
       "cast": payload.cast ?? [],
+      ai_confidence:
+        payload.ai_confidence !== undefined ? payload.ai_confidence : null,
       status: payload.status ?? "draft",
     })
     .select("id, category, slug, status")

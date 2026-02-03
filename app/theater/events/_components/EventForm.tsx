@@ -33,6 +33,7 @@ type FormState = {
   cast: string;
   flyer_url: string;
   image_url: string;
+  ai_confidence: string;
   status: "draft" | "published" | "archived";
 };
 
@@ -52,6 +53,7 @@ type EventData = {
   cast?: unknown[] | null;
   flyer_url?: string | null;
   image_url?: string | null;
+  ai_confidence?: number | null;
   status?: "draft" | "published" | "archived" | null;
 };
 
@@ -77,6 +79,10 @@ const buildInitialState = (data?: EventData | null): FormState => ({
   cast: Array.isArray(data?.cast) ? JSON.stringify(data.cast, null, 2) : "",
   flyer_url: data?.flyer_url ?? "",
   image_url: data?.image_url ?? "",
+  ai_confidence:
+    data?.ai_confidence !== null && data?.ai_confidence !== undefined
+      ? String(data.ai_confidence)
+      : "",
   status: data?.status ?? "draft",
 });
 
@@ -250,6 +256,10 @@ export default function EventForm({
         cast: Array.isArray(result.cast)
           ? JSON.stringify(result.cast, null, 2)
           : prev.cast,
+        ai_confidence:
+          result.ai_confidence !== null && result.ai_confidence !== undefined
+            ? String(result.ai_confidence)
+            : prev.ai_confidence,
       }));
       setMessage("AI解析が完了しました。内容を確認してください。");
     } finally {
@@ -299,6 +309,7 @@ export default function EventForm({
       status: form.status,
       flyer_url: form.flyer_url || null,
       image_url: form.image_url || null,
+      ai_confidence: form.ai_confidence ? Number(form.ai_confidence) : null,
       cast,
     };
 
@@ -383,19 +394,29 @@ export default function EventForm({
   };
 
   return (
-    <div className="rounded-xl border border-zinc-200 p-6">
-      <h2 className="text-lg font-semibold">
+    <div className="card-retro p-6">
+      <h2 className="font-display text-xl">
         {mode === "create" ? "新規公演作成" : "公演編集"}
       </h2>
-      <p className="mt-2 text-sm text-zinc-600">
+      <p className="mt-2 text-sm text-zinc-700">
         チラシ画像アップロード → AI解析 → 内容確認の流れです。
       </p>
+      {form.ai_confidence && (
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <span className="badge-retro bg-secondary shadow-hard-sm">
+            AI信頼度: {form.ai_confidence}
+          </span>
+        </div>
+      )}
 
       <div className="mt-4 grid gap-3 text-sm">
-        <label className="text-xs text-zinc-600">チラシ画像</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          チラシ画像
+        </label>
         <input
           type="file"
           accept="image/*"
+          className="input-retro"
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (file) void uploadFlyer(file);
@@ -406,12 +427,12 @@ export default function EventForm({
             type="button"
             onClick={runAnalyze}
             disabled={analyzing || !form.flyer_url}
-            className="rounded-md border border-zinc-200 px-3 py-2 text-sm disabled:opacity-50"
+            className="btn-retro btn-surface text-xs disabled:opacity-50"
           >
             {analyzing ? "AI解析中..." : "AI解析を実行"}
           </button>
           <input
-            className="flex-1 rounded-md border border-zinc-200 px-3 py-2"
+            className="input-retro flex-1"
             placeholder="flyer_url（自動入力）"
             value={form.flyer_url}
             onChange={(e) => updateField("flyer_url", e.target.value)}
@@ -424,22 +445,28 @@ export default function EventForm({
             width={800}
             height={600}
             unoptimized
-            className="max-h-64 rounded-md border border-zinc-200 object-contain"
+            className="max-h-64 rounded-2xl border-2 border-ink bg-surface shadow-hard-sm object-contain"
           />
         )}
-        {uploading && <p className="text-xs text-zinc-600">アップロード中...</p>}
+        {uploading && (
+          <p className="text-xs text-zinc-600">アップロード中...</p>
+        )}
 
-        <label className="text-xs text-zinc-600">OGP画像URL（任意）</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          OGP画像URL（任意）
+        </label>
         <input
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           placeholder="image_url"
           value={form.image_url}
           onChange={(e) => updateField("image_url", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">カテゴリ</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          カテゴリ
+        </label>
         <select
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           value={form.category}
           onChange={(e) => updateField("category", e.target.value)}
         >
@@ -450,106 +477,132 @@ export default function EventForm({
           ))}
         </select>
 
-        <label className="text-xs text-zinc-600">slug</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          slug
+        </label>
         <input
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           placeholder="nights-coffee"
           value={form.slug}
           onChange={(e) => updateField("slug", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">公演タイトル</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          公演タイトル
+        </label>
         <input
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           placeholder="夜明けのコーヒー"
           value={form.title}
           onChange={(e) => updateField("title", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">開始日時</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          開始日時
+        </label>
         <input
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           placeholder="2026-02-01T19:00:00+09:00"
           value={form.start_date}
           onChange={(e) => updateField("start_date", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">終了日時（任意）</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          終了日時（任意）
+        </label>
         <input
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           placeholder="2026-02-03T21:00:00+09:00"
           value={form.end_date}
           onChange={(e) => updateField("end_date", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">会場名（任意）</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          会場名（任意）
+        </label>
         <input
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           placeholder="ぽんプラザホール"
           value={form.venue}
           onChange={(e) => updateField("venue", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">会場住所（任意）</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          会場住所（任意）
+        </label>
         <input
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           placeholder="福岡市..."
           value={form.venue_address}
           onChange={(e) => updateField("venue_address", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">一般料金（円・任意）</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          一般料金（円・任意）
+        </label>
         <input
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           placeholder="2500"
           value={form.price_general}
           onChange={(e) => updateField("price_general", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">学生料金（円・任意）</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          学生料金（円・任意）
+        </label>
         <input
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           placeholder="2000"
           value={form.price_student}
           onChange={(e) => updateField("price_student", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">チケットURL（任意）</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          チケットURL（任意）
+        </label>
         <input
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           placeholder="https://..."
           value={form.ticket_url}
           onChange={(e) => updateField("ticket_url", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">あらすじ（任意）</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          あらすじ（任意）
+        </label>
         <textarea
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="textarea-retro"
           placeholder="あらすじ..."
           value={form.description}
           onChange={(e) => updateField("description", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">タグ（カンマ区切り）</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          タグ（カンマ区切り）
+        </label>
         <input
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           placeholder="学生歓迎, 感動"
           value={form.tags}
           onChange={(e) => updateField("tags", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">キャスト（JSON配列）</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          キャスト（JSON配列）
+        </label>
         <textarea
-          className="rounded-md border border-zinc-200 px-3 py-2 font-mono text-xs"
+          className="textarea-retro font-mono text-xs"
           rows={4}
           placeholder='[{"name":"山田太郎","role":"主演","image_url":""}]'
           value={form.cast}
           onChange={(e) => updateField("cast", e.target.value)}
         />
 
-        <label className="text-xs text-zinc-600">ステータス</label>
+        <label className="text-xs font-black tracking-wide text-zinc-700">
+          ステータス
+        </label>
         <select
-          className="rounded-md border border-zinc-200 px-3 py-2"
+          className="input-retro"
           value={form.status}
           onChange={(e) =>
             updateField("status", e.target.value as FormState["status"])
@@ -564,21 +617,21 @@ export default function EventForm({
       <button
         onClick={submit}
         disabled={saving}
-        className="mt-4 w-full rounded-md border border-zinc-900 bg-zinc-900 px-4 py-2 text-sm text-white disabled:opacity-50"
+        className="btn-retro btn-ink mt-4 w-full disabled:opacity-50"
       >
         {saving ? "保存中..." : mode === "create" ? "公演を作成" : "変更を保存"}
       </button>
 
       {createdId && (
-        <p className="mt-2 text-xs text-zinc-600">
+        <p className="mt-2 text-xs text-zinc-700">
           作成後の編集はこちら: /theater/events/{createdId}
         </p>
       )}
-      {message && <p className="mt-2 text-xs text-zinc-600">{message}</p>}
+      {message && <p className="mt-2 text-xs text-zinc-700">{message}</p>}
 
-      <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-        <h3 className="text-sm font-semibold">SNS宣伝文生成</h3>
-        <p className="mt-1 text-xs text-zinc-600">
+      <div className="mt-6 rounded-2xl border-2 border-ink bg-surface-muted p-4 shadow-hard-sm">
+        <h3 className="text-sm font-black">SNS宣伝文生成</h3>
+        <p className="mt-1 text-xs text-zinc-700">
           公演情報をもとに宣伝文を自動生成します（保存後に利用可能）。
         </p>
         <div className="mt-3 flex flex-wrap gap-3 text-xs">
@@ -597,24 +650,27 @@ export default function EventForm({
           type="button"
           onClick={generatePromotion}
           disabled={promotionLoading}
-          className="mt-3 rounded-md border border-zinc-900 bg-zinc-900 px-3 py-2 text-xs text-white disabled:opacity-50"
+          className="btn-retro btn-ink mt-3 text-xs disabled:opacity-50"
         >
           {promotionLoading ? "生成中..." : "宣伝文を生成する"}
         </button>
         {promotionMessage && (
-          <p className="mt-2 text-xs text-zinc-600">{promotionMessage}</p>
+          <p className="mt-2 text-xs text-zinc-700">{promotionMessage}</p>
         )}
         {promotions.length > 0 && (
           <div className="mt-4 space-y-3">
             {promotions.map((promotion) => {
               const text = buildPromotionText(promotion);
               return (
-                <div key={promotion.platform} className="rounded-md border p-3">
-                  <div className="flex items-center justify-between text-xs text-zinc-500">
+                <div
+                  key={promotion.platform}
+                  className="rounded-2xl border-2 border-ink bg-surface p-3 shadow-hard-sm"
+                >
+                  <div className="flex items-center justify-between text-xs text-zinc-600">
                     <span>{promotion.platform}</span>
                     <button
                       type="button"
-                      className="text-xs text-zinc-900 underline"
+                      className="link-retro text-xs"
                       onClick={() => copyText(text)}
                     >
                       コピー

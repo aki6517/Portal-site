@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Dela_Gothic_One, Geist_Mono, Zen_Kaku_Gothic_New } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+import SiteHeader from "./_components/SiteHeader";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const zenSans = Zen_Kaku_Gothic_New({
+  variable: "--font-zen-sans",
+  weight: ["400", "500", "700", "900"],
+  subsets: ["latin"],
+});
+
+const delaDisplay = Dela_Gothic_One({
+  variable: "--font-dela-display",
+  weight: "400",
   subsets: ["latin"],
 });
 
@@ -27,39 +35,22 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${zenSans.variable} ${delaDisplay.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="min-h-screen bg-white text-zinc-900">
-          <header className="border-b border-zinc-200">
-            <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-              <Link href="/" className="text-sm font-bold tracking-wide">
-                福岡アクトポータル
-              </Link>
-              <nav className="flex items-center gap-4 text-sm">
-                <Link href="/events" className="hover:underline">
-                  公演を探す
-                </Link>
-                <Link href="/blog" className="hover:underline">
-                  ブログ
-                </Link>
-                <Link href="/register" className="hover:underline">
-                  劇団の方へ
-                </Link>
-                <Link href="/admin/contact" className="hover:underline">
-                  管理者
-                </Link>
-              </nav>
-            </div>
-          </header>
-          <main>{children}</main>
-          <footer className="border-t border-zinc-200">
-            <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 text-xs text-zinc-600">
-              <span>© 2026 福岡アクトポータル</span>
+        <div className="min-h-screen text-ink">
+          <SiteHeader />
+          <main className="pt-20 md:pt-24">{children}</main>
+          <footer className="mt-16 border-t-4 border-ink bg-ink text-white">
+            <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-xs sm:flex-row sm:items-center sm:justify-between">
+              <span className="opacity-90">© 2026 福岡アクトポータル</span>
               <div className="flex items-center gap-4">
-                <Link href="/about" className="hover:underline">
+                <Link href="/about" className="opacity-90 hover:opacity-100">
                   運営者情報
                 </Link>
-                <Link href="/privacy-policy" className="hover:underline">
+                <Link
+                  href="/privacy-policy"
+                  className="opacity-90 hover:opacity-100"
+                >
                   プライバシーポリシー
                 </Link>
               </div>
