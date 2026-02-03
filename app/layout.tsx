@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
-import { Dela_Gothic_One, Geist_Mono, Zen_Kaku_Gothic_New } from "next/font/google";
+import {
+  Dela_Gothic_One,
+  Geist_Mono,
+  M_PLUS_Rounded_1c,
+  Zen_Kaku_Gothic_New,
+} from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 import SiteHeader from "./_components/SiteHeader";
@@ -7,18 +12,28 @@ import SiteHeader from "./_components/SiteHeader";
 const zenSans = Zen_Kaku_Gothic_New({
   variable: "--font-zen-sans",
   weight: ["400", "500", "700", "900"],
-  subsets: ["latin"],
+  subsets: ["latin", "japanese"],
+  display: "swap",
 });
 
 const delaDisplay = Dela_Gothic_One({
   variable: "--font-dela-display",
   weight: "400",
-  subsets: ["latin"],
+  subsets: ["latin", "japanese"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const rounded = M_PLUS_Rounded_1c({
+  variable: "--font-rounded",
+  weight: ["400", "500", "700", "800"],
+  subsets: ["latin", "japanese"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -35,7 +50,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body
-        className={`${zenSans.variable} ${delaDisplay.variable} ${geistMono.variable} antialiased`}
+        className={`${zenSans.variable} ${delaDisplay.variable} ${geistMono.variable} ${rounded.variable} antialiased`}
       >
         <div className="min-h-screen text-ink">
           <SiteHeader />

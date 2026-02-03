@@ -2,20 +2,20 @@
 
 :root {
   /* Brand (from stitch/prototype) */
-  --paper: #fffbf5;
-  --ink: #1a1a1a;
-  --primary: #00e0ff;
-  --accent: #ff2e63;
-  --secondary: #ffd700;
+  --paper: #f6f6f8;
+  --ink: #111318;
+  --primary: #206cee;
+  --accent: #ff4785;
+  --secondary: #ffd600;
   --pop-pink: #ff4785;
-  --pop-blue: #26cdff;
-  --pop-yellow: #ffcf00;
-  --pop-green: #00d1b2;
-  --pop-purple: #9b5de5;
+  --pop-blue: #206cee;
+  --pop-yellow: #ffd600;
+  --pop-green: #0bddc4;
+  --pop-purple: #805cfc;
 
   /* Surfaces */
   --surface: #ffffff;
-  --surface-muted: #f4f1e6;
+  --surface-muted: #f6f6f8;
 
   /* Shadows (retro “hard” shadow) */
   --shadow-hard: 4px 4px 0px 0px var(--ink);
@@ -68,6 +68,27 @@
       ui-sans-serif,
       system-ui,
       sans-serif;
+  }
+  .font-rounded {
+    font-family:
+      var(--font-rounded),
+      var(--font-sans),
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
+  }
+
+  .logo-mark {
+    font-family:
+      var(--font-display),
+      var(--font-sans),
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
+    color: var(--ink);
+    -webkit-text-stroke: 2px var(--ink);
+    text-shadow: 4px 4px 0 var(--pop-pink);
+    letter-spacing: -0.02em;
   }
 
   .bg-paper {
@@ -184,6 +205,12 @@
     border-radius: 0.75rem;
     padding: 0.6rem 1rem;
     font-weight: 800;
+    font-family:
+      var(--font-rounded),
+      var(--font-sans),
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
     transition:
       transform 120ms ease,
       box-shadow 120ms ease,
@@ -236,6 +263,12 @@
     padding: 0.2rem 0.6rem;
     font-size: 0.75rem;
     font-weight: 800;
+    font-family:
+      var(--font-rounded),
+      var(--font-sans),
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
     line-height: 1.25;
     white-space: nowrap;
   }

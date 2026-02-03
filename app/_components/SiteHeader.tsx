@@ -26,7 +26,7 @@ export default function SiteHeader() {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled
-          ? "bg-[rgba(255,251,245,0.9)] backdrop-blur-md shadow-hard-sm border-b-2 border-ink py-3"
+          ? "bg-[rgba(246,246,248,0.9)] backdrop-blur-md shadow-hard-sm border-b-2 border-ink py-3"
           : "bg-transparent py-4 md:py-6"
       }`}
     >
@@ -39,12 +39,12 @@ export default function SiteHeader() {
           <div className="rounded-full border-2 border-ink bg-ink p-1 text-pop-yellow transition-colors group-hover:bg-pop-pink group-hover:text-white">
             <Zap size={18} fill="currentColor" />
           </div>
-          <span className="font-display text-lg tracking-tight text-ink md:text-xl">
+          <span className="logo-mark text-lg md:text-xl">
             福岡アクトポータル
           </span>
         </Link>
 
-        <nav className="hidden items-center rounded-full border-2 border-ink bg-white px-6 py-2 text-sm font-bold text-ink shadow-hard-sm md:flex">
+        <nav className="font-rounded hidden items-center rounded-full border-2 border-ink bg-white px-6 py-2 text-sm font-bold text-ink shadow-hard-sm md:flex">
           {navItems.map((item, index) => (
             <div key={item.href} className="flex items-center gap-4">
               <Link
@@ -71,7 +71,7 @@ export default function SiteHeader() {
       </div>
 
       {mobileMenuOpen && (
-        <div className="mx-4 mt-3 rounded-2xl border-2 border-ink bg-white p-4 text-sm font-bold text-ink shadow-hard-sm md:hidden">
+        <div className="font-rounded mx-4 mt-3 rounded-2xl border-2 border-ink bg-white p-4 text-sm font-bold text-ink shadow-hard-sm md:hidden">
           <nav className="flex flex-col gap-3">
             {navItems.map((item) => (
               <Link
