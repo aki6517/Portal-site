@@ -30,6 +30,17 @@ type CategoryRow = {
   sort_order?: number | null;
 };
 
+const fallbackCategories: CategoryRow[] = [
+  { id: "comedy", name: "コメディ", icon: "😂", sort_order: 1 },
+  { id: "conversation", name: "会話劇", icon: "💬", sort_order: 2 },
+  { id: "musical", name: "ミュージカル", icon: "🎵", sort_order: 3 },
+  { id: "classic", name: "古典・時代劇", icon: "🏯", sort_order: 4 },
+  { id: "dance", name: "ダンス", icon: "💃", sort_order: 5 },
+  { id: "student", name: "学生演劇", icon: "🎓", sort_order: 6 },
+  { id: "conte", name: "コント", icon: "🎭", sort_order: 7 },
+  { id: "experimental", name: "実験的", icon: "🔬", sort_order: 8 },
+];
+
 const formatDate = (value?: string | null) => {
   if (!value) return "";
   const date = new Date(value);
@@ -92,7 +103,11 @@ export default async function Home() {
     getTrendingEvents(),
     getCategories(),
   ]);
-  const categoryMap = new Map(categories.map((category) => [category.id, category]));
+  const categoriesList =
+    categories.length > 0 ? categories : fallbackCategories;
+  const categoryMap = new Map(
+    categoriesList.map((category) => [category.id, category])
+  );
   const featured = trending[0];
   const featuredImage = featured?.image_url || featured?.flyer_url || null;
   const featuredHref = featured
@@ -265,7 +280,7 @@ export default async function Home() {
           </h2>
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-          {categories.map((category, index) => {
+          {categoriesList.map((category, index) => {
             const color = categoryPalette[index % categoryPalette.length];
             return (
               <Link
