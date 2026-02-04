@@ -50,7 +50,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body
-        className={`${zenSans.variable} ${delaDisplay.variable} ${geistMono.variable} ${rounded.variable} antialiased`}
+        className={`${zenSans.className} ${zenSans.variable} ${delaDisplay.variable} ${geistMono.variable} ${rounded.variable} antialiased`}
       >
         <div className="min-h-screen text-ink">
           <SiteHeader />
