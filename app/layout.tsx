@@ -12,14 +12,14 @@ import SiteHeader from "./_components/SiteHeader";
 const zenSans = Zen_Kaku_Gothic_New({
   variable: "--font-zen-sans",
   weight: ["400", "500", "700", "900"],
-  subsets: ["latin", "japanese"],
+  subsets: ["latin"],
   display: "swap",
 });
 
 const delaDisplay = Dela_Gothic_One({
   variable: "--font-dela-display",
   weight: "400",
-  subsets: ["latin", "japanese"],
+  subsets: ["latin"],
   display: "swap",
 });
 
@@ -32,7 +32,7 @@ const geistMono = Geist_Mono({
 const rounded = M_PLUS_Rounded_1c({
   variable: "--font-rounded",
   weight: ["400", "500", "700", "800"],
-  subsets: ["latin", "japanese"],
+  subsets: ["latin"],
   display: "swap",
 });
 
