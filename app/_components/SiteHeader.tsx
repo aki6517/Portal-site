@@ -37,9 +37,9 @@ export default function SiteHeader() {
           onClick={() => setMobileMenuOpen(false)}
         >
           <div className="rounded-full border-2 border-ink bg-ink p-1 text-pop-yellow transition-colors group-hover:bg-pop-pink group-hover:text-white">
-            <Zap size={18} fill="currentColor" />
+            <Zap size={20} fill="currentColor" />
           </div>
-          <span className="logo-mark text-lg md:text-xl">
+          <span className="logo-mark text-xl leading-none sm:text-2xl md:text-3xl">
             福岡アクトポータル
           </span>
         </Link>
