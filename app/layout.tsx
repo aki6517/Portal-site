@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import {
   Dela_Gothic_One,
   Geist_Mono,
@@ -36,6 +37,13 @@ const rounded = M_PLUS_Rounded_1c({
   display: "swap",
 });
 
+const fontStyles: CSSProperties = {
+  "--font-sans": zenSans.style.fontFamily,
+  "--font-display": delaDisplay.style.fontFamily,
+  "--font-rounded": rounded.style.fontFamily,
+  "--font-mono": geistMono.style.fontFamily,
+};
+
 export const metadata: Metadata = {
   title: "福岡アクトポータル - 福岡演劇公演ポータル",
   description:
@@ -51,6 +59,7 @@ export default function RootLayout({
     <html lang="ja">
       <body
         className={`${zenSans.className} ${zenSans.variable} ${delaDisplay.variable} ${geistMono.variable} ${rounded.variable} antialiased`}
+        style={fontStyles}
       >
         <div className="min-h-screen text-ink">
           <SiteHeader />
