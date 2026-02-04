@@ -148,40 +148,7 @@ export default async function Home() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
-      <section className="mt-2">
-        <div className="card-retro p-6 md:p-8">
-          <div className="flex items-center justify-center gap-2 text-center">
-            <Sparkles size={20} className="text-pop-yellow" />
-            <h2 className="font-display text-xl md:text-2xl">
-              今、どんな気分？
-            </h2>
-          </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {moodCards.map((card) => {
-              const Icon = card.icon;
-              return (
-                <Link
-                  key={card.title}
-                  href={card.href}
-                  className="group relative rounded-xl border-2 border-ink bg-white p-6 text-center shadow-hard-sm transition-all hover:-translate-y-1 hover-shadow-hard"
-                >
-                  <div
-                    className={`absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink p-2 ${card.color} transition-transform group-hover:scale-110`}
-                  >
-                    <Icon size={22} className={card.iconTone} />
-                  </div>
-                  <h3 className="mt-4 font-display text-lg">{card.title}</h3>
-                  <p className="mt-1 text-xs font-bold text-ink/60">
-                    {card.tags}
-                  </p>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-8 md:mt-10">
+      <section className="mt-4 md:mt-6">
         <div className="card-retro relative overflow-hidden p-6 md:p-12 shadow-hard-lg">
           <div className="absolute right-0 top-0 h-40 w-40 -translate-y-1/2 translate-x-1/2 rounded-full bg-pop-yellow blur-3xl opacity-20 md:h-64 md:w-64" />
           <div className="relative z-10 grid gap-8 md:gap-12 lg:grid-cols-2 lg:items-center">
@@ -268,6 +235,39 @@ export default async function Home() {
                 </div>
               </div>
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-12">
+        <div className="card-retro p-6 md:p-8">
+          <div className="flex items-center justify-center gap-2 text-center">
+            <Sparkles size={20} className="text-pop-yellow" />
+            <h2 className="font-display text-xl md:text-2xl">
+              今、どんな気分？
+            </h2>
+          </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {moodCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <Link
+                  key={card.title}
+                  href={card.href}
+                  className="group relative rounded-xl border-2 border-ink bg-white p-6 text-center shadow-hard-sm transition-all hover:-translate-y-1 hover-shadow-hard"
+                >
+                  <div
+                    className={`absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink p-2 ${card.color} transition-transform group-hover:scale-110`}
+                  >
+                    <Icon size={22} className={card.iconTone} />
+                  </div>
+                  <h3 className="mt-4 font-display text-lg">{card.title}</h3>
+                  <p className="mt-1 text-xs font-bold text-ink/60">
+                    {card.tags}
+                  </p>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
