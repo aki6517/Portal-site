@@ -297,6 +297,9 @@ export default function TheaterDashboardPage() {
             <Link href="/theater/events/new" className="btn-retro btn-ink">
               新規公演を作成
             </Link>
+            <Link href="/theater/settings" className="btn-retro btn-surface">
+              劇団情報を編集
+            </Link>
             <button
               onClick={signOut}
               disabled={loggingOut}

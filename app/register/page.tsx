@@ -326,9 +326,9 @@ export default function RegisterPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-10">
       <div className="card-retro p-7">
-        <h1 className="font-display text-2xl">劇団ログイン / オンボーディング</h1>
+        <h1 className="font-display text-2xl">劇団アカウント登録 / ログイン</h1>
         <p className="mt-2 text-sm text-zinc-700">
-          Google OAuth または メールリンクでログインできます。
+          初めての方は「Googleでログイン」または「メールリンクでログイン」からアカウントを登録してください。その後は登録したアドレスからログインできます。
         </p>
       </div>
 

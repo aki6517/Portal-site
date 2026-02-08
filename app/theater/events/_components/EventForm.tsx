@@ -16,6 +16,12 @@ const CATEGORY_OPTIONS = [
 ];
 
 const FLYER_BUCKET = "flyers-public";
+const CREATE_STEPS = [
+  "画像",
+  "基本",
+  "日程・会場",
+  "詳細・公開",
+] as const;
 
 type FormState = {
   category: string;
@@ -151,10 +157,15 @@ export default function EventForm({
   const [promotions, setPromotions] = useState<
     { platform: string; text: string; hashtags: string[] }[]
   >([]);
+  const [createStep, setCreateStep] = useState(0);
 
   useEffect(() => {
     setForm(buildInitialState(initialData));
   }, [initialData]);
+
+  useEffect(() => {
+    if (mode === "create") setCreateStep(0);
+  }, [mode]);
 
   const flyerPreview = useMemo(
     () => form.flyer_url || form.image_url,
@@ -393,6 +404,19 @@ export default function EventForm({
     }
   };
 
+  const isWizard = mode === "create";
+  const isLastCreateStep = createStep >= CREATE_STEPS.length - 1;
+  const canContinueStep = (() => {
+    if (!isWizard) return true;
+    if (createStep === 1) {
+      return Boolean(form.slug.trim() && form.title.trim());
+    }
+    if (createStep === 2) {
+      return Boolean(form.start_date.trim());
+    }
+    return true;
+  })();
+
   return (
     <div className="card-retro p-6">
       <h2 className="font-display text-xl">
@@ -409,218 +433,289 @@ export default function EventForm({
         </div>
       )}
 
-      <div className="mt-4 grid gap-3 text-sm">
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          チラシ画像
-        </label>
-        <input
-          type="file"
-          accept="image/*"
-          className="input-retro"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void uploadFlyer(file);
-          }}
-        />
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={runAnalyze}
-            disabled={analyzing || !form.flyer_url}
-            className="btn-retro btn-surface text-xs disabled:opacity-50"
-          >
-            {analyzing ? "AI解析中..." : "AI解析を実行"}
-          </button>
-          <input
-            className="input-retro flex-1"
-            placeholder="flyer_url（自動入力）"
-            value={form.flyer_url}
-            onChange={(e) => updateField("flyer_url", e.target.value)}
-          />
-        </div>
-        {flyerPreview && (
-          <NextImage
-            src={flyerPreview}
-            alt="flyer preview"
-            width={800}
-            height={600}
-            unoptimized
-            className="max-h-64 rounded-2xl border-2 border-ink bg-surface shadow-hard-sm object-contain"
-          />
-        )}
-        {uploading && (
-          <p className="text-xs text-zinc-600">アップロード中...</p>
-        )}
-
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          OGP画像URL（任意）
-        </label>
-        <input
-          className="input-retro"
-          placeholder="image_url"
-          value={form.image_url}
-          onChange={(e) => updateField("image_url", e.target.value)}
-        />
-
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          カテゴリ
-        </label>
-        <select
-          className="input-retro"
-          value={form.category}
-          onChange={(e) => updateField("category", e.target.value)}
-        >
-          {CATEGORY_OPTIONS.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.id}（{option.label}）
-            </option>
+      {isWizard && (
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+          {CREATE_STEPS.map((label, index) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setCreateStep(index)}
+              className={`badge-retro justify-center py-2 text-center transition-opacity ${
+                createStep === index
+                  ? "bg-pop-yellow opacity-100"
+                  : "bg-surface opacity-75"
+              }`}
+            >
+              {index + 1}. {label}
+            </button>
           ))}
-        </select>
+        </div>
+      )}
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          slug
-        </label>
-        <input
-          className="input-retro"
-          placeholder="nights-coffee"
-          value={form.slug}
-          onChange={(e) => updateField("slug", e.target.value)}
-        />
+      <div className="mt-4 grid gap-3 text-sm">
+        {(!isWizard || createStep === 0) && (
+          <>
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              チラシ画像
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              className="input-retro"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void uploadFlyer(file);
+              }}
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={runAnalyze}
+                disabled={analyzing || !form.flyer_url}
+                className="btn-retro btn-surface text-xs disabled:opacity-50"
+              >
+                {analyzing ? "AI解析中..." : "AI解析を実行"}
+              </button>
+              <input
+                className="input-retro flex-1"
+                placeholder="flyer_url（自動入力）"
+                value={form.flyer_url}
+                onChange={(e) => updateField("flyer_url", e.target.value)}
+              />
+            </div>
+            {flyerPreview && (
+              <NextImage
+                src={flyerPreview}
+                alt="flyer preview"
+                width={800}
+                height={600}
+                unoptimized
+                className="max-h-64 rounded-2xl border-2 border-ink bg-surface object-contain shadow-hard-sm"
+              />
+            )}
+            {uploading && <p className="text-xs text-zinc-600">アップロード中...</p>}
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              OGP画像URL（任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="image_url"
+              value={form.image_url}
+              onChange={(e) => updateField("image_url", e.target.value)}
+            />
+          </>
+        )}
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          公演タイトル
-        </label>
-        <input
-          className="input-retro"
-          placeholder="夜明けのコーヒー"
-          value={form.title}
-          onChange={(e) => updateField("title", e.target.value)}
-        />
+        {(!isWizard || createStep === 1) && (
+          <>
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              カテゴリ
+            </label>
+            <select
+              className="input-retro"
+              value={form.category}
+              onChange={(e) => updateField("category", e.target.value)}
+            >
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.id}（{option.label}）
+                </option>
+              ))}
+            </select>
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          開始日時
-        </label>
-        <input
-          className="input-retro"
-          placeholder="2026-02-01T19:00:00+09:00"
-          value={form.start_date}
-          onChange={(e) => updateField("start_date", e.target.value)}
-        />
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              slug
+            </label>
+            <input
+              className="input-retro"
+              placeholder="nights-coffee"
+              value={form.slug}
+              onChange={(e) => updateField("slug", e.target.value)}
+            />
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          終了日時（任意）
-        </label>
-        <input
-          className="input-retro"
-          placeholder="2026-02-03T21:00:00+09:00"
-          value={form.end_date}
-          onChange={(e) => updateField("end_date", e.target.value)}
-        />
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              公演タイトル
+            </label>
+            <input
+              className="input-retro"
+              placeholder="夜明けのコーヒー"
+              value={form.title}
+              onChange={(e) => updateField("title", e.target.value)}
+            />
+          </>
+        )}
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          会場名（任意）
-        </label>
-        <input
-          className="input-retro"
-          placeholder="ぽんプラザホール"
-          value={form.venue}
-          onChange={(e) => updateField("venue", e.target.value)}
-        />
+        {(!isWizard || createStep === 2) && (
+          <>
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              開始日時
+            </label>
+            <input
+              className="input-retro"
+              placeholder="2026-02-01T19:00:00+09:00"
+              value={form.start_date}
+              onChange={(e) => updateField("start_date", e.target.value)}
+            />
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          会場住所（任意）
-        </label>
-        <input
-          className="input-retro"
-          placeholder="福岡市..."
-          value={form.venue_address}
-          onChange={(e) => updateField("venue_address", e.target.value)}
-        />
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              終了日時（任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="2026-02-03T21:00:00+09:00"
+              value={form.end_date}
+              onChange={(e) => updateField("end_date", e.target.value)}
+            />
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          一般料金（円・任意）
-        </label>
-        <input
-          className="input-retro"
-          placeholder="2500"
-          value={form.price_general}
-          onChange={(e) => updateField("price_general", e.target.value)}
-        />
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              会場名（任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="ぽんプラザホール"
+              value={form.venue}
+              onChange={(e) => updateField("venue", e.target.value)}
+            />
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          学生料金（円・任意）
-        </label>
-        <input
-          className="input-retro"
-          placeholder="2000"
-          value={form.price_student}
-          onChange={(e) => updateField("price_student", e.target.value)}
-        />
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              会場住所（任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="福岡市..."
+              value={form.venue_address}
+              onChange={(e) => updateField("venue_address", e.target.value)}
+            />
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          チケットURL（任意）
-        </label>
-        <input
-          className="input-retro"
-          placeholder="https://..."
-          value={form.ticket_url}
-          onChange={(e) => updateField("ticket_url", e.target.value)}
-        />
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              一般料金（円・任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="2500"
+              value={form.price_general}
+              onChange={(e) => updateField("price_general", e.target.value)}
+            />
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          あらすじ（任意）
-        </label>
-        <textarea
-          className="textarea-retro"
-          placeholder="あらすじ..."
-          value={form.description}
-          onChange={(e) => updateField("description", e.target.value)}
-        />
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              学生料金（円・任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="2000"
+              value={form.price_student}
+              onChange={(e) => updateField("price_student", e.target.value)}
+            />
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          タグ（カンマ区切り）
-        </label>
-        <input
-          className="input-retro"
-          placeholder="学生歓迎, 感動"
-          value={form.tags}
-          onChange={(e) => updateField("tags", e.target.value)}
-        />
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              チケットURL（任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="https://..."
+              value={form.ticket_url}
+              onChange={(e) => updateField("ticket_url", e.target.value)}
+            />
+          </>
+        )}
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          キャスト（JSON配列）
-        </label>
-        <textarea
-          className="textarea-retro font-mono text-xs"
-          rows={4}
-          placeholder='[{"name":"山田太郎","role":"主演","image_url":""}]'
-          value={form.cast}
-          onChange={(e) => updateField("cast", e.target.value)}
-        />
+        {(!isWizard || createStep === 3) && (
+          <>
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              あらすじ（任意）
+            </label>
+            <textarea
+              className="textarea-retro"
+              placeholder="あらすじ..."
+              value={form.description}
+              onChange={(e) => updateField("description", e.target.value)}
+            />
 
-        <label className="text-xs font-black tracking-wide text-zinc-700">
-          ステータス
-        </label>
-        <select
-          className="input-retro"
-          value={form.status}
-          onChange={(e) =>
-            updateField("status", e.target.value as FormState["status"])
-          }
-        >
-          <option value="draft">draft</option>
-          <option value="published">published</option>
-          <option value="archived">archived</option>
-        </select>
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              タグ（カンマ区切り）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="学生歓迎, 感動"
+              value={form.tags}
+              onChange={(e) => updateField("tags", e.target.value)}
+            />
+
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              キャスト（JSON配列）
+            </label>
+            <textarea
+              className="textarea-retro font-mono text-xs"
+              rows={4}
+              placeholder='[{"name":"山田太郎","role":"主演","image_url":""}]'
+              value={form.cast}
+              onChange={(e) => updateField("cast", e.target.value)}
+            />
+
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              ステータス
+            </label>
+            <select
+              className="input-retro"
+              value={form.status}
+              onChange={(e) =>
+                updateField("status", e.target.value as FormState["status"])
+              }
+            >
+              <option value="draft">draft</option>
+              <option value="published">published</option>
+              <option value="archived">archived</option>
+            </select>
+          </>
+        )}
       </div>
 
-      <button
-        onClick={submit}
-        disabled={saving}
-        className="btn-retro btn-ink mt-4 w-full disabled:opacity-50"
-      >
-        {saving ? "保存中..." : mode === "create" ? "公演を作成" : "変更を保存"}
-      </button>
+      {isWizard ? (
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setCreateStep((prev) => Math.max(prev - 1, 0))}
+            disabled={createStep === 0}
+            className="btn-retro btn-surface disabled:opacity-50"
+          >
+            前へ
+          </button>
+          {isLastCreateStep ? (
+            <button
+              onClick={submit}
+              disabled={saving}
+              className="btn-retro btn-ink disabled:opacity-50"
+            >
+              {saving ? "保存中..." : "公演を作成"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (!canContinueStep) {
+                  setMessage("必須項目を入力してから次へ進んでください。");
+                  return;
+                }
+                setMessage(null);
+                setCreateStep((prev) =>
+                  Math.min(prev + 1, CREATE_STEPS.length - 1)
+                );
+              }}
+              className="btn-retro btn-ink"
+            >
+              次へ
+            </button>
+          )}
+        </div>
+      ) : (
+        <button
+          onClick={submit}
+          disabled={saving}
+          className="btn-retro btn-ink mt-4 w-full disabled:opacity-50"
+        >
+          {saving ? "保存中..." : "変更を保存"}
+        </button>
+      )}
 
       {createdId && (
         <p className="mt-2 text-xs text-zinc-700">

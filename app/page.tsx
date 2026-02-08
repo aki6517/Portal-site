@@ -196,10 +196,10 @@ export default async function Home() {
                   公演を探す
                 </Link>
                 <Link href="/calendar" className="btn-retro btn-surface">
-                  カレンダー
+                  カレンダーで公演を探す
                 </Link>
                 <Link href="/blog" className="btn-retro btn-surface">
-                  ブログ
+                  演劇ブログを見る
                 </Link>
               </div>
             </div>
@@ -213,7 +213,7 @@ export default async function Home() {
                     alt={featured?.title ?? "ピックアップ公演"}
                     fill
                     unoptimized
-                    className="object-cover grayscale transition-all duration-500 group-hover:grayscale-0"
+                    className="object-cover transition-all duration-500"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-surface-muted text-xs font-bold text-zinc-600">
