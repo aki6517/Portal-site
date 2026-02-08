@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { resolveActiveTheater } from "@/lib/theater/activeTheater";
 
 type EventPayload = {
   category?: string;
+  categories?: string[];
   slug?: string;
   title?: string;
   description?: string | null;
   start_date?: string;
   end_date?: string | null;
+  schedule_times?: { start_date?: string; end_date?: string | null; label?: string }[];
   venue_id?: string | null;
   venue?: string | null;
   venue_address?: string | null;
@@ -16,6 +19,7 @@ type EventPayload = {
   venue_lng?: number | null;
   price_general?: number | null;
   price_student?: number | null;
+  ticket_types?: { label?: string; price?: number | null; note?: string }[] | null;
   tags?: string[] | string | null;
   image_url?: string | null;
   flyer_url?: string | null;
@@ -34,6 +38,50 @@ const normalizeTags = (tags?: string[] | string | null) => {
     .filter(Boolean);
 };
 
+const normalizeCategories = (categories?: string[] | null, primary?: string) => {
+  const list = Array.isArray(categories) ? categories : [];
+  const merged = [
+    ...(primary ? [primary] : []),
+    ...list.map((item) => item.trim()),
+  ].filter(Boolean);
+  return Array.from(new Set(merged));
+};
+
+const normalizeScheduleTimes = (
+  scheduleTimes?: { start_date?: string; end_date?: string | null; label?: string }[]
+) => {
+  if (!Array.isArray(scheduleTimes)) return [];
+  return scheduleTimes
+    .map((item) => ({
+      start_date: (item.start_date ?? "").trim(),
+      end_date: item.end_date ? item.end_date.trim() : null,
+      label: item.label?.trim() ?? "",
+    }))
+    .filter((item) => item.start_date);
+};
+
+const deriveDateRange = (
+  scheduleTimes: { start_date: string; end_date: string | null }[],
+  fallbackStart?: string,
+  fallbackEnd?: string | null
+) => {
+  if (scheduleTimes.length === 0) {
+    return {
+      start: fallbackStart,
+      end: fallbackEnd ?? null,
+    };
+  }
+  const starts = scheduleTimes.map((item) => item.start_date).sort();
+  const ends = scheduleTimes
+    .map((item) => item.end_date)
+    .filter(Boolean)
+    .sort() as string[];
+  return {
+    start: starts[0],
+    end: ends.length > 0 ? ends[ends.length - 1] : fallbackEnd ?? null,
+  };
+};
+
 export async function GET() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -47,20 +95,8 @@ export async function GET() {
     );
   }
 
-  const { data: member, error: memberError } = await supabase
-    .from("theater_members")
-    .select("theater_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (memberError) {
-    return NextResponse.json(
-      { error: { code: "DB_ERROR", message: memberError.message } },
-      { status: 500 }
-    );
-  }
-
-  if (!member) {
+  const resolved = await resolveActiveTheater(user.id);
+  if (!resolved.activeTheaterId) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Theater not onboarded" } },
       { status: 403 }
@@ -72,7 +108,7 @@ export async function GET() {
     .select(
       "id, title, slug, category, status, start_date, end_date, updated_at"
     )
-    .eq("theater_id", member.theater_id)
+    .eq("theater_id", resolved.activeTheaterId)
     .order("updated_at", { ascending: false });
 
   if (eventsError) {
@@ -113,6 +149,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
+  const service = createSupabaseServiceClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -134,10 +171,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const category = payload.category?.trim();
+  const category = payload.category?.trim() ?? "";
+  const categories = normalizeCategories(payload.categories ?? null, category);
   const slug = payload.slug?.trim();
   const title = payload.title?.trim();
-  const startDate = payload.start_date;
+  const scheduleTimes = normalizeScheduleTimes(payload.schedule_times);
+  const derivedDates = deriveDateRange(
+    scheduleTimes,
+    payload.start_date,
+    payload.end_date ?? null
+  );
+  const startDate = derivedDates.start;
+  const endDate = derivedDates.end;
 
   if (!category || !slug || !title || !startDate) {
     return NextResponse.json(
@@ -151,30 +196,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data: member, error: memberError } = await supabase
-    .from("theater_members")
-    .select("theater_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (memberError) {
-    return NextResponse.json(
-      { error: { code: "DB_ERROR", message: memberError.message } },
-      { status: 500 }
-    );
-  }
-
-  if (!member) {
+  const resolved = await resolveActiveTheater(user.id);
+  if (!resolved.activeTheaterId) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Theater not onboarded" } },
       { status: 403 }
     );
   }
 
-  const { data: theater, error: theaterError } = await supabase
+  const { data: theater, error: theaterError } = await service
     .from("theaters")
     .select("id, name, status")
-    .eq("id", member.theater_id)
+    .eq("id", resolved.activeTheaterId)
     .single();
 
   if (theaterError || !theater) {
@@ -189,19 +222,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (payload.status === "published" && theater.status !== "approved") {
-    return NextResponse.json(
-      {
-        error: {
-          code: "FORBIDDEN",
-          message: "Theater is not approved",
-        },
-      },
-      { status: 403 }
-    );
-  }
-
-  const { data: event, error: insertError } = await supabase
+  const { data: event, error: insertError } = await service
     .from("events")
     .insert({
       theater_id: theater.id,
@@ -211,7 +232,8 @@ export async function POST(req: Request) {
       company: theater.name,
       description: payload.description ?? null,
       start_date: startDate,
-      end_date: payload.end_date ?? null,
+      end_date: endDate ?? null,
+      schedule_times: scheduleTimes,
       venue_id: payload.venue_id ?? null,
       venue: payload.venue ?? null,
       venue_address: payload.venue_address ?? null,
@@ -219,6 +241,7 @@ export async function POST(req: Request) {
       venue_lng: payload.venue_lng ?? null,
       price_general: payload.price_general ?? null,
       price_student: payload.price_student ?? null,
+      ticket_types: payload.ticket_types ?? [],
       tags: normalizeTags(payload.tags),
       image_url: payload.image_url ?? null,
       flyer_url: payload.flyer_url ?? null,
@@ -227,6 +250,7 @@ export async function POST(req: Request) {
       ai_confidence:
         payload.ai_confidence !== undefined ? payload.ai_confidence : null,
       status: payload.status ?? "draft",
+      categories,
     })
     .select("id, category, slug, status")
     .single();

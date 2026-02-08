@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { resolveActiveTheater } from "@/lib/theater/activeTheater";
 
 type EventUpdatePayload = {
   category?: string;
+  categories?: string[];
   slug?: string;
   title?: string;
   description?: string | null;
   start_date?: string;
   end_date?: string | null;
+  schedule_times?: { start_date?: string; end_date?: string | null; label?: string }[];
   venue_id?: string | null;
   venue?: string | null;
   venue_address?: string | null;
@@ -16,6 +19,7 @@ type EventUpdatePayload = {
   venue_lng?: number | null;
   price_general?: number | null;
   price_student?: number | null;
+  ticket_types?: { label?: string; price?: number | null; note?: string }[] | null;
   tags?: string[] | string | null;
   image_url?: string | null;
   flyer_url?: string | null;
@@ -32,6 +36,50 @@ const normalizeTags = (tags?: string[] | string | null) => {
     .split(",")
     .map((v) => v.trim())
     .filter(Boolean);
+};
+
+const normalizeCategories = (categories?: string[] | null, primary?: string) => {
+  const list = Array.isArray(categories) ? categories : [];
+  const merged = [
+    ...(primary ? [primary] : []),
+    ...list.map((item) => item.trim()),
+  ].filter(Boolean);
+  return Array.from(new Set(merged));
+};
+
+const normalizeScheduleTimes = (
+  scheduleTimes?: { start_date?: string; end_date?: string | null; label?: string }[]
+) => {
+  if (!Array.isArray(scheduleTimes)) return undefined;
+  return scheduleTimes
+    .map((item) => ({
+      start_date: (item.start_date ?? "").trim(),
+      end_date: item.end_date ? item.end_date.trim() : null,
+      label: item.label?.trim() ?? "",
+    }))
+    .filter((item) => item.start_date);
+};
+
+const deriveDateRange = (
+  scheduleTimes: { start_date: string; end_date: string | null }[],
+  fallbackStart?: string,
+  fallbackEnd?: string | null
+) => {
+  if (scheduleTimes.length === 0) {
+    return {
+      start: fallbackStart,
+      end: fallbackEnd ?? null,
+    };
+  }
+  const starts = scheduleTimes.map((item) => item.start_date).sort();
+  const ends = scheduleTimes
+    .map((item) => item.end_date)
+    .filter(Boolean)
+    .sort() as string[];
+  return {
+    start: starts[0],
+    end: ends.length > 0 ? ends[ends.length - 1] : fallbackEnd ?? null,
+  };
 };
 
 export async function GET(
@@ -51,13 +99,8 @@ export async function GET(
     );
   }
 
-  const { data: member } = await supabase
-    .from("theater_members")
-    .select("theater_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!member) {
+  const resolved = await resolveActiveTheater(user.id);
+  if (!resolved.activeTheaterId) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Theater not onboarded" } },
       { status: 403 }
@@ -68,7 +111,7 @@ export async function GET(
     .from("events")
     .select("*")
     .eq("id", id)
-    .eq("theater_id", member.theater_id)
+    .eq("theater_id", resolved.activeTheaterId)
     .single();
 
   if (error) {
@@ -87,6 +130,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const supabase = await createSupabaseServerClient();
+  const service = createSupabaseServiceClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -108,23 +152,18 @@ export async function PATCH(
     );
   }
 
-  const { data: member } = await supabase
-    .from("theater_members")
-    .select("theater_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!member) {
+  const resolved = await resolveActiveTheater(user.id);
+  if (!resolved.activeTheaterId) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Theater not onboarded" } },
       { status: 403 }
     );
   }
 
-  const { data: theater } = await supabase
+  const { data: theater } = await service
     .from("theaters")
     .select("id, status")
-    .eq("id", member.theater_id)
+    .eq("id", resolved.activeTheaterId)
     .single();
 
   if (!theater) {
@@ -134,18 +173,11 @@ export async function PATCH(
     );
   }
 
-  if (payload.status === "published" && theater.status !== "approved") {
-    return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "Theater is not approved" } },
-      { status: 403 }
-    );
-  }
-
-  const { data: current, error: currentError } = await supabase
+  const { data: current, error: currentError } = await service
     .from("events")
-    .select("id, category, slug")
+    .select("id, category, slug, start_date, end_date, categories")
     .eq("id", id)
-    .eq("theater_id", member.theater_id)
+    .eq("theater_id", resolved.activeTheaterId)
     .single();
 
   if (currentError || !current) {
@@ -156,12 +188,38 @@ export async function PATCH(
   }
 
   const update: Record<string, unknown> = {};
-  if (payload.category) update.category = payload.category.trim();
+  const incomingCategory = payload.category?.trim();
+  const hasCategories = "categories" in payload;
+  const hasCategory = "category" in payload;
+  if (hasCategories || hasCategory) {
+    const primary =
+      incomingCategory ??
+      (Array.isArray(payload.categories) ? payload.categories[0] : undefined) ??
+      current.category;
+    const normalized = normalizeCategories(payload.categories ?? null, primary);
+    update.category = primary;
+    update.categories = normalized;
+  }
   if (payload.slug) update.slug = payload.slug.trim();
   if (payload.title) update.title = payload.title.trim();
   if ("description" in payload) update.description = payload.description ?? null;
-  if (payload.start_date) update.start_date = payload.start_date;
-  if ("end_date" in payload) update.end_date = payload.end_date ?? null;
+  const scheduleTimes =
+    "schedule_times" in payload
+      ? normalizeScheduleTimes(payload.schedule_times) ?? []
+      : undefined;
+  if (scheduleTimes) {
+    update.schedule_times = scheduleTimes;
+    const derived = deriveDateRange(
+      scheduleTimes,
+      payload.start_date ?? current.start_date,
+      "end_date" in payload ? payload.end_date ?? null : current.end_date
+    );
+    update.start_date = derived.start;
+    update.end_date = derived.end;
+  } else {
+    if (payload.start_date) update.start_date = payload.start_date;
+    if ("end_date" in payload) update.end_date = payload.end_date ?? null;
+  }
   if ("venue_id" in payload) update.venue_id = payload.venue_id ?? null;
   if ("venue" in payload) update.venue = payload.venue ?? null;
   if ("venue_address" in payload)
@@ -172,6 +230,8 @@ export async function PATCH(
     update.price_general = payload.price_general ?? null;
   if ("price_student" in payload)
     update.price_student = payload.price_student ?? null;
+  if ("ticket_types" in payload)
+    update.ticket_types = payload.ticket_types ?? [];
   if ("tags" in payload) update.tags = normalizeTags(payload.tags) ?? [];
   if ("image_url" in payload) update.image_url = payload.image_url ?? null;
   if ("flyer_url" in payload) update.flyer_url = payload.flyer_url ?? null;
@@ -181,11 +241,11 @@ export async function PATCH(
     update.ai_confidence = payload.ai_confidence ?? null;
   if (payload.status) update.status = payload.status;
 
-  const { data: updated, error: updateError } = await supabase
+  const { data: updated, error: updateError } = await service
     .from("events")
     .update(update)
     .eq("id", id)
-    .eq("theater_id", member.theater_id)
+    .eq("theater_id", resolved.activeTheaterId)
     .select("id, category, slug, status")
     .single();
 
@@ -204,7 +264,6 @@ export async function PATCH(
     (newCategory !== current.category || newSlug !== current.slug) &&
     process.env.SUPABASE_SERVICE_ROLE_KEY
   ) {
-    const service = createSupabaseServiceClient();
     await service.from("event_redirects").upsert(
       {
         from_category: current.category,
@@ -224,6 +283,7 @@ export async function DELETE(
 ) {
   const { id } = await params;
   const supabase = await createSupabaseServerClient();
+  const service = createSupabaseServiceClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -235,24 +295,19 @@ export async function DELETE(
     );
   }
 
-  const { data: member } = await supabase
-    .from("theater_members")
-    .select("theater_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!member) {
+  const resolved = await resolveActiveTheater(user.id);
+  if (!resolved.activeTheaterId) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Theater not onboarded" } },
       { status: 403 }
     );
   }
 
-  const { error } = await supabase
+  const { error } = await service
     .from("events")
     .delete()
     .eq("id", id)
-    .eq("theater_id", member.theater_id);
+    .eq("theater_id", resolved.activeTheaterId);
 
   if (error) {
     return NextResponse.json(
