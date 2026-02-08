@@ -75,6 +75,12 @@ export default async function AdminContactPage({
 
       <div className="mt-4 flex items-center gap-2 text-xs">
         <Link
+          href="/admin/theaters"
+          className="rounded-full border border-zinc-200 px-3 py-1 text-zinc-600"
+        >
+          劇団ステータス管理
+        </Link>
+        <Link
           href="/admin/contact"
           className={`rounded-full border px-3 py-1 ${
             onlyNew
