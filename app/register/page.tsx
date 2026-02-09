@@ -7,6 +7,7 @@ type MeResponse = {
   data?: {
     theater: { id: string; name: string; status: string } | null;
     member: { role: string } | null;
+    theaters?: { id: string; name: string; status: string; role: string }[];
     stats?: {
       memberCount: number;
       inviteCount: number;
