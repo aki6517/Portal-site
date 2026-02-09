@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { resolveActiveTheater } from "@/lib/theater/activeTheater";
 
 type InvitePayload = {
   email?: string;
@@ -47,11 +48,8 @@ export async function POST(req: Request) {
   }
 
   const service = createSupabaseServiceClient();
-  const { data: member } = await service
-    .from("theater_members")
-    .select("theater_id, role")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const resolved = await resolveActiveTheater(user.id);
+  const member = resolved.activeMembership;
 
   if (!member) {
     return NextResponse.json(
@@ -160,11 +158,8 @@ export async function DELETE(req: Request) {
   }
 
   const service = createSupabaseServiceClient();
-  const { data: member } = await service
-    .from("theater_members")
-    .select("theater_id, role")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const resolved = await resolveActiveTheater(user.id);
+  const member = resolved.activeMembership;
 
   if (!member || member.role !== "owner") {
     return NextResponse.json(

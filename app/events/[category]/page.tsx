@@ -3,16 +3,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-
-const SITE_NAME = "福岡アクトポータル";
+import { buildMetadata } from "@/lib/seo";
 
 const formatDate = (value?: string | null) => {
   if (!value) return "";
   const date = new Date(value);
-  return new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  if (Number.isNaN(date.getTime())) return value;
+  const formatter = new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tokyo",
+  });
+  return formatter.format(date);
 };
 
 const normalizeQuery = (value?: string) => {
@@ -30,17 +37,24 @@ const getCategories = async () => {
   return data ?? [];
 };
 
-const getEvents = async (category: string) => {
+const getEvents = async (category: string, query?: string) => {
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+  let request = supabase
     .from("events")
     .select(
-      "id, title, category, slug, start_date, end_date, venue, image_url, flyer_url"
+      "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company"
     )
     .eq("status", "published")
-    .eq("category", category)
-    .order("start_date", { ascending: true });
-  return data ?? [];
+    .or(`category.eq.${category},categories.cs.{${category}}`);
+
+  const { data } = await request.order("start_date", { ascending: true });
+  if (!query) return data ?? [];
+  const lowered = query.toLowerCase();
+  return (data ?? []).filter((event) =>
+    [event.title, event.venue, event.company]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(lowered))
+  );
 };
 
 const getViews30Map = async () => {
@@ -61,10 +75,25 @@ const getViews30Map = async () => {
   return map;
 };
 
-export async function generateMetadata() {
-  return {
-    title: `カテゴリ別 公演一覧 | ${SITE_NAME}`,
-  };
+export async function generateMetadata({
+  params,
+}: {
+  params: { category: string };
+}) {
+  const categories = await getCategories();
+  const category = categories.find((item) => item.id === params.category);
+  const title = category
+    ? `${category.name}の公演`
+    : "カテゴリ別 公演一覧";
+  const description = category
+    ? `福岡の${category.name}公演を一覧で紹介します。`
+    : "福岡の公演をカテゴリ別に一覧表示します。";
+
+  return buildMetadata({
+    title,
+    description,
+    path: `/events/${params.category}`,
+  });
 }
 
 export default async function EventsByCategoryPage({
@@ -72,13 +101,14 @@ export default async function EventsByCategoryPage({
   searchParams,
 }: {
   params: { category: string };
-  searchParams?: { sort?: string; q?: string };
+  searchParams?: { sort?: string; q?: string } | Promise<{ sort?: string; q?: string }>;
 }) {
-  const sort = searchParams?.sort === "popular" ? "popular" : "date";
-  const q = normalizeQuery(searchParams?.q);
+  const resolvedSearchParams = await Promise.resolve(searchParams);
+  const sort = resolvedSearchParams?.sort === "popular" ? "popular" : "date";
+  const q = normalizeQuery(resolvedSearchParams?.q);
   const [categories, events, viewsMap] = await Promise.all([
     getCategories(),
-    getEvents(params.category),
+    getEvents(params.category, q),
     sort === "popular" ? getViews30Map() : Promise.resolve(new Map()),
   ]);
 
@@ -87,24 +117,15 @@ export default async function EventsByCategoryPage({
     notFound();
   }
 
-  const filteredEvents = q
-    ? events.filter((event) => {
-        const haystack = `${event.title ?? ""} ${event.venue ?? ""}`
-          .toLowerCase()
-          .trim();
-        return haystack.includes(q.toLowerCase());
-      })
-    : events;
-
   const sortedEvents =
     sort === "popular"
-      ? [...filteredEvents].sort((a, b) => {
+      ? [...events].sort((a, b) => {
           const aViews = viewsMap.get(a.id) ?? 0;
           const bViews = viewsMap.get(b.id) ?? 0;
           if (bViews !== aViews) return bViews - aViews;
           return a.start_date.localeCompare(b.start_date);
         })
-      : filteredEvents;
+      : events;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -180,7 +201,7 @@ export default async function EventsByCategoryPage({
           </div>
         )}
         {sortedEvents.map((event) => {
-          const image = event.flyer_url || event.image_url;
+          const image = event.image_url || event.flyer_url;
           const views = viewsMap.get(event.id) ?? 0;
           return (
             <div key={event.id} className="card-retro p-5">

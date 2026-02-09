@@ -2,16 +2,24 @@ import Image from "next/image";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-
-const SITE_NAME = "福岡アクトポータル";
+import { buildIlikeFilter } from "@/lib/search";
+import { buildMetadata } from "@/lib/seo";
 
 const formatDate = (value?: string | null) => {
   if (!value) return "";
   const date = new Date(value);
-  return new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  if (Number.isNaN(date.getTime())) return value;
+  const formatter = new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tokyo",
+  });
+  return formatter.format(date);
 };
 
 const normalizeQuery = (value?: string) => {
@@ -29,15 +37,23 @@ const getCategories = async () => {
   return data ?? [];
 };
 
-const getEvents = async () => {
+const getEvents = async (query?: string) => {
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+  let request = supabase
     .from("events")
     .select(
-      "id, title, category, slug, start_date, end_date, venue, image_url, flyer_url"
+      "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company"
     )
-    .eq("status", "published")
-    .order("start_date", { ascending: true });
+    .eq("status", "published");
+
+  if (query) {
+    const filter = buildIlikeFilter(query, ["title", "venue", "company"]);
+    if (filter) {
+      request = request.or(filter);
+    }
+  }
+
+  const { data } = await request.order("start_date", { ascending: true });
   return data ?? [];
 };
 
@@ -60,42 +76,36 @@ const getViews30Map = async () => {
 };
 
 export async function generateMetadata() {
-  return {
-    title: `公演一覧 | ${SITE_NAME}`,
-  };
+  return buildMetadata({
+    title: "公演一覧",
+    description: "福岡の公演情報を開催日順・人気順で検索できます。",
+    path: "/events",
+  });
 }
 
 export default async function EventsPage({
   searchParams,
 }: {
-  searchParams?: { sort?: string; q?: string };
+  searchParams?: { sort?: string; q?: string } | Promise<{ sort?: string; q?: string }>;
 }) {
-  const sort = searchParams?.sort === "popular" ? "popular" : "date";
-  const q = normalizeQuery(searchParams?.q);
+  const resolvedSearchParams = await Promise.resolve(searchParams);
+  const sort = resolvedSearchParams?.sort === "popular" ? "popular" : "date";
+  const q = normalizeQuery(resolvedSearchParams?.q);
   const [categories, events, viewsMap] = await Promise.all([
     getCategories(),
-    getEvents(),
+    getEvents(q),
     sort === "popular" ? getViews30Map() : Promise.resolve(new Map()),
   ]);
 
-  const filteredEvents = q
-    ? events.filter((event) => {
-        const haystack = `${event.title ?? ""} ${event.venue ?? ""}`
-          .toLowerCase()
-          .trim();
-        return haystack.includes(q.toLowerCase());
-      })
-    : events;
-
   const sortedEvents =
     sort === "popular"
-      ? [...filteredEvents].sort((a, b) => {
+      ? [...events].sort((a, b) => {
           const aViews = viewsMap.get(a.id) ?? 0;
           const bViews = viewsMap.get(b.id) ?? 0;
           if (bViews !== aViews) return bViews - aViews;
           return a.start_date.localeCompare(b.start_date);
         })
-      : filteredEvents;
+      : events;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -161,7 +171,7 @@ export default async function EventsPage({
           </div>
         )}
         {sortedEvents.map((event) => {
-          const image = event.flyer_url || event.image_url;
+          const image = event.image_url || event.flyer_url;
           const views = viewsMap.get(event.id) ?? 0;
           return (
             <div key={event.id} className="card-retro p-5">

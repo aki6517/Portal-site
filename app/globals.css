@@ -94,6 +94,14 @@
     letter-spacing: -0.02em;
   }
 
+  @media (max-width: 640px) {
+    .logo-mark {
+      -webkit-text-stroke-width: 0;
+      text-shadow: none;
+      letter-spacing: -0.005em;
+    }
+  }
+
   .bg-paper {
     background-color: var(--paper);
   }

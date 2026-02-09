@@ -1,0 +1,79 @@
+:root {
+  --fc-small-font-size: 0.9rem;
+  --fc-page-bg-color: #f6f7fb;
+  --fc-neutral-bg-color: #eef1f6;
+  --fc-neutral-text-color: #222;
+  --fc-border-color: #111318;
+  --fc-button-text-color: #fff;
+  --fc-button-bg-color: #2c3e50;
+  --fc-button-border-color: #111318;
+  --fc-button-hover-bg-color: #111318;
+  --fc-button-hover-border-color: #111318;
+  --fc-button-active-bg-color: #111318;
+  --fc-button-active-border-color: #111318;
+  --fc-event-bg-color: #ff4785;
+  --fc-event-border-color: #111318;
+  --fc-event-text-color: #fff;
+  --fc-today-bg-color: rgba(255, 199, 0, 0.15);
+  --fc-now-indicator-color: #ff4785;
+}
+
+.fc {
+  font-family: var(--font-zen-sans), "Zen Kaku Gothic New", system-ui, -apple-system, sans-serif;
+  color: #111318;
+}
+
+.fc .fc-toolbar-title {
+  font-family: var(--font-dela-display), "Dela Gothic One", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.fc .fc-button {
+  border-width: 2px;
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 #111318;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.fc .fc-button:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 #111318;
+}
+
+.fc .fc-button:focus-visible {
+  outline: 2px solid #3e8fff;
+  outline-offset: 2px;
+}
+
+.fc .fc-daygrid-day-number {
+  font-weight: 700;
+}
+
+.fc .fc-event {
+  border-width: 2px;
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 #111318;
+}
+
+.fc .fc-col-header-cell {
+  background: #eef1f6;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: #111318;
+}
+
+.fc .fc-daygrid-day.fc-day-today {
+  background: rgba(255, 71, 133, 0.08);
+}
+
+.fc .fc-event-title {
+  font-weight: 800;
+}
+
+.fc .fc-daygrid-event-dot {
+  border-color: #111318;
+}

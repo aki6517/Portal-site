@@ -14,36 +14,43 @@ export default function BlogPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="text-2xl font-bold">ブログ</h1>
-      <p className="mt-2 text-sm text-zinc-600">
-        運営からのお知らせやアップデート情報を掲載します。
-      </p>
+      <div className="card-retro p-6 md:p-8">
+        <span className="badge-retro bg-pop-yellow shadow-hard-sm">
+          BLOG
+        </span>
+        <h1 className="mt-3 font-display text-3xl tracking-tight md:text-4xl">
+          演劇ブログ
+        </h1>
+        <p className="mt-2 text-sm text-zinc-700">
+          運営からのお知らせ、アップデート、特集記事を掲載しています。
+        </p>
+      </div>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
         {posts.length === 0 && (
-          <div className="rounded-xl border border-zinc-200 p-6 text-sm text-zinc-600">
+          <div className="card-retro p-6 text-sm text-zinc-700">
             記事がまだありません。
           </div>
         )}
         {posts.map((post) => (
-          <div key={post.slug} className="rounded-xl border border-zinc-200 p-5">
-            <Link
-              href={`/blog/${post.slug}`}
-              className="text-lg font-semibold hover:underline"
-            >
+          <Link
+            key={post.slug}
+            href={`/blog/${post.slug}`}
+            className="card-retro block p-5 transition-transform hover:-translate-y-0.5"
+          >
+            <div className="badge-retro bg-surface shadow-hard-sm text-[11px]">
+              {post.frontMatter.date ?? "公開日未設定"}
+            </div>
+            <h2 className="mt-3 font-display text-xl leading-tight">
               {post.frontMatter.title ?? post.slug}
-            </Link>
-            {post.frontMatter.date && (
-              <div className="mt-1 text-xs text-zinc-500">
-                {post.frontMatter.date}
-              </div>
-            )}
-            {post.frontMatter.description && (
-              <p className="mt-2 text-sm text-zinc-600">
-                {post.frontMatter.description}
-              </p>
-            )}
-          </div>
+            </h2>
+            <p className="mt-2 text-sm text-zinc-700">
+              {post.frontMatter.description ?? "続きを読む"}
+            </p>
+            <div className="mt-4 text-xs font-black text-pop-pink">
+              記事を読む →
+            </div>
+          </Link>
         ))}
       </div>
     </div>

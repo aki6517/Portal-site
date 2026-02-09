@@ -7,6 +7,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 type MeData = {
   theater: { id: string; name: string; status: string } | null;
   member: { role: string } | null;
+  theaters?: { id: string; name: string; status: string; role: string }[] | null;
+  active_theater_id?: string | null;
 };
 
 type EventRow = {
@@ -19,38 +21,6 @@ type EventRow = {
   end_date?: string | null;
   updated_at?: string | null;
   views_30?: number;
-};
-
-const getTheaterStatusCopy = (status: string) => {
-  switch (status) {
-    case "pending":
-      return {
-        label: "登録処理中",
-        detail:
-          "登録は完了していますが、反映に時間がかかっている可能性があります。少し待っても変わらない場合はお問い合わせください。",
-      };
-    case "approved":
-      return {
-        label: "利用可能",
-        detail: "公演の作成・公開ができます。",
-      };
-    case "rejected":
-      return {
-        label: "差し戻し",
-        detail: "内容の修正が必要です。/register から修正して再送信してください。",
-      };
-    case "suspended":
-      return {
-        label: "停止中",
-        detail:
-          "運営により一時停止されています。公開・編集が制限されている可能性があります。",
-      };
-    default:
-      return {
-        label: status,
-        detail: "ステータスを確認してください。",
-      };
-  }
 };
 
 const getEventStatusCopy = (status: string) => {
@@ -69,15 +39,32 @@ const getEventStatusCopy = (status: string) => {
 const formatDate = (value?: string | null) => {
   if (!value) return "";
   const date = new Date(value);
-  return new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(date);
+  if (Number.isNaN(date.getTime())) return value;
+  const formatter = new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tokyo",
+  });
+  return formatter.format(date);
 };
 
 export default function TheaterDashboardPage() {
   const supabase = createSupabaseBrowserClient();
   const [me, setMe] = useState<MeData | null>(null);
+  const [theaters, setTheaters] = useState<
+    { id: string; name: string; status: string; role: string }[]
+  >([]);
+  const [activeTheaterId, setActiveTheaterId] = useState<string | null>(null);
+  const [switchingTheater, setSwitchingTheater] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dashboardMessage, setDashboardMessage] = useState<string | null>(null);
   const [authState, setAuthState] = useState<
     "loading" | "loggedOut" | "loggedIn"
   >("loading");
@@ -102,7 +89,10 @@ export default function TheaterDashboardPage() {
         return;
       }
       const json = (await res.json()) as { data?: MeData };
-      setMe(json.data ?? null);
+      const data = json.data ?? null;
+      setMe(data);
+      setTheaters(data?.theaters ?? []);
+      setActiveTheaterId(data?.active_theater_id ?? null);
       setAuthState("loggedIn");
 
       const eventsRes = await fetch("/api/theater/events", {
@@ -118,6 +108,41 @@ export default function TheaterDashboardPage() {
     };
     fetchData();
   }, []);
+
+  const switchTheater = async (theaterId: string) => {
+    if (!theaterId || theaterId === activeTheaterId) return;
+    setSwitchingTheater(true);
+    try {
+      const res = await fetch("/api/theater/active", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theater_id: theaterId }),
+      });
+      if (!res.ok) {
+        setDashboardMessage("劇団の切り替えに失敗しました。");
+      } else {
+        setActiveTheaterId(theaterId);
+        window.location.reload();
+      }
+    } finally {
+      setSwitchingTheater(false);
+    }
+  };
+
+  const deleteEvent = async (eventId: string) => {
+    if (!confirm("この公演を完全削除します。よろしいですか？")) return;
+    setDashboardMessage(null);
+    const res = await fetch(`/api/theater/events/${eventId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      setDashboardMessage(json?.error?.message ?? "削除に失敗しました。");
+      return;
+    }
+    setEvents((prev) => prev.filter((event) => event.id !== eventId));
+    setDashboardMessage("削除しました。");
+  };
 
   const signInWithGoogle = async () => {
     setLoginMessage(null);
@@ -255,7 +280,6 @@ export default function TheaterDashboardPage() {
     );
   }
 
-  const theaterStatus = getTheaterStatusCopy(theater.status);
   const publishedCount = events.filter((e) => e.status === "published").length;
   const draftCount = events.filter((e) => e.status === "draft").length;
   const archivedCount = events.filter((e) => e.status === "archived").length;
@@ -263,14 +287,6 @@ export default function TheaterDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {theater.status !== "approved" && (
-        <div className="rounded-2xl border-2 border-ink bg-secondary p-5 text-sm shadow-hard-sm">
-          <div className="font-black">
-            ステータス: {theaterStatus.label}
-          </div>
-          <div className="mt-2 text-zinc-800">{theaterStatus.detail}</div>
-        </div>
-      )}
       <div className="card-retro p-7">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
@@ -294,11 +310,11 @@ export default function TheaterDashboardPage() {
             </div>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Link href="/theater/events/new" className="btn-retro btn-ink">
-              新規公演を作成
-            </Link>
             <Link href="/theater/settings" className="btn-retro btn-surface">
               劇団情報を編集
+            </Link>
+            <Link href="/theater/events/new" className="btn-retro btn-ink">
+              新規公演を作成
             </Link>
             <button
               onClick={signOut}
@@ -311,6 +327,31 @@ export default function TheaterDashboardPage() {
         </div>
       </div>
 
+      {theaters.length > 1 && (
+        <div className="card-retro p-5 text-sm text-zinc-700">
+          <div className="text-xs font-black tracking-wide text-zinc-700">
+            操作中の劇団
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <select
+              className="input-retro max-w-xs"
+              value={activeTheaterId ?? ""}
+              onChange={(e) => switchTheater(e.target.value)}
+              disabled={switchingTheater}
+            >
+              {theaters.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+            {switchingTheater && (
+              <span className="text-xs text-zinc-600">切り替え中...</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3">
         <div className="flex items-end justify-between gap-3">
           <h3 className="font-display text-xl">公演一覧</h3>
@@ -319,6 +360,11 @@ export default function TheaterDashboardPage() {
           </Link>
         </div>
 
+        {dashboardMessage && (
+          <div className="rounded-2xl border-2 border-ink bg-surface p-4 text-sm text-zinc-700 shadow-hard-sm">
+            {dashboardMessage}
+          </div>
+        )}
         {events.length === 0 ? (
           <div className="rounded-2xl border-2 border-ink bg-surface p-6 text-sm text-zinc-700 shadow-hard-sm">
             まだ公演がありません。「新規公演を作成」から追加できます。
@@ -368,6 +414,13 @@ export default function TheaterDashboardPage() {
                             公開ページ
                           </Link>
                         )}
+                        <button
+                          type="button"
+                          className="btn-retro btn-surface border-red-600 text-red-700"
+                          onClick={() => deleteEvent(event.id)}
+                        >
+                          削除
+                        </button>
                       </div>
                     </div>
                   </div>
