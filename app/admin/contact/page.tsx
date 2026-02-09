@@ -73,12 +73,18 @@ export default async function AdminContactPage({
         直近200件の問い合わせを表示しています。
       </p>
 
-      <div className="mt-4 flex items-center gap-2 text-xs">
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
         <Link
           href="/admin/theaters"
           className="rounded-full border border-zinc-200 px-3 py-1 text-zinc-600"
         >
           劇団ステータス管理
+        </Link>
+        <Link
+          href="/admin/site-tags"
+          className="rounded-full border border-zinc-200 px-3 py-1 text-zinc-600"
+        >
+          計測タグ設定
         </Link>
         <Link
           href="/admin/contact"

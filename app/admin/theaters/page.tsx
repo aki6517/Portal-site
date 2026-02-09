@@ -103,6 +103,12 @@ export default async function AdminTheatersPage({
         >
           お問い合わせ管理へ
         </Link>
+        <Link
+          href="/admin/site-tags"
+          className="rounded-full border border-zinc-200 px-3 py-1 text-zinc-600"
+        >
+          計測タグ設定
+        </Link>
       </div>
 
       <div className="mt-4 space-y-4">

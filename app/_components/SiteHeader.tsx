@@ -8,7 +8,6 @@ const navItems = [
   { label: "公演を探す", href: "/events" },
   { label: "劇団の方へ", href: "/register" },
   { label: "特集記事", href: "/blog" },
-  { label: "管理者", href: "/admin/contact" },
 ];
 
 export default function SiteHeader() {
