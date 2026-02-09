@@ -8,6 +8,7 @@ import {
 import Link from "next/link";
 import "./globals.css";
 import SiteHeader from "./_components/SiteHeader";
+import RuntimeTagInjector from "./_components/RuntimeTagInjector";
 
 const zenSans = Zen_Kaku_Gothic_New({
   variable: "--font-zen-sans",
@@ -53,6 +54,7 @@ export default function RootLayout({
       className={`${zenSans.variable} ${delaDisplay.variable} ${geistMono.variable} ${rounded.variable}`}
     >
       <body className={`${zenSans.className} antialiased`}>
+        <RuntimeTagInjector />
         <div className="min-h-screen text-ink">
           <SiteHeader />
           <main className="pt-20 md:pt-24">{children}</main>
