@@ -89,37 +89,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data: existingMember, error: memberError } = await service
-    .from("theater_members")
-    .select("theater_id, role")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (memberError) {
-    return NextResponse.json(
-      {
-        error: {
-          code: "DB_ERROR",
-          message: memberError.message,
-        },
-      },
-      { status: 500 }
-    );
-  }
-
-  if (existingMember) {
-    return NextResponse.json(
-      {
-        error: {
-          code: "ALREADY_ONBOARDED",
-          message: "User already belongs to a theater",
-        },
-      },
-      { status: 409 }
-    );
-  }
-
   const { data: theater, error: theaterError } = await service
     .from("theaters")
     .insert({

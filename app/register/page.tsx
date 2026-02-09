@@ -106,6 +106,11 @@ export default function RegisterPage() {
       }
 
       setUserEmail(user.email ?? null);
+      setOnboardForm((prev) =>
+        prev.contact_email
+          ? prev
+          : { ...prev, contact_email: user.email ?? "" }
+      );
       setAuthState("loggedIn");
 
       try {
@@ -206,7 +211,18 @@ export default function RegisterPage() {
       setOnboarding(false);
       return;
     }
-    setOnboardMessage("劇団情報を送信しました。すぐに公演を作成できます。");
+    setOnboardMessage(
+      "劇団を追加しました。/theater で操作対象を切り替えて編集できます。"
+    );
+    setOnboardForm({
+      name: "",
+      contact_email: userEmail ?? "",
+      website_url: "",
+      description: "",
+      sns_x_url: "",
+      sns_instagram_url: "",
+      sns_facebook_url: "",
+    });
     setOnboarding(false);
   };
 
@@ -377,6 +393,11 @@ export default function RegisterPage() {
             <div className="mt-2 text-base font-semibold">
               劇団: {me.theater.name}
             </div>
+            {Array.isArray(me.theaters) && me.theaters.length > 1 && (
+              <div className="mt-2 text-xs text-zinc-700">
+                管理可能な劇団: {me.theaters.length}件
+              </div>
+            )}
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
               <span className="badge-retro bg-secondary shadow-hard-sm">
                 ステータス: {getTheaterStatusCopy(me.theater.status).label}
@@ -564,11 +585,12 @@ export default function RegisterPage() {
         </div>
       )}
 
-      {authState === "loggedIn" && !me?.theater && (
+      {authState === "loggedIn" && (
         <div className="card-retro p-6">
-          <h2 className="font-display text-lg">劇団情報の登録</h2>
+          <h2 className="font-display text-lg">劇団情報の登録 / 追加</h2>
           <p className="mt-1 text-sm text-zinc-700">
-            登録後すぐに公演の作成・公開ができます。
+            1つのアカウントで複数の劇団を追加できます。追加後は /theater で
+            操作対象の劇団を切り替えられます。
           </p>
           <div className="mt-4 space-y-3 text-sm">
             <input
