@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 const STATUS_OPTIONS = [
-  { value: "pending", label: "pending" },
-  { value: "approved", label: "approved" },
-  { value: "rejected", label: "rejected" },
-  { value: "suspended", label: "suspended" },
+  { value: "pending", label: "審査中" },
+  { value: "approved", label: "承認済み" },
+  { value: "rejected", label: "差し戻し" },
+  { value: "suspended", label: "停止中" },
 ] as const;
 
 type Props = {

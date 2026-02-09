@@ -12,6 +12,15 @@ type TheaterRow = {
   created_at: string;
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  pending: "審査中",
+  approved: "承認済み",
+  rejected: "差し戻し",
+  suspended: "停止中",
+};
+
+const getStatusLabel = (status: string) => STATUS_LABELS[status] ?? status;
+
 const formatDate = (value: string) => {
   const date = new Date(value);
   return new Intl.DateTimeFormat("ja-JP", {
@@ -94,7 +103,7 @@ export default async function AdminTheatersPage({
                 : "border-zinc-200 text-zinc-600"
             }`}
           >
-            {status}
+            {getStatusLabel(status)}
           </Link>
         ))}
         <Link
@@ -143,7 +152,7 @@ export default async function AdminTheatersPage({
               <TheaterStatusActions id={theater.id} status={theater.status} />
             </div>
             <div className="mt-3 text-[11px] text-zinc-500">
-              status: {theater.status} / created: {formatDate(theater.created_at)} /
+              status: {getStatusLabel(theater.status)} / created: {formatDate(theater.created_at)} /
               updated: {formatDate(theater.updated_at)} / id: {theater.id}
             </div>
           </div>

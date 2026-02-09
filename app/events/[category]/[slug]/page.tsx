@@ -129,6 +129,14 @@ const formatScheduleDisplay = (item: {
   return { main, note };
 };
 
+const decodeRouteParam = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
 const getEvent = async (category: string, slug: string) => {
   const supabase = await createSupabaseServerClient();
   const selectFields =
@@ -284,7 +292,9 @@ export async function generateMetadata({
   params: { category: string; slug: string } | Promise<{ category: string; slug: string }>;
 }) {
   const resolvedParams = await Promise.resolve(params);
-  const event = await getEvent(resolvedParams.category, resolvedParams.slug);
+  const category = decodeRouteParam(resolvedParams.category);
+  const slug = decodeRouteParam(resolvedParams.slug);
+  const event = await getEvent(category, slug);
   const path = `/events/${resolvedParams.category}/${resolvedParams.slug}`;
   if (!event) {
     return buildMetadata({ title: "公演詳細", path });
@@ -304,13 +314,15 @@ export default async function EventDetailPage({
   params: { category: string; slug: string } | Promise<{ category: string; slug: string }>;
 }) {
   const resolvedParams = await Promise.resolve(params);
-  const event = await getEvent(resolvedParams.category, resolvedParams.slug);
+  const category = decodeRouteParam(resolvedParams.category);
+  const slug = decodeRouteParam(resolvedParams.slug);
+  const event = await getEvent(category, slug);
 
   if (!event) {
-    await tryRedirect(resolvedParams.category, resolvedParams.slug);
+    await tryRedirect(category, slug);
     notFound();
   }
-  if (event.category !== resolvedParams.category) {
+  if (event.category !== category) {
     permanentRedirect(`/events/${event.category}/${event.slug}`);
   }
 

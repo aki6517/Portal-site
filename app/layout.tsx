@@ -41,6 +41,11 @@ export const metadata: Metadata = {
   title: "福岡アクトポータル - 福岡演劇公演ポータル",
   description:
     "福岡の演劇公演情報を一元管理。今の気分で公演を探せるポータルサイト。",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({
