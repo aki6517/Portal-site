@@ -388,7 +388,7 @@ export default async function EventDetailPage({
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
+    <div className="mx-auto max-w-6xl overflow-x-hidden px-4 py-10">
       <ViewCounter category={event.category} slug={event.slug} />
       <script
         type="application/ld+json"
@@ -429,7 +429,9 @@ export default async function EventDetailPage({
           <li>
             <span className="px-1 text-zinc-500">→</span>
           </li>
-          <li className="badge-retro bg-primary">{event.title}</li>
+          <li className="max-w-full rounded-full border-2 border-ink bg-primary px-3 py-1 text-[11px] font-black leading-tight break-words">
+            {event.title}
+          </li>
         </ol>
       </nav>
 
@@ -456,18 +458,18 @@ export default async function EventDetailPage({
           <h1 className="mt-4 font-display text-2xl font-normal leading-tight tracking-tight text-ink sm:text-3xl md:text-4xl">
             {event.title}
           </h1>
-          <p className="mt-2 text-sm font-semibold text-zinc-800">
+          <p className="mt-2 text-base font-semibold text-zinc-800">
             {event.company}
           </p>
 
-          <div className="mt-5 grid gap-3 text-sm">
+          <div className="mt-5 grid gap-3 text-base leading-relaxed">
             <div>
               <span className="font-semibold">開催日時:</span> {dateLabel}
             </div>
             {scheduleTimes.length > 0 && (
               <div>
                 <span className="font-semibold">公演日程:</span>
-                <div className="mt-2 grid gap-1 text-xs text-zinc-700">
+                <div className="mt-2 grid gap-1 text-sm text-zinc-700">
                   {scheduleTimes.map((item, index) => {
                     const { main, note } = formatScheduleDisplay(item);
                     return (
@@ -488,7 +490,7 @@ export default async function EventDetailPage({
               </div>
             )}
             {event.venue_address && (
-              <div>
+              <div className="break-words">
                 <span className="font-semibold">住所:</span>{" "}
                 {event.venue_address}
               </div>
@@ -496,7 +498,7 @@ export default async function EventDetailPage({
             {ticketTypes.length > 0 && (
               <div>
                 <span className="font-semibold">チケット種別:</span>
-                <div className="mt-2 grid gap-1 text-xs text-zinc-700">
+                <div className="mt-2 grid gap-2 text-sm text-zinc-700">
                   {ticketTypes.map((item, index) => (
                     <div key={`ticket-${index}`} className="flex flex-wrap gap-2">
                       <span className="badge-retro bg-secondary">
@@ -506,7 +508,7 @@ export default async function EventDetailPage({
                         <span>{item.price}円</span>
                       )}
                       {item.note && (
-                        <span className="text-[11px] text-zinc-600">
+                        <span className="text-sm text-zinc-600">
                           {item.note}
                         </span>
                       )}
@@ -543,7 +545,7 @@ export default async function EventDetailPage({
               {event.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="badge-retro bg-surface-muted max-w-full whitespace-normal break-words text-[11px]"
+                  className="badge-retro bg-surface-muted max-w-full whitespace-normal break-words text-xs"
                 >
                   #{tag}
                 </span>
@@ -573,7 +575,7 @@ export default async function EventDetailPage({
       {event.description && (
         <div className="card-retro mt-10 p-6">
           <h2 className="font-display text-xl font-black">あらすじ</h2>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-zinc-800">
+          <p className="mt-3 whitespace-pre-wrap break-words text-base leading-relaxed text-zinc-800">
             {event.description}
           </p>
         </div>
@@ -590,7 +592,7 @@ export default async function EventDetailPage({
               >
                 <div className="font-bold">{member.name ?? "名称未設定"}</div>
                 {member.role && (
-                  <div className="mt-1 text-xs text-zinc-700">{member.role}</div>
+                  <div className="mt-1 text-sm text-zinc-700">{member.role}</div>
                 )}
               </div>
             ))}
@@ -640,10 +642,10 @@ export default async function EventDetailPage({
         <h2 className="font-display text-xl font-black">
           公演を掲載したい劇団の方へ
         </h2>
-        <p className="mt-2 text-sm text-zinc-800">
+        <p className="mt-2 text-base text-zinc-800">
           ログイン後に劇団情報を入力すると、公演の作成・編集ができます。
         </p>
-        <div className="mt-4 flex flex-wrap gap-3 text-sm">
+        <div className="mt-4 flex flex-wrap gap-3 text-base">
           <Link
             href="/register"
             className="btn-retro btn-ink"
