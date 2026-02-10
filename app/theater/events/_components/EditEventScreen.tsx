@@ -97,7 +97,7 @@ export default function EditEventScreen({ eventId }: Props) {
         <div className="space-y-4">
           <div className="card-retro p-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs font-black tracking-wide text-zinc-700">
                   編集中の公演
                 </div>
@@ -112,8 +112,8 @@ export default function EditEventScreen({ eventId }: Props) {
                         : "非公開"}
                   </span>
                 </div>
-                <div className="mt-2 break-all text-xs text-zinc-600">
-                  URL: /events/{event.category}/{event.slug}
+                <div className="text-anywhere mt-2 text-xs text-zinc-600">
+                  {`URL: /events/${event.category}/${event.slug}`}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">

@@ -377,9 +377,11 @@ export default function TheaterDashboardPage() {
               return (
                 <div key={event.id} className="card-retro p-5">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-lg font-black">{event.title}</div>
+                        <div className="text-anywhere min-w-0 text-lg font-black">
+                          {event.title}
+                        </div>
                         <span
                           className={`badge-retro ${statusCopy.bg} shadow-hard-sm`}
                         >
@@ -395,8 +397,8 @@ export default function TheaterDashboardPage() {
                           ? ` 〜 ${formatDate(event.end_date)}`
                           : ""}
                       </div>
-                      <div className="mt-1 break-all text-xs text-zinc-600">
-                        URL: /events/{event.category}/{event.slug}
+                      <div className="text-anywhere mt-1 text-xs text-zinc-600">
+                        {`URL: /events/${event.category}/${event.slug}`}
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2 text-sm">
                         <Link

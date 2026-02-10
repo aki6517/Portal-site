@@ -29,16 +29,16 @@ export default function SiteHeader() {
           : "bg-transparent py-4 md:py-6"
       }`}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 md:px-6">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 sm:px-4 md:px-6">
         <Link
           href="/"
-          className="group flex min-w-0 items-center gap-2"
+          className="group flex min-w-0 flex-1 items-center gap-2"
           onClick={() => setMobileMenuOpen(false)}
         >
-          <div className="rounded-full border-2 border-ink bg-ink p-1 text-pop-yellow transition-colors group-hover:bg-pop-pink group-hover:text-white">
+          <div className="shrink-0 rounded-full border-2 border-ink bg-ink p-1 text-pop-yellow transition-colors group-hover:bg-pop-pink group-hover:text-white">
             <Zap size={22} fill="currentColor" />
           </div>
-          <span className="logo-mark min-w-0 break-words text-xl leading-tight sm:text-3xl md:text-4xl">
+          <span className="logo-mark text-anywhere block min-w-0 text-[1rem] leading-tight sm:text-3xl md:text-4xl">
             福岡アクトポータル
           </span>
         </Link>

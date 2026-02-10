@@ -78,6 +78,11 @@
       sans-serif;
   }
 
+  .text-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   .logo-mark {
     font-family:
       var(--font-display),
