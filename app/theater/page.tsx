@@ -395,19 +395,23 @@ export default function TheaterDashboardPage() {
                           ? ` 〜 ${formatDate(event.end_date)}`
                           : ""}
                       </div>
-                      <div className="mt-1 text-xs text-zinc-600">
+                      <div className="mt-1 break-all text-xs text-zinc-600">
                         URL: /events/{event.category}/{event.slug}
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2 text-sm">
                         <Link
-                          href={`/theater/events/${event.id}`}
+                          href={`/events/${encodeURIComponent(
+                            event.category
+                          )}/${encodeURIComponent(event.slug)}/edit`}
                           className="btn-retro btn-ink"
                         >
                           編集
                         </Link>
                         {event.status === "published" && (
                           <Link
-                            href={`/events/${event.category}/${event.slug}`}
+                            href={`/events/${encodeURIComponent(
+                              event.category
+                            )}/${encodeURIComponent(event.slug)}`}
                             className="btn-retro btn-surface"
                             target="_blank"
                           >

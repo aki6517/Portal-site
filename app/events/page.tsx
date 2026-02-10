@@ -124,7 +124,7 @@ export default async function EventsPage({
             className="input-retro"
           />
           <input type="hidden" name="sort" value={sort} />
-          <button type="submit" className="btn-retro btn-ink whitespace-nowrap">
+          <button type="submit" className="btn-retro btn-ink">
             検索
           </button>
         </form>

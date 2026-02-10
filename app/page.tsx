@@ -345,7 +345,7 @@ export default async function Home() {
                         alt={event.title}
                         fill
                         unoptimized
-                        className="object-cover grayscale transition-all duration-500 group-hover:grayscale-0"
+                        className="object-cover transition-all duration-500"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-xs font-bold text-zinc-600">

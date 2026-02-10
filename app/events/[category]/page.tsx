@@ -1,9 +1,29 @@
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { buildMetadata } from "@/lib/seo";
+
+type CategoryRecord = {
+  id: string;
+  name: string;
+  icon?: string | null;
+  color?: string | null;
+};
+
+type EventRecord = {
+  id: string;
+  title: string;
+  category: string;
+  categories?: string[] | null;
+  slug: string;
+  start_date: string;
+  end_date?: string | null;
+  venue?: string | null;
+  image_url?: string | null;
+  flyer_url?: string | null;
+  company?: string | null;
+};
 
 const formatDate = (value?: string | null) => {
   if (!value) return "";
@@ -28,29 +48,61 @@ const normalizeQuery = (value?: string) => {
   return trimmed.slice(0, 80);
 };
 
+const decodeRouteParam = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
 const getCategories = async () => {
-  const supabase = await createSupabaseServerClient();
+  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createSupabaseServiceClient()
+    : await createSupabaseServerClient();
   const { data } = await supabase
     .from("categories")
     .select("id, name, icon, color")
     .order("sort_order", { ascending: true });
-  return data ?? [];
+  return (data ?? []) as CategoryRecord[];
 };
 
 const getEvents = async (category: string, query?: string) => {
-  const supabase = await createSupabaseServerClient();
-  let request = supabase
+  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createSupabaseServiceClient()
+    : await createSupabaseServerClient();
+  const selectFields =
+    "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company";
+  const { data, error } = await supabase
     .from("events")
-    .select(
-      "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company"
-    )
+    .select(selectFields)
     .eq("status", "published")
-    .or(`category.eq.${category},categories.cs.{${category}}`);
+    .order("start_date", { ascending: true });
 
-  const { data } = await request.order("start_date", { ascending: true });
-  if (!query) return data ?? [];
+  let rows = (data ?? []) as EventRecord[];
+  const missingCategoriesColumn =
+    !!error &&
+    (error.message.includes("column") || error.message.includes("does not exist"));
+
+  if (missingCategoriesColumn) {
+    const fallback = await supabase
+      .from("events")
+      .select(
+        "id, title, category, slug, start_date, end_date, venue, image_url, flyer_url, company"
+      )
+      .eq("status", "published")
+      .order("start_date", { ascending: true });
+    rows = (fallback.data ?? []) as EventRecord[];
+  }
+
+  const filtered = rows.filter(
+    (event) =>
+      event.category === category ||
+      (Array.isArray(event.categories) && event.categories.includes(category))
+  );
+  if (!query) return filtered;
   const lowered = query.toLowerCase();
-  return (data ?? []).filter((event) =>
+  return filtered.filter((event) =>
     [event.title, event.venue, event.company]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(lowered))
@@ -78,10 +130,12 @@ const getViews30Map = async () => {
 export async function generateMetadata({
   params,
 }: {
-  params: { category: string };
+  params: { category: string } | Promise<{ category: string }>;
 }) {
+  const resolvedParams = await Promise.resolve(params);
+  const categoryId = decodeRouteParam(resolvedParams.category);
   const categories = await getCategories();
-  const category = categories.find((item) => item.id === params.category);
+  const category = categories.find((item) => item.id === categoryId);
   const title = category
     ? `${category.name}の公演`
     : "カテゴリ別 公演一覧";
@@ -92,7 +146,7 @@ export async function generateMetadata({
   return buildMetadata({
     title,
     description,
-    path: `/events/${params.category}`,
+    path: `/events/${resolvedParams.category}`,
   });
 }
 
@@ -100,22 +154,29 @@ export default async function EventsByCategoryPage({
   params,
   searchParams,
 }: {
-  params: { category: string };
-  searchParams?: { sort?: string; q?: string } | Promise<{ sort?: string; q?: string }>;
+  params: { category: string } | Promise<{ category: string }>;
+  searchParams?:
+    | { sort?: string; q?: string }
+    | Promise<{ sort?: string; q?: string }>;
 }) {
+  const resolvedParams = await Promise.resolve(params);
+  const categoryId = decodeRouteParam(resolvedParams.category);
   const resolvedSearchParams = await Promise.resolve(searchParams);
   const sort = resolvedSearchParams?.sort === "popular" ? "popular" : "date";
   const q = normalizeQuery(resolvedSearchParams?.q);
   const [categories, events, viewsMap] = await Promise.all([
     getCategories(),
-    getEvents(params.category, q),
+    getEvents(categoryId, q),
     sort === "popular" ? getViews30Map() : Promise.resolve(new Map()),
   ]);
 
-  const category = categories.find((item) => item.id === params.category);
-  if (!category) {
-    notFound();
-  }
+  const category = categories.find((item) => item.id === categoryId);
+  const categoryName = category?.name ?? categoryId;
+  const categoryIcon = category?.icon ?? "🎭";
+  const hasCurrentCategory = categories.some((item) => item.id === categoryId);
+  const categoryTabs = hasCurrentCategory
+    ? categories
+    : [{ id: categoryId, name: categoryName, icon: categoryIcon }, ...categories];
 
   const sortedEvents =
     sort === "popular"
@@ -132,14 +193,14 @@ export default async function EventsByCategoryPage({
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="font-display text-3xl tracking-tight">
-            {category.icon ?? "🎭"} {category.name} の公演
+            {categoryIcon} {categoryName} の公演
           </h1>
           <p className="mt-2 text-sm text-zinc-700">
             開催日順／人気順（直近30日PV）で並べ替えできます。
           </p>
         </div>
         <form
-          action={`/events/${params.category}`}
+          action={`/events/${resolvedParams.category}`}
           method="get"
           className="flex w-full gap-3 md:max-w-md"
         >
@@ -150,7 +211,7 @@ export default async function EventsByCategoryPage({
             className="input-retro"
           />
           <input type="hidden" name="sort" value={sort} />
-          <button type="submit" className="btn-retro btn-ink whitespace-nowrap">
+          <button type="submit" className="btn-retro btn-ink">
             検索
           </button>
         </form>
@@ -158,7 +219,7 @@ export default async function EventsByCategoryPage({
 
       <div className="mt-6 flex flex-wrap gap-2 text-sm">
         <Link
-          href={`/events/${params.category}?sort=date${
+          href={`/events/${resolvedParams.category}?sort=date${
             q ? `&q=${encodeURIComponent(q)}` : ""
           }`}
           className={`btn-retro ${sort === "date" ? "btn-ink" : "btn-surface"}`}
@@ -166,7 +227,7 @@ export default async function EventsByCategoryPage({
           開催日順
         </Link>
         <Link
-          href={`/events/${params.category}?sort=popular${
+          href={`/events/${resolvedParams.category}?sort=popular${
             q ? `&q=${encodeURIComponent(q)}` : ""
           }`}
           className={`btn-retro ${
@@ -178,12 +239,12 @@ export default async function EventsByCategoryPage({
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2">
-        {categories.map((item) => (
+        {categoryTabs.map((item) => (
           <Link
             key={item.id}
-            href={`/events/${item.id}`}
+            href={`/events/${encodeURIComponent(item.id)}`}
             className={`badge-retro shadow-hard-sm ${
-              item.id === params.category ? "bg-primary" : "bg-surface"
+              item.id === categoryId ? "bg-primary" : "bg-surface"
             }`}
           >
             <span aria-hidden>{item.icon ?? "🎭"}</span>
@@ -208,7 +269,9 @@ export default async function EventsByCategoryPage({
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <Link
-                    href={`/events/${event.category}/${event.slug}`}
+                    href={`/events/${encodeURIComponent(
+                      event.category
+                    )}/${encodeURIComponent(event.slug)}`}
                     className="text-lg font-black hover:underline"
                   >
                     {event.title}
@@ -218,7 +281,9 @@ export default async function EventsByCategoryPage({
                     {event.end_date ? ` 〜 ${formatDate(event.end_date)}` : ""}
                   </div>
                   {event.venue && (
-                    <div className="text-xs text-zinc-600">{event.venue}</div>
+                    <div className="break-words text-xs text-zinc-600">
+                      {event.venue}
+                    </div>
                   )}
                   {sort === "popular" && (
                     <div className="mt-2">

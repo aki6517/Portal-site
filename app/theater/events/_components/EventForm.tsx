@@ -719,7 +719,7 @@ export default function EventForm({
 
       {createdId && (
         <p className="mt-2 text-xs text-zinc-700">
-          作成後の編集はこちら: /theater/events/{createdId}
+          作成後の編集はこちら: /events/{form.category}/{form.slug}/edit
         </p>
       )}
       {message && <p className="mt-2 text-xs text-zinc-700">{message}</p>}

@@ -1,15 +1,28 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getBlogPostBySlug } from "@/lib/content";
+import { getAllBlogPosts, getBlogPostBySlug } from "@/lib/content";
 
 const SITE_NAME = "福岡アクトポータル";
+
+const decodeRouteParam = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+export function generateStaticParams() {
+  return getAllBlogPosts().map((post) => ({ slug: post.slug }));
+}
 
 export async function generateMetadata({
   params,
 }: {
-  params: { slug: string };
+  params: { slug: string } | Promise<{ slug: string }>;
 }) {
-  const post = getBlogPostBySlug(params.slug);
+  const resolvedParams = await Promise.resolve(params);
+  const post = getBlogPostBySlug(decodeRouteParam(resolvedParams.slug));
   if (!post) {
     return {
       title: `ブログ | ${SITE_NAME}`,
@@ -21,12 +34,13 @@ export async function generateMetadata({
   };
 }
 
-export default function BlogDetailPage({
+export default async function BlogDetailPage({
   params,
 }: {
-  params: { slug: string };
+  params: { slug: string } | Promise<{ slug: string }>;
 }) {
-  const post = getBlogPostBySlug(params.slug);
+  const resolvedParams = await Promise.resolve(params);
+  const post = getBlogPostBySlug(decodeRouteParam(resolvedParams.slug));
   if (!post) {
     notFound();
   }

@@ -37,14 +37,16 @@ const rounded = M_PLUS_Rounded_1c({
   display: "swap",
 });
 
+const ICON_PATH = "/icon.png?v=20260210a";
+
 export const metadata: Metadata = {
   title: "福岡アクトポータル - 福岡演劇公演ポータル",
   description:
     "福岡の演劇公演情報を一元管理。今の気分で公演を探せるポータルサイト。",
   icons: {
-    icon: "/icon.png",
-    shortcut: "/icon.png",
-    apple: "/icon.png",
+    icon: [{ url: ICON_PATH, type: "image/png" }],
+    shortcut: ICON_PATH,
+    apple: [{ url: ICON_PATH, type: "image/png" }],
   },
 };
 
