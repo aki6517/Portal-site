@@ -34,7 +34,7 @@ type EventRecord = {
   image_url: string | null;
   flyer_url: string | null;
   ticket_url: string | null;
-  cast: { name?: string; role?: string; image_url?: string }[] | null;
+  cast?: { name?: string; role?: string; image_url?: string }[] | null;
 };
 
 type RelatedEvent = {
@@ -186,58 +186,68 @@ const pickMatchedEvent = (rows: EventRecord[] | null | undefined, category: stri
   );
 };
 
+const DETAIL_SELECT_ATTEMPTS: string[] = [
+  "id, title, company, description, playwright, director, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, reservation_links, schedule_times, venue, venue_address, price_general, price_student, ticket_types, tags, image_url, flyer_url, ticket_url, cast",
+  "id, title, company, description, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
+  "id, title, company, description, category, slug, publish_at, start_date, end_date, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
+  "id, title, company, description, category, slug, start_date, end_date, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
+  "id, title, company, description, category, slug, start_date, end_date, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url",
+];
+
 const getEvent = async (category: string, slug: string) => {
-  const supabase = await createSupabaseServerClient();
-  const selectFields =
-    "id, title, company, description, playwright, director, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, reservation_links, schedule_times, venue, venue_address, price_general, price_student, ticket_types, tags, image_url, flyer_url, ticket_url, cast";
-  const fallbackSelect =
-    "id, title, company, description, category, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast";
-
   const queryBySlug = async (
-    client: Awaited<ReturnType<typeof createSupabaseServerClient>> | ReturnType<typeof createSupabaseServiceClient>,
-    fields: string
-  ) =>
-    client
-      .from("events")
-      .select(fields)
-      .eq("slug", slug)
-      .eq("status", "published")
-      .returns<EventRecord[]>();
+    client:
+      | Awaited<ReturnType<typeof createSupabaseServerClient>>
+      | ReturnType<typeof createSupabaseServiceClient>,
+    source: "anon" | "service"
+  ) => {
+    const errors: string[] = [];
+    for (const fields of DETAIL_SELECT_ATTEMPTS) {
+      const result = await client
+        .from("events")
+        .select(fields)
+        .eq("slug", slug)
+        .eq("status", "published")
+        .returns<EventRecord[]>();
+      const matched = pickMatchedEvent(result.data, category);
+      if (matched) return matched;
 
-  const primary = await queryBySlug(supabase, selectFields);
-  const matchedPrimary = pickMatchedEvent(primary.data, category);
-  if (matchedPrimary) return matchedPrimary;
+      if (result.error) {
+        errors.push(result.error.message);
+        const missingColumns =
+          result.error.message.includes("column") ||
+          result.error.message.includes("does not exist");
+        if (!missingColumns) break;
+        continue;
+      }
 
-  const primaryMessage = primary.error?.message ?? "";
-  const missingColumns =
-    primaryMessage.includes("column") || primaryMessage.includes("does not exist");
-  if (primary.error && !missingColumns) {
-    console.warn("[event-detail] query error (anon)", primary.error.message);
-  }
+      if ((result.data?.length ?? 0) > 0) {
+        console.warn("[event-detail] rows found but filtered by release window", {
+          category,
+          slug,
+          source,
+        });
+      }
+    }
+    if (errors.length > 0) {
+      console.warn("[event-detail] query attempts failed", {
+        category,
+        slug,
+        source,
+        errors,
+      });
+    }
+    return null;
+  };
 
-  if (missingColumns) {
-    const fallback = await queryBySlug(supabase, fallbackSelect);
-    const fallbackMatched = pickMatchedEvent(fallback.data, category);
-    if (fallbackMatched) return fallbackMatched;
-  }
+  const supabase = await createSupabaseServerClient();
+  const anonMatched = await queryBySlug(supabase, "anon");
+  if (anonMatched) return anonMatched;
 
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const service = createSupabaseServiceClient();
-    const serviceRows = await queryBySlug(service, selectFields);
-    const matchedService = pickMatchedEvent(serviceRows.data, category);
-    if (matchedService) return matchedService;
-
-    const serviceMessage = serviceRows.error?.message ?? "";
-    const serviceMissingColumns =
-      serviceMessage.includes("column") || serviceMessage.includes("does not exist");
-    if (serviceRows.error && !serviceMissingColumns) {
-      console.warn("[event-detail] query error (service)", serviceRows.error.message);
-    }
-    if (serviceMissingColumns) {
-      const serviceFallback = await queryBySlug(service, fallbackSelect);
-      const matchedServiceFallback = pickMatchedEvent(serviceFallback.data, category);
-      if (matchedServiceFallback) return matchedServiceFallback;
-    }
+    const serviceMatched = await queryBySlug(service, "service");
+    if (serviceMatched) return serviceMatched;
   }
 
   console.warn("[event-detail] not found", { category, slug });
