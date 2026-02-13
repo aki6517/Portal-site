@@ -60,6 +60,24 @@ const isReleased = (publishAt?: string | null) => {
   return date.getTime() <= Date.now();
 };
 
+const normalizeImageUrl = (value?: string | null) => {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("/")) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  try {
+    return new URL(trimmed).toString();
+  } catch {
+    return null;
+  }
+};
+
+const pickEventImage = (event?: {
+  image_url?: string | null;
+  flyer_url?: string | null;
+} | null) =>
+  normalizeImageUrl(event?.image_url) ?? normalizeImageUrl(event?.flyer_url);
+
 const getReservationBadge = (event: TrendingEvent) => {
   if (!event.ticket_url) return null;
   if (!event.reservation_start_at) return "予約可";
@@ -166,9 +184,11 @@ export default async function Home() {
     categoriesList.map((category) => [category.id, category])
   );
   const featured = trending[0];
-  const featuredImage = featured?.image_url || featured?.flyer_url || null;
+  const featuredImage = pickEventImage(featured);
   const featuredHref = featured
-    ? `/events/${featured.category}/${featured.slug}`
+    ? `/events/${encodeURIComponent(featured.category)}/${encodeURIComponent(
+        featured.slug
+      )}`
     : "/events";
   const moodCards = [
     {
@@ -271,6 +291,7 @@ export default async function Home() {
                     fill
                     priority
                     sizes="(min-width: 1024px) 50vw, 100vw"
+                    unoptimized
                     className="object-cover transition-all duration-500"
                   />
                 ) : (
@@ -387,14 +408,16 @@ export default async function Home() {
         ) : (
           <div className="grid gap-6 md:grid-cols-3">
             {trending.map((event) => {
-              const image = event.image_url || event.flyer_url;
+              const image = pickEventImage(event);
               const categoryLabel =
                 categoryMap.get(event.category)?.name ?? event.category;
               const reservationBadge = getReservationBadge(event);
               return (
                 <Link
                   key={event.id}
-                  href={`/events/${event.category}/${event.slug}`}
+                  href={`/events/${encodeURIComponent(
+                    event.category
+                  )}/${encodeURIComponent(event.slug)}`}
                   className="group cursor-pointer rounded-lg border-2 border-ink bg-white p-3 shadow-hard transition-all hover:-translate-y-1 hover-shadow-hard-lg"
                 >
                   <div className="relative mb-4 aspect-[4/3] overflow-hidden rounded border-2 border-ink bg-surface-muted">
@@ -404,6 +427,7 @@ export default async function Home() {
                         alt={event.title}
                         fill
                         sizes="(min-width: 1024px) 30vw, (min-width: 768px) 33vw, 100vw"
+                        unoptimized
                         className="object-cover transition-all duration-500"
                       />
                     ) : (

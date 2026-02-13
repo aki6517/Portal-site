@@ -21,6 +21,7 @@ type EventRecord = {
   end_date: string | null;
   reservation_start_at?: string | null;
   reservation_label?: string | null;
+  reservation_links?: { label?: string | null; url?: string | null }[] | null;
   schedule_times?: { start_date?: string; end_date?: string | null; label?: string }[] | null;
   venue: string | null;
   venue_address: string | null;
@@ -155,121 +156,89 @@ const isReservationOpen = (reservationStartAt?: string | null) => {
   return date.getTime() <= Date.now();
 };
 
+const normalizeImageUrl = (value?: string | null) => {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("/")) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  try {
+    return new URL(trimmed).toString();
+  } catch {
+    return null;
+  }
+};
+
+const pickEventImage = (event: {
+  image_url?: string | null;
+  flyer_url?: string | null;
+}) => normalizeImageUrl(event.image_url) ?? normalizeImageUrl(event.flyer_url);
+
+const pickMatchedEvent = (rows: EventRecord[] | null | undefined, category: string) => {
+  const released = (rows ?? []).filter((item) => isReleased(item.publish_at));
+  return (
+    released.find(
+      (item) =>
+        item.category === category ||
+        (Array.isArray(item.categories) && item.categories.includes(category))
+    ) ?? released[0] ?? null
+  );
+};
+
 const getEvent = async (category: string, slug: string) => {
   const supabase = await createSupabaseServerClient();
   const selectFields =
-    "id, title, company, description, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, schedule_times, venue, venue_address, price_general, price_student, ticket_types, tags, image_url, flyer_url, ticket_url, cast";
+    "id, title, company, description, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, reservation_links, schedule_times, venue, venue_address, price_general, price_student, ticket_types, tags, image_url, flyer_url, ticket_url, cast";
+  const fallbackSelect =
+    "id, title, company, description, category, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast";
 
-  const { data, error } = await supabase
-    .from("events")
-    .select(selectFields)
-    .eq("slug", slug)
-    .or(`category.eq.${category},categories.cs.{${category}}`)
-    .eq("status", "published")
-    .maybeSingle<EventRecord>();
-
-  if (!error && data && isReleased(data.publish_at)) return data;
-  if (!error && !data) {
-    console.warn("[event-detail] not found (anon)", {
-      category,
-      slug,
-    });
-  }
-  if (error) {
-    console.warn("[event-detail] query error (anon)", error.message);
-  }
-
-  const message = error?.message ?? "";
-  const missingColumns = message.includes("column") || message.includes("does not exist");
-  const multipleRows = message.toLowerCase().includes("multiple");
-
-  if (multipleRows) {
-    const { data: candidates } = await supabase
+  const queryBySlug = async (
+    client: Awaited<ReturnType<typeof createSupabaseServerClient>> | ReturnType<typeof createSupabaseServiceClient>,
+    fields: string
+  ) =>
+    client
       .from("events")
-      .select(selectFields)
+      .select(fields)
       .eq("slug", slug)
       .eq("status", "published")
       .returns<EventRecord[]>();
-    const matched =
-      candidates?.find(
-        (item) =>
-          (item.category === category ||
-            (Array.isArray(item.categories) && item.categories.includes(category))) &&
-          isReleased(item.publish_at)
-      ) ??
-      candidates?.find((item) => isReleased(item.publish_at));
-    if (matched) return matched;
+
+  const primary = await queryBySlug(supabase, selectFields);
+  const matchedPrimary = pickMatchedEvent(primary.data, category);
+  if (matchedPrimary) return matchedPrimary;
+
+  const primaryMessage = primary.error?.message ?? "";
+  const missingColumns =
+    primaryMessage.includes("column") || primaryMessage.includes("does not exist");
+  if (primary.error && !missingColumns) {
+    console.warn("[event-detail] query error (anon)", primary.error.message);
   }
 
   if (missingColumns) {
-    const fallback = await supabase
-      .from("events")
-      .select(
-        "id, title, company, description, category, slug, start_date, end_date, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast"
-      )
-      .eq("slug", slug)
-      .eq("status", "published")
-      .returns<EventRecord[]>();
-    const matched =
-      fallback.data?.find((item) => item.category === category) ??
-      fallback.data?.[0];
-    if (matched) return matched;
+    const fallback = await queryBySlug(supabase, fallbackSelect);
+    const fallbackMatched = pickMatchedEvent(fallback.data, category);
+    if (fallbackMatched) return fallbackMatched;
   }
-
-  const { data: bySlug } = await supabase
-    .from("events")
-    .select(selectFields)
-    .eq("slug", slug)
-    .eq("status", "published")
-    .returns<EventRecord[]>();
-  const matched =
-    bySlug?.find(
-      (item) =>
-        (item.category === category ||
-          (Array.isArray(item.categories) && item.categories.includes(category))) &&
-        isReleased(item.publish_at)
-    ) ?? bySlug?.find((item) => isReleased(item.publish_at));
-  if (matched) return matched;
 
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const service = createSupabaseServiceClient();
-    const { data: serviceData, error: serviceError } = await service
-      .from("events")
-      .select(selectFields)
-      .eq("slug", slug)
-      .or(`category.eq.${category},categories.cs.{${category}}`)
-      .eq("status", "published")
-      .maybeSingle<EventRecord>();
-    if (!serviceError && serviceData && isReleased(serviceData.publish_at)) {
-      return serviceData;
-    }
-    if (!serviceError && !serviceData) {
-      console.warn("[event-detail] not found (service)", {
-        category,
-        slug,
-      });
-    }
-    if (serviceError) {
-      console.warn("[event-detail] query error (service)", serviceError.message);
-    }
+    const serviceRows = await queryBySlug(service, selectFields);
+    const matchedService = pickMatchedEvent(serviceRows.data, category);
+    if (matchedService) return matchedService;
 
-    const { data: serviceBySlug } = await service
-      .from("events")
-      .select(selectFields)
-      .eq("slug", slug)
-      .eq("status", "published")
-      .returns<EventRecord[]>();
-    const serviceMatched =
-      serviceBySlug?.find(
-        (item) =>
-          (item.category === category ||
-            (Array.isArray(item.categories) && item.categories.includes(category))) &&
-          isReleased(item.publish_at)
-      ) ?? serviceBySlug?.find((item) => isReleased(item.publish_at));
-    if (serviceMatched) return serviceMatched;
+    const serviceMessage = serviceRows.error?.message ?? "";
+    const serviceMissingColumns =
+      serviceMessage.includes("column") || serviceMessage.includes("does not exist");
+    if (serviceRows.error && !serviceMissingColumns) {
+      console.warn("[event-detail] query error (service)", serviceRows.error.message);
+    }
+    if (serviceMissingColumns) {
+      const serviceFallback = await queryBySlug(service, fallbackSelect);
+      const matchedServiceFallback = pickMatchedEvent(serviceFallback.data, category);
+      if (matchedServiceFallback) return matchedServiceFallback;
+    }
   }
 
-  console.warn("[event-detail] not found (final)", { category, slug });
+  console.warn("[event-detail] not found", { category, slug });
   return null;
 };
 
@@ -326,7 +295,11 @@ const tryRedirect = async (category: string, slug: string) => {
   if (!target || target.status !== "published" || !isReleased(target.publish_at)) {
     return;
   }
-  permanentRedirect(`/events/${target.category}/${target.slug}`);
+  permanentRedirect(
+    `/events/${encodeURIComponent(target.category)}/${encodeURIComponent(
+      target.slug
+    )}`
+  );
 };
 
 export async function generateMetadata({
@@ -342,7 +315,7 @@ export async function generateMetadata({
   if (!event) {
     return buildMetadata({ title: "公演詳細", path });
   }
-  const image = event.image_url || event.flyer_url || undefined;
+  const image = pickEventImage(event) ?? undefined;
   return buildMetadata({
     title: event.title,
     description: event.description ?? undefined,
@@ -366,7 +339,11 @@ export default async function EventDetailPage({
     notFound();
   }
   if (event.category !== category) {
-    permanentRedirect(`/events/${event.category}/${event.slug}`);
+    permanentRedirect(
+      `/events/${encodeURIComponent(event.category)}/${encodeURIComponent(
+        event.slug
+      )}`
+    );
   }
 
   const categoryCopy = CATEGORY_COPY[event.category] ?? {
@@ -377,13 +354,31 @@ export default async function EventDetailPage({
   const start = formatDate(event.start_date);
   const end = formatDate(event.end_date);
   const dateLabel = end ? `${start} 〜 ${end}` : start;
-  const image = event.image_url || event.flyer_url;
+  const image = pickEventImage(event);
   const scheduleTimes = Array.isArray(event.schedule_times)
     ? event.schedule_times
     : [];
   const ticketTypes = Array.isArray(event.ticket_types)
     ? event.ticket_types
     : [];
+  const reservationLinks = (() => {
+    const rows = Array.isArray(event.reservation_links)
+      ? event.reservation_links
+          .map((item) => ({
+            label: (item?.label ?? "").trim(),
+            url: (item?.url ?? "").trim(),
+          }))
+          .filter((item) => item.label || item.url)
+      : [];
+    if (rows.length > 0) return rows;
+    if (!event.reservation_label && !event.ticket_url) return [];
+    return [
+      {
+        label: (event.reservation_label ?? "").trim(),
+        url: (event.ticket_url ?? "").trim(),
+      },
+    ];
+  })();
   const reservationOpen = isReservationOpen(event.reservation_start_at);
   const related = await getRelatedEvents(event.category, event.id);
 
@@ -406,13 +401,15 @@ export default async function EventDetailPage({
       "@type": "ListItem",
       position: 3,
       name: categoryCopy.label,
-      item: `${siteUrl}/events/${event.category}/`,
+      item: `${siteUrl}/events/${encodeURIComponent(event.category)}/`,
     },
     {
       "@type": "ListItem",
       position: 4,
       name: event.title,
-      item: `${siteUrl}/events/${event.category}/${event.slug}`,
+      item: `${siteUrl}/events/${encodeURIComponent(event.category)}/${encodeURIComponent(
+        event.slug
+      )}`,
     },
   ];
 
@@ -475,7 +472,7 @@ export default async function EventDetailPage({
           </li>
           <li>
             <Link
-              href={`/events/${event.category}`}
+              href={`/events/${encodeURIComponent(event.category)}`}
               className="badge-retro bg-surface"
             >
               <span aria-hidden>{categoryCopy.icon}</span>
@@ -581,39 +578,40 @@ export default async function EventDetailPage({
                 {event.price_student ? `学生 ${event.price_student}円` : ""}
               </div>
             )}
-            {(event.ticket_url ||
-              event.reservation_label ||
-              event.reservation_start_at) && (
+            {(reservationLinks.length > 0 || event.reservation_start_at) && (
               <div>
-                {event.reservation_label && (
-                  <div>
-                    <span className="font-semibold">予約受付:</span>{" "}
-                    {event.reservation_label}
-                  </div>
-                )}
                 {event.reservation_start_at && (
                   <div>
                     <span className="font-semibold">予約開始:</span>{" "}
                     {formatDate(event.reservation_start_at)}
                   </div>
                 )}
-                {event.ticket_url && (
-                  <div>
-                    <span className="font-semibold">チケット:</span>{" "}
-                    {reservationOpen ? (
-                      <a
-                        className="link-retro"
-                        href={event.ticket_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        購入ページへ
-                      </a>
-                    ) : (
-                      <span className="badge-retro bg-surface-muted text-xs">
-                        予約開始前
-                      </span>
-                    )}
+                {reservationLinks.length > 0 && (
+                  <div className="mt-2 grid gap-1 text-sm text-zinc-700">
+                    {reservationLinks.map((item, index) => (
+                      <div key={`reservation-link-${index}`} className="flex flex-wrap gap-2">
+                        <span className="font-semibold">
+                          予約受付{reservationLinks.length > 1 ? ` ${index + 1}` : ""}:
+                        </span>
+                        {item.label ? <span>{item.label}</span> : null}
+                        {item.url ? (
+                          reservationOpen ? (
+                            <a
+                              className="link-retro"
+                              href={item.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              購入ページへ
+                            </a>
+                          ) : (
+                            <span className="badge-retro bg-surface-muted text-xs">
+                              予約開始前
+                            </span>
+                          )
+                        ) : null}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -642,6 +640,7 @@ export default async function EventDetailPage({
               width={800}
               height={1000}
               sizes="(min-width: 1024px) 40vw, 100vw"
+              unoptimized
               className="h-full w-full bg-surface object-cover"
             />
           ) : (
@@ -685,11 +684,13 @@ export default async function EventDetailPage({
           <h2 className="font-display text-xl font-black">関連の公演</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             {related.map((item) => {
-              const thumb = item.image_url || item.flyer_url;
+              const thumb = pickEventImage(item);
               return (
                 <Link
                   key={item.id}
-                  href={`/events/${item.category}/${item.slug}`}
+                  href={`/events/${encodeURIComponent(
+                    item.category
+                  )}/${encodeURIComponent(item.slug)}`}
                   className="card-retro block overflow-hidden transition-transform hover:-translate-y-0.5"
                 >
                   <div className="aspect-[4/3] bg-surface-muted">
@@ -700,6 +701,7 @@ export default async function EventDetailPage({
                         width={800}
                         height={600}
                         sizes="(min-width: 1024px) 20vw, (min-width: 768px) 33vw, 100vw"
+                        unoptimized
                         className="h-full w-full object-cover"
                       />
                     ) : null}

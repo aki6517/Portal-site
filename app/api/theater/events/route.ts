@@ -14,6 +14,7 @@ type EventPayload = {
   end_date?: string | null;
   reservation_start_at?: string | null;
   reservation_label?: string | null;
+  reservation_links?: { label?: string; url?: string }[] | null;
   schedule_times?: { start_date?: string; end_date?: string | null; label?: string }[];
   venue_id?: string | null;
   venue?: string | null;
@@ -63,6 +64,18 @@ const normalizeScheduleTimes = (
     .filter((item) => item.start_date);
 };
 
+const normalizeReservationLinks = (
+  links?: { label?: string; url?: string }[] | null
+) => {
+  if (!Array.isArray(links)) return [];
+  return links
+    .map((item) => ({
+      label: item.label?.trim() ?? "",
+      url: item.url?.trim() ?? "",
+    }))
+    .filter((item) => item.label || item.url);
+};
+
 const deriveDateRange = (
   scheduleTimes: { start_date: string; end_date: string | null }[],
   fallbackStart?: string,
@@ -106,13 +119,27 @@ export async function GET() {
     );
   }
 
-  const { data: events, error: eventsError } = await supabase
+  let { data: events, error: eventsError } = await supabase
     .from("events")
     .select(
-      "id, title, slug, category, status, start_date, end_date, updated_at"
+      "id, title, slug, category, categories, status, start_date, end_date, updated_at"
     )
     .eq("theater_id", resolved.activeTheaterId)
     .order("updated_at", { ascending: false });
+
+  const missingColumns =
+    !!eventsError &&
+    (eventsError.message.includes("column") ||
+      eventsError.message.includes("does not exist"));
+  if (missingColumns) {
+    const fallback = await supabase
+      .from("events")
+      .select("id, title, slug, category, status, start_date, end_date, updated_at")
+      .eq("theater_id", resolved.activeTheaterId)
+      .order("updated_at", { ascending: false });
+    events = fallback.data;
+    eventsError = fallback.error;
+  }
 
   if (eventsError) {
     return NextResponse.json(
@@ -179,6 +206,7 @@ export async function POST(req: Request) {
   const slug = payload.slug?.trim();
   const title = payload.title?.trim();
   const scheduleTimes = normalizeScheduleTimes(payload.schedule_times);
+  const reservationLinks = normalizeReservationLinks(payload.reservation_links);
   const derivedDates = deriveDateRange(
     scheduleTimes,
     payload.start_date,
@@ -239,6 +267,7 @@ export async function POST(req: Request) {
       end_date: endDate ?? null,
       reservation_start_at: payload.reservation_start_at ?? null,
       reservation_label: payload.reservation_label ?? null,
+      reservation_links: reservationLinks,
       schedule_times: scheduleTimes,
       venue_id: payload.venue_id ?? null,
       venue: payload.venue ?? null,
@@ -278,7 +307,6 @@ export async function POST(req: Request) {
       description: payload.description ?? null,
       start_date: startDate,
       end_date: endDate ?? null,
-      schedule_times: scheduleTimes,
       venue_id: payload.venue_id ?? null,
       venue: payload.venue ?? null,
       venue_address: payload.venue_address ?? null,
@@ -286,7 +314,6 @@ export async function POST(req: Request) {
       venue_lng: payload.venue_lng ?? null,
       price_general: payload.price_general ?? null,
       price_student: payload.price_student ?? null,
-      ticket_types: payload.ticket_types ?? [],
       tags: normalizeTags(payload.tags),
       image_url: payload.image_url ?? null,
       flyer_url: payload.flyer_url ?? null,
@@ -295,7 +322,6 @@ export async function POST(req: Request) {
       ai_confidence:
         payload.ai_confidence !== undefined ? payload.ai_confidence : null,
       status: payload.status ?? "draft",
-      categories,
     };
     const retry = await service
       .from("events")

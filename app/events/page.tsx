@@ -50,6 +50,21 @@ const isReleased = (publishAt?: string | null) => {
   return date.getTime() <= Date.now();
 };
 
+const normalizeImageUrl = (value?: string | null) => {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("/")) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  try {
+    return new URL(trimmed).toString();
+  } catch {
+    return null;
+  }
+};
+
+const pickEventImage = (event: { image_url?: string | null; flyer_url?: string | null }) =>
+  normalizeImageUrl(event.image_url) ?? normalizeImageUrl(event.flyer_url);
+
 const getCategories = async () => {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
@@ -196,7 +211,7 @@ export default async function EventsPage({
         {categories.map((category) => (
           <Link
             key={category.id}
-            href={`/events/${category.id}`}
+            href={`/events/${encodeURIComponent(category.id)}`}
             className="badge-retro bg-surface shadow-hard-sm"
           >
             <span aria-hidden>{category.icon ?? "🎭"}</span>
@@ -214,14 +229,16 @@ export default async function EventsPage({
           </div>
         )}
         {sortedEvents.map((event) => {
-          const image = event.image_url || event.flyer_url;
+          const image = pickEventImage(event);
           const views = viewsMap.get(event.id) ?? 0;
           return (
             <div key={event.id} className="card-retro p-5">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <Link
-                    href={`/events/${event.category}/${event.slug}`}
+                    href={`/events/${encodeURIComponent(
+                      event.category
+                    )}/${encodeURIComponent(event.slug)}`}
                     className="text-lg font-black hover:underline"
                   >
                     {event.title}
@@ -248,6 +265,7 @@ export default async function EventsPage({
                     width={128}
                     height={80}
                     sizes="128px"
+                    unoptimized
                     className="h-20 w-32 rounded-xl border-2 border-ink object-cover shadow-hard-sm"
                   />
                 )}

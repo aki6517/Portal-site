@@ -14,6 +14,7 @@ type EventUpdatePayload = {
   end_date?: string | null;
   reservation_start_at?: string | null;
   reservation_label?: string | null;
+  reservation_links?: { label?: string; url?: string }[] | null;
   schedule_times?: { start_date?: string; end_date?: string | null; label?: string }[];
   venue_id?: string | null;
   venue?: string | null;
@@ -61,6 +62,18 @@ const normalizeScheduleTimes = (
       label: item.label?.trim() ?? "",
     }))
     .filter((item) => item.start_date);
+};
+
+const normalizeReservationLinks = (
+  links?: { label?: string; url?: string }[] | null
+) => {
+  if (!Array.isArray(links)) return undefined;
+  return links
+    .map((item) => ({
+      label: item.label?.trim() ?? "",
+      url: item.url?.trim() ?? "",
+    }))
+    .filter((item) => item.label || item.url);
 };
 
 const deriveDateRange = (
@@ -176,12 +189,27 @@ export async function PATCH(
     );
   }
 
-  const { data: current, error: currentError } = await service
+  let { data: current, error: currentError } = await service
     .from("events")
     .select("id, category, slug, status, start_date, end_date, categories")
     .eq("id", id)
     .eq("theater_id", resolved.activeTheaterId)
     .single();
+
+  const missingCurrentColumns =
+    !!currentError &&
+    (currentError.message.includes("column") ||
+      currentError.message.includes("does not exist"));
+  if (missingCurrentColumns) {
+    const fallbackCurrent = await service
+      .from("events")
+      .select("id, category, slug, status, start_date, end_date")
+      .eq("id", id)
+      .eq("theater_id", resolved.activeTheaterId)
+      .single();
+    current = fallbackCurrent.data as typeof current;
+    currentError = fallbackCurrent.error;
+  }
 
   if (currentError || !current) {
     return NextResponse.json(
@@ -223,12 +251,15 @@ export async function PATCH(
   } else {
     if (payload.start_date) update.start_date = payload.start_date;
     if ("end_date" in payload) update.end_date = payload.end_date ?? null;
-    if ("reservation_start_at" in payload) {
-      update.reservation_start_at = payload.reservation_start_at ?? null;
-    }
-    if ("reservation_label" in payload) {
-      update.reservation_label = payload.reservation_label ?? null;
-    }
+  }
+  if ("reservation_start_at" in payload) {
+    update.reservation_start_at = payload.reservation_start_at ?? null;
+  }
+  if ("reservation_label" in payload) {
+    update.reservation_label = payload.reservation_label ?? null;
+  }
+  if ("reservation_links" in payload) {
+    update.reservation_links = normalizeReservationLinks(payload.reservation_links) ?? [];
   }
   if ("venue_id" in payload) update.venue_id = payload.venue_id ?? null;
   if ("venue" in payload) update.venue = payload.venue ?? null;
@@ -265,9 +296,13 @@ export async function PATCH(
       updateError.message.includes("does not exist"));
   if (missingColumns) {
     const retryUpdate: Record<string, unknown> = { ...update };
+    delete retryUpdate.categories;
+    delete retryUpdate.schedule_times;
+    delete retryUpdate.ticket_types;
     delete retryUpdate.publish_at;
     delete retryUpdate.reservation_start_at;
     delete retryUpdate.reservation_label;
+    delete retryUpdate.reservation_links;
 
     if (Object.keys(retryUpdate).length === 0) {
       updated = {

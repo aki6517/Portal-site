@@ -64,6 +64,21 @@ const isReleased = (publishAt?: string | null) => {
   return date.getTime() <= Date.now();
 };
 
+const normalizeImageUrl = (value?: string | null) => {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("/")) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  try {
+    return new URL(trimmed).toString();
+  } catch {
+    return null;
+  }
+};
+
+const pickEventImage = (event: { image_url?: string | null; flyer_url?: string | null }) =>
+  normalizeImageUrl(event.image_url) ?? normalizeImageUrl(event.flyer_url);
+
 const getCategories = async () => {
   const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createSupabaseServiceClient()
@@ -209,7 +224,7 @@ export default async function EventsByCategoryPage({
           </p>
         </div>
         <form
-          action={`/events/${resolvedParams.category}`}
+          action={`/events/${encodeURIComponent(categoryId)}`}
           method="get"
           className="flex w-full gap-3 md:max-w-md"
         >
@@ -228,7 +243,7 @@ export default async function EventsByCategoryPage({
 
       <div className="mt-6 flex flex-wrap gap-2 text-sm">
         <Link
-          href={`/events/${resolvedParams.category}?sort=date${
+          href={`/events/${encodeURIComponent(categoryId)}?sort=date${
             q ? `&q=${encodeURIComponent(q)}` : ""
           }`}
           className={`btn-retro ${sort === "date" ? "btn-ink" : "btn-surface"}`}
@@ -236,7 +251,7 @@ export default async function EventsByCategoryPage({
           開催日順
         </Link>
         <Link
-          href={`/events/${resolvedParams.category}?sort=popular${
+          href={`/events/${encodeURIComponent(categoryId)}?sort=popular${
             q ? `&q=${encodeURIComponent(q)}` : ""
           }`}
           className={`btn-retro ${
@@ -271,7 +286,7 @@ export default async function EventsByCategoryPage({
           </div>
         )}
         {sortedEvents.map((event) => {
-          const image = event.image_url || event.flyer_url;
+          const image = pickEventImage(event);
           const views = viewsMap.get(event.id) ?? 0;
           return (
             <div key={event.id} className="card-retro p-5">
@@ -309,6 +324,7 @@ export default async function EventsByCategoryPage({
                     width={128}
                     height={80}
                     sizes="128px"
+                    unoptimized
                     className="h-20 w-32 rounded-xl border-2 border-ink object-cover shadow-hard-sm"
                   />
                 )}

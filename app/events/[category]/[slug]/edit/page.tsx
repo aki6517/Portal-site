@@ -8,6 +8,7 @@ import EditEventScreen from "@/app/theater/events/_components/EditEventScreen";
 type TheaterEvent = {
   id: string;
   category: string;
+  categories?: string[] | null;
   slug: string;
 };
 
@@ -72,7 +73,10 @@ export default function EventEditBySlugPage() {
       const json = (await res.json()) as { data?: { events?: TheaterEvent[] } };
       const events = json.data?.events ?? [];
       const matched = events.find(
-        (event) => event.category === category && event.slug === slug
+        (event) =>
+          event.slug === slug &&
+          (event.category === category ||
+            (Array.isArray(event.categories) && event.categories.includes(category)))
       );
 
       if (!matched) {

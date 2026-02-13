@@ -9,6 +9,7 @@ type EventData = {
   title: string;
   slug: string;
   category: string;
+  categories?: string[] | null;
   status: "draft" | "published" | "archived";
   description?: string | null;
   publish_at?: string | null;
@@ -16,11 +17,14 @@ type EventData = {
   end_date?: string | null;
   reservation_start_at?: string | null;
   reservation_label?: string | null;
+  reservation_links?: { label?: string; url?: string }[] | null;
+  schedule_times?: { start_date?: string; end_date?: string | null; label?: string }[] | null;
   venue?: string | null;
   venue_address?: string | null;
   price_general?: number | null;
   price_student?: number | null;
   ticket_url?: string | null;
+  ticket_types?: { label?: string; price?: number | null; note?: string }[] | null;
   tags?: string[] | null;
   cast?: unknown[] | null;
   flyer_url?: string | null;

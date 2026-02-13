@@ -8,46 +8,69 @@ const CATEGORY_OPTIONS = [
   { id: "conversation", label: "会話劇" },
   { id: "musical", label: "ミュージカル" },
   { id: "classic", label: "古典・時代劇" },
+  { id: "action", label: "アクション" },
+  { id: "serious", label: "シリアス" },
+  { id: "drama", label: "ドラマ" },
   { id: "dance", label: "ダンス" },
   { id: "student", label: "学生演劇" },
   { id: "conte", label: "コント" },
   { id: "experimental", label: "実験的" },
   { id: "other", label: "その他" },
-];
-
-const FLYER_BUCKET = "flyers-public";
-const CREATE_STEPS = [
-  "画像",
-  "基本",
-  "日程・会場",
-  "詳細・公開",
 ] as const;
 
+const STATUS_OPTIONS = [
+  { value: "published", label: "公開" },
+  { value: "draft", label: "下書き" },
+  { value: "archived", label: "非公開" },
+] as const;
+
+const FLYER_BUCKET = "flyers-public";
+const CREATE_STEPS = ["画像", "基本", "日程・会場", "詳細・公開"] as const;
+
+type CastMember = {
+  name: string;
+  role: string;
+  image_url: string;
+};
+
+type ScheduleTime = {
+  start_date: string;
+  label: string;
+};
+
+type ReservationLink = {
+  label: string;
+  url: string;
+};
+
 type FormState = {
-  category: string;
+  categories: string[];
   slug: string;
   title: string;
   description: string;
   publish_at: string;
-  start_date: string;
-  end_date: string;
+  schedule_times: ScheduleTime[];
   reservation_start_at: string;
-  reservation_label: string;
+  reservation_links: ReservationLink[];
   venue: string;
   venue_address: string;
   price_general: string;
   price_student: string;
-  ticket_url: string;
   tags: string;
-  cast: string;
+  cast: CastMember[];
   flyer_url: string;
   image_url: string;
   ai_confidence: string;
   status: "draft" | "published" | "archived";
 };
 
+type TextFieldKey = {
+  [K in keyof FormState]: FormState[K] extends string ? K : never;
+}[keyof FormState];
+
 type EventData = {
   category?: string | null;
+  categories?: string[] | null;
   slug?: string | null;
   title?: string | null;
   description?: string | null;
@@ -56,6 +79,8 @@ type EventData = {
   end_date?: string | null;
   reservation_start_at?: string | null;
   reservation_label?: string | null;
+  reservation_links?: { label?: string | null; url?: string | null }[] | null;
+  schedule_times?: { start_date?: string | null; end_date?: string | null; label?: string | null }[] | null;
   venue?: string | null;
   venue_address?: string | null;
   price_general?: number | null;
@@ -69,16 +94,147 @@ type EventData = {
   status?: "draft" | "published" | "archived" | null;
 };
 
+const emptyCastMember = (): CastMember => ({
+  name: "",
+  role: "",
+  image_url: "",
+});
+
+const emptyScheduleTime = (): ScheduleTime => ({
+  start_date: "",
+  label: "",
+});
+
+const emptyReservationLink = (): ReservationLink => ({
+  label: "",
+  url: "",
+});
+
+const normalizeText = (value?: string | null) => (value ?? "").trim();
+
+const normalizeCastMembers = (input?: unknown[] | null) => {
+  if (!Array.isArray(input)) return [emptyCastMember()];
+  const rows = input
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const record = item as Record<string, unknown>;
+      return {
+        name: normalizeText(String(record.name ?? "")),
+        role: normalizeText(String(record.role ?? "")),
+        image_url: normalizeText(String(record.image_url ?? "")),
+      } satisfies CastMember;
+    })
+    .filter((item): item is CastMember => Boolean(item));
+  return rows.length > 0 ? rows : [emptyCastMember()];
+};
+
+const toTokyoDateTimeInput = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const formatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return formatter.format(date).replace(" ", "T");
+};
+
+const toJstIso = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) {
+    return `${trimmed}:00+09:00`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(trimmed)) {
+    return trimmed;
+  }
+  return trimmed;
+};
+
+const formatJapaneseDateTime = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const pick = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${pick("year")}年${pick("month")}/${pick("day")}(${pick("weekday")})${pick("hour")}:${pick("minute")}〜`;
+};
+
+const normalizeScheduleTimes = (
+  scheduleTimes?: { start_date?: string | null; end_date?: string | null; label?: string | null }[] | null,
+  fallbackStartDate?: string | null
+) => {
+  const fromSchedule = Array.isArray(scheduleTimes)
+    ? scheduleTimes
+        .map((item) => ({
+          start_date: toTokyoDateTimeInput(item.start_date ?? ""),
+          label: normalizeText(item.label),
+        }))
+        .filter((item) => item.start_date)
+    : [];
+
+  if (fromSchedule.length > 0) return fromSchedule;
+  if (!fallbackStartDate) return [emptyScheduleTime()];
+  const fallback = toTokyoDateTimeInput(fallbackStartDate);
+  return fallback ? [{ start_date: fallback, label: "" }] : [emptyScheduleTime()];
+};
+
+const normalizeReservationLinks = (data?: EventData | null) => {
+  const fromArray = Array.isArray(data?.reservation_links)
+    ? data.reservation_links
+        .map((item) => ({
+          label: normalizeText(item?.label),
+          url: normalizeText(item?.url),
+        }))
+        .filter((item) => item.label || item.url)
+    : [];
+
+  if (fromArray.length > 0) return fromArray;
+
+  const legacy = {
+    label: normalizeText(data?.reservation_label),
+    url: normalizeText(data?.ticket_url),
+  };
+
+  if (legacy.label || legacy.url) return [legacy];
+  return [emptyReservationLink()];
+};
+
+const normalizeCategories = (data?: EventData | null) => {
+  const list = Array.isArray(data?.categories)
+    ? data.categories.map((item) => normalizeText(item))
+    : [];
+  const primary = normalizeText(data?.category);
+  const merged = [...(primary ? [primary] : []), ...list].filter(Boolean);
+  const unique = Array.from(new Set(merged));
+  if (unique.length > 0) return unique;
+  return ["comedy"];
+};
+
 const buildInitialState = (data?: EventData | null): FormState => ({
-  category: data?.category ?? "comedy",
+  categories: normalizeCategories(data),
   slug: data?.slug ?? "",
   title: data?.title ?? "",
   description: data?.description ?? "",
-  publish_at: data?.publish_at ?? "",
-  start_date: data?.start_date ?? "",
-  end_date: data?.end_date ?? "",
-  reservation_start_at: data?.reservation_start_at ?? "",
-  reservation_label: data?.reservation_label ?? "",
+  publish_at: toTokyoDateTimeInput(data?.publish_at),
+  schedule_times: normalizeScheduleTimes(data?.schedule_times, data?.start_date),
+  reservation_start_at: toTokyoDateTimeInput(data?.reservation_start_at),
+  reservation_links: normalizeReservationLinks(data),
   venue: data?.venue ?? "",
   venue_address: data?.venue_address ?? "",
   price_general:
@@ -89,9 +245,8 @@ const buildInitialState = (data?: EventData | null): FormState => ({
     data?.price_student !== null && data?.price_student !== undefined
       ? String(data.price_student)
       : "",
-  ticket_url: data?.ticket_url ?? "",
   tags: Array.isArray(data?.tags) ? data.tags.join(", ") : "",
-  cast: Array.isArray(data?.cast) ? JSON.stringify(data.cast, null, 2) : "",
+  cast: normalizeCastMembers(data?.cast),
   flyer_url: data?.flyer_url ?? "",
   image_url: data?.image_url ?? "",
   ai_confidence:
@@ -185,8 +340,109 @@ export default function EventForm({
     [eventId, createdId]
   );
 
-  const updateField = (key: keyof FormState, value: string) => {
+  const updateField = (key: TextFieldKey, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    setForm((prev) => {
+      const exists = prev.categories.includes(categoryId);
+      if (exists) {
+        const next = prev.categories.filter((item) => item !== categoryId);
+        return { ...prev, categories: next.length > 0 ? next : prev.categories };
+      }
+      return { ...prev, categories: [...prev.categories, categoryId] };
+    });
+  };
+
+  const updateScheduleTime = (
+    index: number,
+    key: keyof ScheduleTime,
+    value: string
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      schedule_times: prev.schedule_times.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [key]: value } : row
+      ),
+    }));
+  };
+
+  const addScheduleTime = () => {
+    setForm((prev) => ({
+      ...prev,
+      schedule_times: [...prev.schedule_times, emptyScheduleTime()],
+    }));
+  };
+
+  const removeScheduleTime = (index: number) => {
+    setForm((prev) => {
+      if (prev.schedule_times.length <= 1) return prev;
+      return {
+        ...prev,
+        schedule_times: prev.schedule_times.filter((_, rowIndex) => rowIndex !== index),
+      };
+    });
+  };
+
+  const updateCast = (
+    index: number,
+    key: keyof CastMember,
+    value: string
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      cast: prev.cast.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [key]: value } : row
+      ),
+    }));
+  };
+
+  const addCast = () => {
+    setForm((prev) => ({
+      ...prev,
+      cast: [...prev.cast, emptyCastMember()],
+    }));
+  };
+
+  const removeCast = (index: number) => {
+    setForm((prev) => {
+      if (prev.cast.length <= 1) return prev;
+      return {
+        ...prev,
+        cast: prev.cast.filter((_, rowIndex) => rowIndex !== index),
+      };
+    });
+  };
+
+  const updateReservationLink = (
+    index: number,
+    key: keyof ReservationLink,
+    value: string
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      reservation_links: prev.reservation_links.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [key]: value } : row
+      ),
+    }));
+  };
+
+  const addReservationLink = () => {
+    setForm((prev) => ({
+      ...prev,
+      reservation_links: [...prev.reservation_links, emptyReservationLink()],
+    }));
+  };
+
+  const removeReservationLink = (index: number) => {
+    setForm((prev) => {
+      if (prev.reservation_links.length <= 1) return prev;
+      return {
+        ...prev,
+        reservation_links: prev.reservation_links.filter((_, rowIndex) => rowIndex !== index),
+      };
+    });
   };
 
   const togglePlatform = (platform: string) => {
@@ -253,80 +509,118 @@ export default function EventForm({
         return;
       }
       const result = json?.data?.result ?? {};
-      setForm((prev) => ({
-        ...prev,
-        title: result.title ?? prev.title,
-        description: result.description ?? prev.description,
-        start_date: result.start_date ?? prev.start_date,
-        end_date: result.end_date ?? prev.end_date,
-        venue: result.venue ?? prev.venue,
-        venue_address: result.venue_address ?? prev.venue_address,
-        price_general:
-          result.price_general !== null && result.price_general !== undefined
-            ? String(result.price_general)
-            : prev.price_general,
-        price_student:
-          result.price_student !== null && result.price_student !== undefined
-            ? String(result.price_student)
-            : prev.price_student,
-        category: result.category ?? prev.category,
-        tags: Array.isArray(result.tags)
-          ? result.tags.join(", ")
-          : prev.tags,
-        cast: Array.isArray(result.cast)
-          ? JSON.stringify(result.cast, null, 2)
-          : prev.cast,
-        ai_confidence:
-          result.ai_confidence !== null && result.ai_confidence !== undefined
-            ? String(result.ai_confidence)
-            : prev.ai_confidence,
-      }));
+      setForm((prev) => {
+        const aiCategory = normalizeText(result.category);
+        const nextCategories = aiCategory
+          ? [aiCategory, ...prev.categories.filter((item) => item !== aiCategory)]
+          : prev.categories;
+        const aiStartDate = toTokyoDateTimeInput(result.start_date ?? "");
+
+        return {
+          ...prev,
+          title: result.title ?? prev.title,
+          description: result.description ?? prev.description,
+          schedule_times:
+            aiStartDate && prev.schedule_times.every((item) => !item.start_date)
+              ? [{ start_date: aiStartDate, label: "" }]
+              : prev.schedule_times,
+          venue: result.venue ?? prev.venue,
+          venue_address: result.venue_address ?? prev.venue_address,
+          price_general:
+            result.price_general !== null && result.price_general !== undefined
+              ? String(result.price_general)
+              : prev.price_general,
+          price_student:
+            result.price_student !== null && result.price_student !== undefined
+              ? String(result.price_student)
+              : prev.price_student,
+          categories: nextCategories,
+          tags: Array.isArray(result.tags)
+            ? result.tags.join(", ")
+            : prev.tags,
+          cast: Array.isArray(result.cast)
+            ? normalizeCastMembers(result.cast)
+            : prev.cast,
+          ai_confidence:
+            result.ai_confidence !== null && result.ai_confidence !== undefined
+              ? String(result.ai_confidence)
+              : prev.ai_confidence,
+        };
+      });
       setMessage("AI解析が完了しました。内容を確認してください。");
     } finally {
       setAnalyzing(false);
     }
   };
 
-  const parseCast = () => {
-    if (!form.cast.trim()) return [];
-    const parsed = JSON.parse(form.cast);
-    if (!Array.isArray(parsed)) {
-      throw new Error("キャストは配列で入力してください");
-    }
-    return parsed;
-  };
-
   const submit = async () => {
-    setSaving(true);
-    setMessage(null);
-    setCreatedId(null);
-    let cast: unknown[] | null = null;
-    try {
-      cast = parseCast();
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "キャストの形式が不正です"
-      );
-      setSaving(false);
+    const normalizedCategories = Array.from(
+      new Set(form.categories.map((item) => normalizeText(item)).filter(Boolean))
+    );
+    if (normalizedCategories.length === 0) {
+      setMessage("カテゴリを1つ以上選択してください。");
+      return;
+    }
+    if (!form.slug.trim() || !form.title.trim()) {
+      setMessage("URL用英字名と公演タイトルは必須です。");
       return;
     }
 
+    const scheduleTimes = form.schedule_times
+      .map((item) => ({
+        start_date: toJstIso(item.start_date),
+        end_date: null,
+        label: normalizeText(item.label),
+      }))
+      .filter((item) => item.start_date)
+      .sort((a, b) => a.start_date.localeCompare(b.start_date));
+
+    if (scheduleTimes.length === 0) {
+      setMessage("公演開始日時を1つ以上入力してください。");
+      return;
+    }
+
+    const cast = form.cast
+      .map((member) => ({
+        name: normalizeText(member.name),
+        role: normalizeText(member.role),
+        image_url: normalizeText(member.image_url),
+      }))
+      .filter((member) => member.name || member.role || member.image_url);
+
+    const reservationLinks = form.reservation_links
+      .map((item) => ({
+        label: normalizeText(item.label),
+        url: normalizeText(item.url),
+      }))
+      .filter((item) => item.label || item.url);
+
+    const primaryCategory = normalizedCategories[0] ?? "other";
+    const firstReservation = reservationLinks[0] ?? null;
+
+    setSaving(true);
+    setMessage(null);
+    setCreatedId(null);
+
     const payload = {
-      category: form.category,
-      slug: form.slug,
-      title: form.title,
-      publish_at: form.publish_at || null,
-      start_date: form.start_date,
-      end_date: form.end_date || null,
-      reservation_start_at: form.reservation_start_at || null,
-      reservation_label: form.reservation_label || null,
+      category: primaryCategory,
+      categories: normalizedCategories,
+      slug: form.slug.trim(),
+      title: form.title.trim(),
+      publish_at: form.publish_at ? toJstIso(form.publish_at) : null,
+      start_date: scheduleTimes[0].start_date,
+      end_date: null,
+      schedule_times: scheduleTimes,
+      reservation_start_at: form.reservation_start_at
+        ? toJstIso(form.reservation_start_at)
+        : null,
+      reservation_label: firstReservation?.label || null,
+      reservation_links: reservationLinks,
       venue: form.venue || null,
       venue_address: form.venue_address || null,
       price_general: form.price_general ? Number(form.price_general) : null,
       price_student: form.price_student ? Number(form.price_student) : null,
-      ticket_url: form.ticket_url || null,
+      ticket_url: firstReservation?.url || null,
       description: form.description || null,
       tags: form.tags || null,
       status: form.status,
@@ -421,13 +715,22 @@ export default function EventForm({
   const canContinueStep = (() => {
     if (!isWizard) return true;
     if (createStep === 1) {
-      return Boolean(form.slug.trim() && form.title.trim());
+      return Boolean(
+        form.slug.trim() && form.title.trim() && form.categories.length > 0
+      );
     }
     if (createStep === 2) {
-      return Boolean(form.start_date.trim());
+      return form.schedule_times.some((item) => item.start_date.trim().length > 0);
     }
     return true;
   })();
+
+  const selectedCategoryLabels = form.categories.map((id) => {
+    const found = CATEGORY_OPTIONS.find((item) => item.id === id);
+    return found ? `${found.label} (${found.id})` : id;
+  });
+
+  const primaryCategory = form.categories[0] ?? "other";
 
   return (
     <div className="card-retro p-6">
@@ -521,22 +824,38 @@ export default function EventForm({
         {(!isWizard || createStep === 1) && (
           <>
             <label className="text-xs font-black tracking-wide text-zinc-700">
-              カテゴリ
+              カテゴリ（複数選択）
             </label>
-            <select
-              className="input-retro"
-              value={form.category}
-              onChange={(e) => updateField("category", e.target.value)}
-            >
-              {CATEGORY_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.id}（{option.label}）
-                </option>
-              ))}
-            </select>
+            <div className="rounded-2xl border-2 border-ink bg-surface p-3 shadow-hard-sm">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {CATEGORY_OPTIONS.map((option) => {
+                  const checked = form.categories.includes(option.id);
+                  return (
+                    <label
+                      key={option.id}
+                      className="flex items-center gap-2 rounded-lg border-2 border-ink/20 bg-white px-3 py-2 text-xs font-semibold"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleCategory(option.id)}
+                      />
+                      <span>{option.label}</span>
+                      <span className="text-zinc-500">({option.id})</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-zinc-600">
+                先頭のカテゴリが公開URLに使われます。
+              </p>
+              <p className="mt-1 text-xs text-zinc-700">
+                選択中: {selectedCategoryLabels.join(" / ")}
+              </p>
+            </div>
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
-              slug
+              URL用英字名（スラッグ）
             </label>
             <input
               className="input-retro"
@@ -544,6 +863,9 @@ export default function EventForm({
               value={form.slug}
               onChange={(e) => updateField("slug", e.target.value)}
             />
+            <p className="text-xs text-zinc-600">
+              公開URL: /events/{primaryCategory}/{form.slug || "your-slug"}
+            </p>
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
               公演タイトル
@@ -563,31 +885,74 @@ export default function EventForm({
               情報公開日時（任意）
             </label>
             <input
+              type="datetime-local"
               className="input-retro"
-              placeholder="2026-02-01T10:00:00+09:00"
               value={form.publish_at}
               onChange={(e) => updateField("publish_at", e.target.value)}
             />
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
-              開始日時
+              公演開始日時（複数）
             </label>
-            <input
-              className="input-retro"
-              placeholder="2026-02-01T19:00:00+09:00"
-              value={form.start_date}
-              onChange={(e) => updateField("start_date", e.target.value)}
-            />
-
-            <label className="text-xs font-black tracking-wide text-zinc-700">
-              終了日時（任意）
-            </label>
-            <input
-              className="input-retro"
-              placeholder="2026-02-03T21:00:00+09:00"
-              value={form.end_date}
-              onChange={(e) => updateField("end_date", e.target.value)}
-            />
+            <div className="space-y-3 rounded-2xl border-2 border-ink bg-surface p-3 shadow-hard-sm">
+              {form.schedule_times.map((item, index) => {
+                const iso = toJstIso(item.start_date);
+                const preview = formatJapaneseDateTime(iso);
+                return (
+                  <div
+                    key={`schedule-${index}`}
+                    className="rounded-xl border-2 border-ink/20 bg-white p-3"
+                  >
+                    <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                      <div>
+                        <label className="text-[11px] font-bold text-zinc-700">
+                          日時
+                        </label>
+                        <input
+                          type="datetime-local"
+                          className="input-retro"
+                          value={item.start_date}
+                          onChange={(e) =>
+                            updateScheduleTime(index, "start_date", e.target.value)
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-zinc-700">
+                          ラベル（任意）
+                        </label>
+                        <input
+                          className="input-retro"
+                          placeholder="昼公演 / 千秋楽"
+                          value={item.label}
+                          onChange={(e) =>
+                            updateScheduleTime(index, "label", e.target.value)
+                          }
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-retro btn-surface h-11 border-red-500 text-red-700 disabled:opacity-40"
+                        disabled={form.schedule_times.length <= 1}
+                        onClick={() => removeScheduleTime(index)}
+                      >
+                        削除
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs text-zinc-700">
+                      {preview || "例: 2026年2/10(火)10:00〜"}
+                    </p>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                className="btn-retro btn-surface text-xs"
+                onClick={addScheduleTime}
+              >
+                公演日時を追加
+              </button>
+            </div>
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
               会場名（任意）
@@ -633,31 +998,67 @@ export default function EventForm({
               予約開始日時（任意）
             </label>
             <input
+              type="datetime-local"
               className="input-retro"
-              placeholder="2026-01-20T10:00:00+09:00"
               value={form.reservation_start_at}
               onChange={(e) => updateField("reservation_start_at", e.target.value)}
             />
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
-              予約受付先（任意）
+              予約窓口（複数）
             </label>
-            <input
-              className="input-retro"
-              placeholder="チケットぴあ / 劇団公式サイト"
-              value={form.reservation_label}
-              onChange={(e) => updateField("reservation_label", e.target.value)}
-            />
-
-            <label className="text-xs font-black tracking-wide text-zinc-700">
-              予約ページURL（任意）
-            </label>
-            <input
-              className="input-retro"
-              placeholder="https://..."
-              value={form.ticket_url}
-              onChange={(e) => updateField("ticket_url", e.target.value)}
-            />
+            <div className="space-y-3 rounded-2xl border-2 border-ink bg-surface p-3 shadow-hard-sm">
+              {form.reservation_links.map((item, index) => (
+                <div
+                  key={`reservation-${index}`}
+                  className="rounded-xl border-2 border-ink/20 bg-white p-3"
+                >
+                  <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                    <div>
+                      <label className="text-[11px] font-bold text-zinc-700">
+                        予約受付先
+                      </label>
+                      <input
+                        className="input-retro"
+                        placeholder="チケットぴあ / 劇団公式サイト"
+                        value={item.label}
+                        onChange={(e) =>
+                          updateReservationLink(index, "label", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-zinc-700">
+                        予約ページURL
+                      </label>
+                      <input
+                        className="input-retro"
+                        placeholder="https://..."
+                        value={item.url}
+                        onChange={(e) =>
+                          updateReservationLink(index, "url", e.target.value)
+                        }
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-retro btn-surface h-11 border-red-500 text-red-700 disabled:opacity-40"
+                      disabled={form.reservation_links.length <= 1}
+                      onClick={() => removeReservationLink(index)}
+                    >
+                      削除
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn-retro btn-surface text-xs"
+                onClick={addReservationLink}
+              >
+                予約窓口を追加
+              </button>
+            </div>
           </>
         )}
 
@@ -684,15 +1085,67 @@ export default function EventForm({
             />
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
-              キャスト（JSON配列）
+              キャスト
             </label>
-            <textarea
-              className="textarea-retro font-mono text-xs"
-              rows={4}
-              placeholder='[{"name":"山田太郎","role":"主演","image_url":""}]'
-              value={form.cast}
-              onChange={(e) => updateField("cast", e.target.value)}
-            />
+            <div className="space-y-3 rounded-2xl border-2 border-ink bg-surface p-3 shadow-hard-sm">
+              {form.cast.map((member, index) => (
+                <div
+                  key={`cast-${index}`}
+                  className="rounded-xl border-2 border-ink/20 bg-white p-3"
+                >
+                  <div className="grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
+                    <div>
+                      <label className="text-[11px] font-bold text-zinc-700">
+                        名前
+                      </label>
+                      <input
+                        className="input-retro"
+                        placeholder="山田太郎"
+                        value={member.name}
+                        onChange={(e) => updateCast(index, "name", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-zinc-700">
+                        役柄（任意）
+                      </label>
+                      <input
+                        className="input-retro"
+                        placeholder="主演"
+                        value={member.role}
+                        onChange={(e) => updateCast(index, "role", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-zinc-700">
+                        画像URL（任意）
+                      </label>
+                      <input
+                        className="input-retro"
+                        placeholder="https://..."
+                        value={member.image_url}
+                        onChange={(e) => updateCast(index, "image_url", e.target.value)}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-retro btn-surface h-11 border-red-500 text-red-700 disabled:opacity-40"
+                      disabled={form.cast.length <= 1}
+                      onClick={() => removeCast(index)}
+                    >
+                      削除
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn-retro btn-surface text-xs"
+                onClick={addCast}
+              >
+                キャストを追加
+              </button>
+            </div>
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
               ステータス
@@ -704,9 +1157,11 @@ export default function EventForm({
                 updateField("status", e.target.value as FormState["status"])
               }
             >
-              <option value="draft">draft</option>
-              <option value="published">published</option>
-              <option value="archived">archived</option>
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </>
         )}
@@ -761,7 +1216,7 @@ export default function EventForm({
 
       {createdId && (
         <p className="mt-2 text-xs text-zinc-700">
-          作成後の編集はこちら: /events/{form.category}/{form.slug}/edit
+          作成後の編集はこちら: /events/{primaryCategory}/{form.slug}/edit
         </p>
       )}
       {message && <p className="mt-2 text-xs text-zinc-700">{message}</p>}
