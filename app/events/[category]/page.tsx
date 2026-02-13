@@ -23,6 +23,7 @@ type EventRecord = {
   image_url?: string | null;
   flyer_url?: string | null;
   company?: string | null;
+  publish_at?: string | null;
 };
 
 const formatDate = (value?: string | null) => {
@@ -56,6 +57,13 @@ const decodeRouteParam = (value: string) => {
   }
 };
 
+const isReleased = (publishAt?: string | null) => {
+  if (!publishAt) return true;
+  const date = new Date(publishAt);
+  if (Number.isNaN(date.getTime())) return true;
+  return date.getTime() <= Date.now();
+};
+
 const getCategories = async () => {
   const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createSupabaseServiceClient()
@@ -72,7 +80,7 @@ const getEvents = async (category: string, query?: string) => {
     ? createSupabaseServiceClient()
     : await createSupabaseServerClient();
   const selectFields =
-    "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company";
+    "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company, publish_at";
   const { data, error } = await supabase
     .from("events")
     .select(selectFields)
@@ -100,9 +108,10 @@ const getEvents = async (category: string, query?: string) => {
       event.category === category ||
       (Array.isArray(event.categories) && event.categories.includes(category))
   );
-  if (!query) return filtered;
+  const released = filtered.filter((event) => isReleased(event.publish_at));
+  if (!query) return released;
   const lowered = query.toLowerCase();
-  return filtered.filter((event) =>
+  return released.filter((event) =>
     [event.title, event.venue, event.company]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(lowered))
@@ -299,7 +308,7 @@ export default async function EventsByCategoryPage({
                     alt={event.title}
                     width={128}
                     height={80}
-                    unoptimized
+                    sizes="128px"
                     className="h-20 w-32 rounded-xl border-2 border-ink object-cover shadow-hard-sm"
                   />
                 )}

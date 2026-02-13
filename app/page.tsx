@@ -19,6 +19,10 @@ type TrendingEvent = {
   category: string;
   slug: string;
   start_date: string;
+  publish_at?: string | null;
+  reservation_start_at?: string | null;
+  reservation_label?: string | null;
+  ticket_url?: string | null;
   image_url?: string | null;
   flyer_url?: string | null;
 };
@@ -49,7 +53,27 @@ const formatDate = (value?: string | null) => {
   }).format(date);
 };
 
+const isReleased = (publishAt?: string | null) => {
+  if (!publishAt) return true;
+  const date = new Date(publishAt);
+  if (Number.isNaN(date.getTime())) return true;
+  return date.getTime() <= Date.now();
+};
+
+const getReservationBadge = (event: TrendingEvent) => {
+  if (!event.ticket_url) return null;
+  if (!event.reservation_start_at) return "予約可";
+  const date = new Date(event.reservation_start_at);
+  if (Number.isNaN(date.getTime())) return "予約可";
+  return date.getTime() <= Date.now() ? "予約可" : "予約開始前";
+};
+
 const getTrendingEvents = async () => {
+  const selectFields =
+    "id, title, category, slug, start_date, publish_at, reservation_start_at, reservation_label, ticket_url, image_url, flyer_url";
+  const fallbackSelect =
+    "id, title, category, slug, start_date, image_url, flyer_url";
+
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const service = createSupabaseServiceClient();
     const since = new Date();
@@ -64,28 +88,61 @@ const getTrendingEvents = async () => {
       const total = map.get(row.event_id) ?? 0;
       map.set(row.event_id, total + (row.views ?? 0));
     });
-    const ranked = [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const ranked = [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20);
     const ids = ranked.map(([id]) => id);
     if (ids.length === 0) return [];
-    const { data: events } = await service
+    const { data: events, error } = await service
       .from("events")
-      .select("id, title, category, slug, start_date, image_url, flyer_url")
+      .select(selectFields)
       .eq("status", "published")
       .in("id", ids);
-    const byId = new Map(events?.map((event) => [event.id, event]) ?? []);
+    let rows = (events ?? []) as TrendingEvent[];
+    const missingColumns =
+      !!error &&
+      (error.message.includes("column") || error.message.includes("does not exist"));
+    if (missingColumns) {
+      const fallback = await service
+        .from("events")
+        .select(fallbackSelect)
+        .eq("status", "published")
+        .in("id", ids);
+      rows = (fallback.data ?? []) as TrendingEvent[];
+    }
+
+    const byId = new Map(
+      rows
+        .filter((event) => isReleased(event.publish_at))
+        .map((event) => [event.id, event])
+    );
     return ranked
       .map(([id]) => byId.get(id))
-      .filter(Boolean) as TrendingEvent[];
+      .filter(Boolean)
+      .slice(0, 3) as TrendingEvent[];
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("events")
-    .select("id, title, category, slug, start_date, image_url, flyer_url")
+    .select(selectFields)
     .eq("status", "published")
     .order("start_date", { ascending: true })
-    .limit(3);
-  return (data ?? []) as TrendingEvent[];
+    .limit(30);
+
+  let rows = (data ?? []) as TrendingEvent[];
+  const missingColumns =
+    !!error &&
+    (error.message.includes("column") || error.message.includes("does not exist"));
+  if (missingColumns) {
+    const fallback = await supabase
+      .from("events")
+      .select(fallbackSelect)
+      .eq("status", "published")
+      .order("start_date", { ascending: true })
+      .limit(30);
+    rows = (fallback.data ?? []) as TrendingEvent[];
+  }
+
+  return rows.filter((event) => isReleased(event.publish_at)).slice(0, 3);
 };
 
 const getCategories = async () => {
@@ -212,7 +269,8 @@ export default async function Home() {
                     src={featuredImage}
                     alt={featured?.title ?? "ピックアップ公演"}
                     fill
-                    unoptimized
+                    priority
+                    sizes="(min-width: 1024px) 50vw, 100vw"
                     className="object-cover transition-all duration-500"
                   />
                 ) : (
@@ -332,6 +390,7 @@ export default async function Home() {
               const image = event.image_url || event.flyer_url;
               const categoryLabel =
                 categoryMap.get(event.category)?.name ?? event.category;
+              const reservationBadge = getReservationBadge(event);
               return (
                 <Link
                   key={event.id}
@@ -344,7 +403,7 @@ export default async function Home() {
                         src={image}
                         alt={event.title}
                         fill
-                        unoptimized
+                        sizes="(min-width: 1024px) 30vw, (min-width: 768px) 33vw, 100vw"
                         className="object-cover transition-all duration-500"
                       />
                     ) : (
@@ -366,10 +425,17 @@ export default async function Home() {
                     <div className="flex items-center gap-1 text-xs font-bold text-ink/70">
                       <Calendar size={12} /> {formatDate(event.start_date)}
                     </div>
-                    <div className="rounded-sm bg-ink px-2 py-1 text-xs font-bold text-white">
-                      予約可
-                    </div>
+                    {reservationBadge && (
+                      <div className="rounded-sm bg-ink px-2 py-1 text-xs font-bold text-white">
+                        {reservationBadge}
+                      </div>
+                    )}
                   </div>
+                  {event.reservation_label && (
+                    <div className="mt-2 text-[11px] font-semibold text-ink/60">
+                      予約: {event.reservation_label}
+                    </div>
+                  )}
                 </Link>
               );
             })}

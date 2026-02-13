@@ -28,8 +28,11 @@ type FormState = {
   slug: string;
   title: string;
   description: string;
+  publish_at: string;
   start_date: string;
   end_date: string;
+  reservation_start_at: string;
+  reservation_label: string;
   venue: string;
   venue_address: string;
   price_general: string;
@@ -48,8 +51,11 @@ type EventData = {
   slug?: string | null;
   title?: string | null;
   description?: string | null;
+  publish_at?: string | null;
   start_date?: string | null;
   end_date?: string | null;
+  reservation_start_at?: string | null;
+  reservation_label?: string | null;
   venue?: string | null;
   venue_address?: string | null;
   price_general?: number | null;
@@ -68,8 +74,11 @@ const buildInitialState = (data?: EventData | null): FormState => ({
   slug: data?.slug ?? "",
   title: data?.title ?? "",
   description: data?.description ?? "",
+  publish_at: data?.publish_at ?? "",
   start_date: data?.start_date ?? "",
   end_date: data?.end_date ?? "",
+  reservation_start_at: data?.reservation_start_at ?? "",
+  reservation_label: data?.reservation_label ?? "",
   venue: data?.venue ?? "",
   venue_address: data?.venue_address ?? "",
   price_general:
@@ -308,8 +317,11 @@ export default function EventForm({
       category: form.category,
       slug: form.slug,
       title: form.title,
+      publish_at: form.publish_at || null,
       start_date: form.start_date,
       end_date: form.end_date || null,
+      reservation_start_at: form.reservation_start_at || null,
+      reservation_label: form.reservation_label || null,
       venue: form.venue || null,
       venue_address: form.venue_address || null,
       price_general: form.price_general ? Number(form.price_general) : null,
@@ -548,6 +560,16 @@ export default function EventForm({
         {(!isWizard || createStep === 2) && (
           <>
             <label className="text-xs font-black tracking-wide text-zinc-700">
+              情報公開日時（任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="2026-02-01T10:00:00+09:00"
+              value={form.publish_at}
+              onChange={(e) => updateField("publish_at", e.target.value)}
+            />
+
+            <label className="text-xs font-black tracking-wide text-zinc-700">
               開始日時
             </label>
             <input
@@ -608,7 +630,27 @@ export default function EventForm({
             />
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
-              チケットURL（任意）
+              予約開始日時（任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="2026-01-20T10:00:00+09:00"
+              value={form.reservation_start_at}
+              onChange={(e) => updateField("reservation_start_at", e.target.value)}
+            />
+
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              予約受付先（任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="チケットぴあ / 劇団公式サイト"
+              value={form.reservation_label}
+              onChange={(e) => updateField("reservation_label", e.target.value)}
+            />
+
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              予約ページURL（任意）
             </label>
             <input
               className="input-retro"

@@ -16,8 +16,11 @@ type EventRecord = {
   category: string;
   categories?: string[] | null;
   slug: string;
+  publish_at?: string | null;
   start_date: string;
   end_date: string | null;
+  reservation_start_at?: string | null;
+  reservation_label?: string | null;
   schedule_times?: { start_date?: string; end_date?: string | null; label?: string }[] | null;
   venue: string | null;
   venue_address: string | null;
@@ -36,6 +39,7 @@ type RelatedEvent = {
   category: string;
   slug: string;
   title: string;
+  publish_at?: string | null;
   start_date: string;
   venue: string | null;
   flyer_url: string | null;
@@ -137,10 +141,24 @@ const decodeRouteParam = (value: string) => {
   }
 };
 
+const isReleased = (publishAt?: string | null) => {
+  if (!publishAt) return true;
+  const date = new Date(publishAt);
+  if (Number.isNaN(date.getTime())) return true;
+  return date.getTime() <= Date.now();
+};
+
+const isReservationOpen = (reservationStartAt?: string | null) => {
+  if (!reservationStartAt) return true;
+  const date = new Date(reservationStartAt);
+  if (Number.isNaN(date.getTime())) return true;
+  return date.getTime() <= Date.now();
+};
+
 const getEvent = async (category: string, slug: string) => {
   const supabase = await createSupabaseServerClient();
   const selectFields =
-    "id, title, company, description, category, categories, slug, start_date, end_date, schedule_times, venue, venue_address, price_general, price_student, ticket_types, tags, image_url, flyer_url, ticket_url, cast";
+    "id, title, company, description, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, schedule_times, venue, venue_address, price_general, price_student, ticket_types, tags, image_url, flyer_url, ticket_url, cast";
 
   const { data, error } = await supabase
     .from("events")
@@ -150,7 +168,7 @@ const getEvent = async (category: string, slug: string) => {
     .eq("status", "published")
     .maybeSingle<EventRecord>();
 
-  if (!error && data) return data;
+  if (!error && data && isReleased(data.publish_at)) return data;
   if (!error && !data) {
     console.warn("[event-detail] not found (anon)", {
       category,
@@ -175,9 +193,11 @@ const getEvent = async (category: string, slug: string) => {
     const matched =
       candidates?.find(
         (item) =>
-          item.category === category ||
-          (Array.isArray(item.categories) && item.categories.includes(category))
-      ) ?? candidates?.[0];
+          (item.category === category ||
+            (Array.isArray(item.categories) && item.categories.includes(category))) &&
+          isReleased(item.publish_at)
+      ) ??
+      candidates?.find((item) => isReleased(item.publish_at));
     if (matched) return matched;
   }
 
@@ -205,9 +225,10 @@ const getEvent = async (category: string, slug: string) => {
   const matched =
     bySlug?.find(
       (item) =>
-        item.category === category ||
-        (Array.isArray(item.categories) && item.categories.includes(category))
-    ) ?? bySlug?.[0];
+        (item.category === category ||
+          (Array.isArray(item.categories) && item.categories.includes(category))) &&
+        isReleased(item.publish_at)
+    ) ?? bySlug?.find((item) => isReleased(item.publish_at));
   if (matched) return matched;
 
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -219,7 +240,9 @@ const getEvent = async (category: string, slug: string) => {
       .or(`category.eq.${category},categories.cs.{${category}}`)
       .eq("status", "published")
       .maybeSingle<EventRecord>();
-    if (!serviceError && serviceData) return serviceData;
+    if (!serviceError && serviceData && isReleased(serviceData.publish_at)) {
+      return serviceData;
+    }
     if (!serviceError && !serviceData) {
       console.warn("[event-detail] not found (service)", {
         category,
@@ -239,9 +262,10 @@ const getEvent = async (category: string, slug: string) => {
     const serviceMatched =
       serviceBySlug?.find(
         (item) =>
-          item.category === category ||
-          (Array.isArray(item.categories) && item.categories.includes(category))
-      ) ?? serviceBySlug?.[0];
+          (item.category === category ||
+            (Array.isArray(item.categories) && item.categories.includes(category))) &&
+          isReleased(item.publish_at)
+      ) ?? serviceBySlug?.find((item) => isReleased(item.publish_at));
     if (serviceMatched) return serviceMatched;
   }
 
@@ -251,9 +275,9 @@ const getEvent = async (category: string, slug: string) => {
 
 const getRelatedEvents = async (category: string, excludeId: string) => {
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("events")
-    .select("id, category, slug, title, start_date, venue, flyer_url, image_url")
+    .select("id, category, slug, title, publish_at, start_date, venue, flyer_url, image_url")
     .eq("category", category)
     .eq("status", "published")
     .neq("id", excludeId)
@@ -261,7 +285,24 @@ const getRelatedEvents = async (category: string, excludeId: string) => {
     .limit(3)
     .returns<RelatedEvent[]>();
 
-  return data ?? [];
+  let rows = data ?? [];
+  const missingColumns =
+    !!error &&
+    (error.message.includes("column") || error.message.includes("does not exist"));
+  if (missingColumns) {
+    const fallback = await supabase
+      .from("events")
+      .select("id, category, slug, title, start_date, venue, flyer_url, image_url")
+      .eq("category", category)
+      .eq("status", "published")
+      .neq("id", excludeId)
+      .order("start_date", { ascending: true })
+      .limit(10)
+      .returns<RelatedEvent[]>();
+    rows = fallback.data ?? [];
+  }
+
+  return rows.filter((item) => isReleased(item.publish_at)).slice(0, 3);
 };
 
 const tryRedirect = async (category: string, slug: string) => {
@@ -278,11 +319,13 @@ const tryRedirect = async (category: string, slug: string) => {
 
   const { data: target } = await service
     .from("events")
-    .select("category, slug, status")
+    .select("category, slug, status, publish_at")
     .eq("id", redirect.to_event_id)
     .maybeSingle();
 
-  if (!target || target.status !== "published") return;
+  if (!target || target.status !== "published" || !isReleased(target.publish_at)) {
+    return;
+  }
   permanentRedirect(`/events/${target.category}/${target.slug}`);
 };
 
@@ -341,6 +384,7 @@ export default async function EventDetailPage({
   const ticketTypes = Array.isArray(event.ticket_types)
     ? event.ticket_types
     : [];
+  const reservationOpen = isReservationOpen(event.reservation_start_at);
   const related = await getRelatedEvents(event.category, event.id);
 
   const startIso = event.start_date;
@@ -537,17 +581,41 @@ export default async function EventDetailPage({
                 {event.price_student ? `学生 ${event.price_student}円` : ""}
               </div>
             )}
-            {event.ticket_url && (
+            {(event.ticket_url ||
+              event.reservation_label ||
+              event.reservation_start_at) && (
               <div>
-                <span className="font-semibold">チケット:</span>{" "}
-                <a
-                  className="link-retro"
-                  href={event.ticket_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  購入ページへ
-                </a>
+                {event.reservation_label && (
+                  <div>
+                    <span className="font-semibold">予約受付:</span>{" "}
+                    {event.reservation_label}
+                  </div>
+                )}
+                {event.reservation_start_at && (
+                  <div>
+                    <span className="font-semibold">予約開始:</span>{" "}
+                    {formatDate(event.reservation_start_at)}
+                  </div>
+                )}
+                {event.ticket_url && (
+                  <div>
+                    <span className="font-semibold">チケット:</span>{" "}
+                    {reservationOpen ? (
+                      <a
+                        className="link-retro"
+                        href={event.ticket_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        購入ページへ
+                      </a>
+                    ) : (
+                      <span className="badge-retro bg-surface-muted text-xs">
+                        予約開始前
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -573,7 +641,7 @@ export default async function EventDetailPage({
               alt={event.title}
               width={800}
               height={1000}
-              unoptimized
+              sizes="(min-width: 1024px) 40vw, 100vw"
               className="h-full w-full bg-surface object-cover"
             />
           ) : (
@@ -631,7 +699,7 @@ export default async function EventDetailPage({
                         alt={item.title}
                         width={800}
                         height={600}
-                        unoptimized
+                        sizes="(min-width: 1024px) 20vw, (min-width: 768px) 33vw, 100vw"
                         className="h-full w-full object-cover"
                       />
                     ) : null}

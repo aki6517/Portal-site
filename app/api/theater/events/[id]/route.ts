@@ -9,8 +9,11 @@ type EventUpdatePayload = {
   slug?: string;
   title?: string;
   description?: string | null;
+  publish_at?: string | null;
   start_date?: string;
   end_date?: string | null;
+  reservation_start_at?: string | null;
+  reservation_label?: string | null;
   schedule_times?: { start_date?: string; end_date?: string | null; label?: string }[];
   venue_id?: string | null;
   venue?: string | null;
@@ -175,7 +178,7 @@ export async function PATCH(
 
   const { data: current, error: currentError } = await service
     .from("events")
-    .select("id, category, slug, start_date, end_date, categories")
+    .select("id, category, slug, status, start_date, end_date, categories")
     .eq("id", id)
     .eq("theater_id", resolved.activeTheaterId)
     .single();
@@ -203,6 +206,7 @@ export async function PATCH(
   if (payload.slug) update.slug = payload.slug.trim();
   if (payload.title) update.title = payload.title.trim();
   if ("description" in payload) update.description = payload.description ?? null;
+  if ("publish_at" in payload) update.publish_at = payload.publish_at ?? null;
   const scheduleTimes =
     "schedule_times" in payload
       ? normalizeScheduleTimes(payload.schedule_times) ?? []
@@ -219,6 +223,12 @@ export async function PATCH(
   } else {
     if (payload.start_date) update.start_date = payload.start_date;
     if ("end_date" in payload) update.end_date = payload.end_date ?? null;
+    if ("reservation_start_at" in payload) {
+      update.reservation_start_at = payload.reservation_start_at ?? null;
+    }
+    if ("reservation_label" in payload) {
+      update.reservation_label = payload.reservation_label ?? null;
+    }
   }
   if ("venue_id" in payload) update.venue_id = payload.venue_id ?? null;
   if ("venue" in payload) update.venue = payload.venue ?? null;
@@ -241,13 +251,44 @@ export async function PATCH(
     update.ai_confidence = payload.ai_confidence ?? null;
   if (payload.status) update.status = payload.status;
 
-  const { data: updated, error: updateError } = await service
+  let { data: updated, error: updateError } = await service
     .from("events")
     .update(update)
     .eq("id", id)
     .eq("theater_id", resolved.activeTheaterId)
     .select("id, category, slug, status")
     .single();
+
+  const missingColumns =
+    !!updateError &&
+    (updateError.message.includes("column") ||
+      updateError.message.includes("does not exist"));
+  if (missingColumns) {
+    const retryUpdate: Record<string, unknown> = { ...update };
+    delete retryUpdate.publish_at;
+    delete retryUpdate.reservation_start_at;
+    delete retryUpdate.reservation_label;
+
+    if (Object.keys(retryUpdate).length === 0) {
+      updated = {
+        id: current.id,
+        category: current.category,
+        slug: current.slug,
+        status: current.status,
+      };
+      updateError = null;
+    } else {
+      const retry = await service
+        .from("events")
+        .update(retryUpdate)
+        .eq("id", id)
+        .eq("theater_id", resolved.activeTheaterId)
+        .select("id, category, slug, status")
+        .single();
+      updated = retry.data;
+      updateError = retry.error;
+    }
+  }
 
   if (updateError || !updated) {
     const status = updateError?.code === "23505" ? 409 : 500;

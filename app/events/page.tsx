@@ -5,6 +5,21 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { buildIlikeFilter } from "@/lib/search";
 import { buildMetadata } from "@/lib/seo";
 
+type EventRecord = {
+  id: string;
+  title: string;
+  category: string;
+  categories?: string[] | null;
+  slug: string;
+  start_date: string;
+  end_date?: string | null;
+  venue?: string | null;
+  image_url?: string | null;
+  flyer_url?: string | null;
+  company?: string | null;
+  publish_at?: string | null;
+};
+
 const formatDate = (value?: string | null) => {
   if (!value) return "";
   const date = new Date(value);
@@ -28,6 +43,13 @@ const normalizeQuery = (value?: string) => {
   return trimmed.slice(0, 80);
 };
 
+const isReleased = (publishAt?: string | null) => {
+  if (!publishAt) return true;
+  const date = new Date(publishAt);
+  if (Number.isNaN(date.getTime())) return true;
+  return date.getTime() <= Date.now();
+};
+
 const getCategories = async () => {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
@@ -42,7 +64,7 @@ const getEvents = async (query?: string) => {
   let request = supabase
     .from("events")
     .select(
-      "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company"
+      "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company, publish_at"
     )
     .eq("status", "published");
 
@@ -53,8 +75,29 @@ const getEvents = async (query?: string) => {
     }
   }
 
-  const { data } = await request.order("start_date", { ascending: true });
-  return data ?? [];
+  const { data, error } = await request.order("start_date", { ascending: true });
+  let rows = (data ?? []) as EventRecord[];
+  const missingColumns =
+    !!error &&
+    (error.message.includes("column") || error.message.includes("does not exist"));
+  if (missingColumns) {
+    let fallback = supabase
+      .from("events")
+      .select(
+        "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company"
+      )
+      .eq("status", "published");
+    if (query) {
+      const filter = buildIlikeFilter(query, ["title", "venue", "company"]);
+      if (filter) {
+        fallback = fallback.or(filter);
+      }
+    }
+    const fallbackRes = await fallback.order("start_date", { ascending: true });
+    rows = (fallbackRes.data ?? []) as EventRecord[];
+  }
+
+  return rows.filter((event) => isReleased(event.publish_at));
 };
 
 const getViews30Map = async () => {
@@ -204,7 +247,7 @@ export default async function EventsPage({
                     alt={event.title}
                     width={128}
                     height={80}
-                    unoptimized
+                    sizes="128px"
                     className="h-20 w-32 rounded-xl border-2 border-ink object-cover shadow-hard-sm"
                   />
                 )}

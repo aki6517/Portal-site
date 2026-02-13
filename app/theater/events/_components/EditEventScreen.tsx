@@ -11,8 +11,11 @@ type EventData = {
   category: string;
   status: "draft" | "published" | "archived";
   description?: string | null;
+  publish_at?: string | null;
   start_date?: string | null;
   end_date?: string | null;
+  reservation_start_at?: string | null;
+  reservation_label?: string | null;
   venue?: string | null;
   venue_address?: string | null;
   price_general?: number | null;

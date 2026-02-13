@@ -9,8 +9,11 @@ type EventPayload = {
   slug?: string;
   title?: string;
   description?: string | null;
+  publish_at?: string | null;
   start_date?: string;
   end_date?: string | null;
+  reservation_start_at?: string | null;
+  reservation_label?: string | null;
   schedule_times?: { start_date?: string; end_date?: string | null; label?: string }[];
   venue_id?: string | null;
   venue?: string | null;
@@ -231,8 +234,11 @@ export async function POST(req: Request) {
       title,
       company: theater.name,
       description: payload.description ?? null,
+      publish_at: payload.publish_at ?? null,
       start_date: startDate,
       end_date: endDate ?? null,
+      reservation_start_at: payload.reservation_start_at ?? null,
+      reservation_label: payload.reservation_label ?? null,
       schedule_times: scheduleTimes,
       venue_id: payload.venue_id ?? null,
       venue: payload.venue ?? null,
@@ -255,18 +261,63 @@ export async function POST(req: Request) {
     .select("id, category, slug, status")
     .single();
 
-  if (insertError) {
-    const status = insertError.code === "23505" ? 409 : 500;
+  let createdEvent = event;
+  let createdError = insertError;
+  const missingColumns =
+    !!createdError &&
+    (createdError.message.includes("column") ||
+      createdError.message.includes("does not exist"));
+
+  if (missingColumns) {
+    const retryPayload = {
+      theater_id: theater.id,
+      category,
+      slug,
+      title,
+      company: theater.name,
+      description: payload.description ?? null,
+      start_date: startDate,
+      end_date: endDate ?? null,
+      schedule_times: scheduleTimes,
+      venue_id: payload.venue_id ?? null,
+      venue: payload.venue ?? null,
+      venue_address: payload.venue_address ?? null,
+      venue_lat: payload.venue_lat ?? null,
+      venue_lng: payload.venue_lng ?? null,
+      price_general: payload.price_general ?? null,
+      price_student: payload.price_student ?? null,
+      ticket_types: payload.ticket_types ?? [],
+      tags: normalizeTags(payload.tags),
+      image_url: payload.image_url ?? null,
+      flyer_url: payload.flyer_url ?? null,
+      ticket_url: payload.ticket_url ?? null,
+      "cast": payload.cast ?? [],
+      ai_confidence:
+        payload.ai_confidence !== undefined ? payload.ai_confidence : null,
+      status: payload.status ?? "draft",
+      categories,
+    };
+    const retry = await service
+      .from("events")
+      .insert(retryPayload)
+      .select("id, category, slug, status")
+      .single();
+    createdEvent = retry.data;
+    createdError = retry.error;
+  }
+
+  if (createdError) {
+    const status = createdError.code === "23505" ? 409 : 500;
     return NextResponse.json(
       {
         error: {
           code: "DB_ERROR",
-          message: insertError.message,
+          message: createdError.message,
         },
       },
       { status }
     );
   }
 
-  return NextResponse.json({ data: { event } }, { status: 201 });
+  return NextResponse.json({ data: { event: createdEvent } }, { status: 201 });
 }
