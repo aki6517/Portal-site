@@ -137,7 +137,11 @@ export async function GET() {
       .select("id, title, slug, category, status, start_date, end_date, updated_at")
       .eq("theater_id", resolved.activeTheaterId)
       .order("updated_at", { ascending: false });
-    events = fallback.data;
+    events =
+      fallback.data?.map((event) => ({
+        ...event,
+        categories: event.category ? [event.category] : [],
+      })) ?? null;
     eventsError = fallback.error;
   }
 
