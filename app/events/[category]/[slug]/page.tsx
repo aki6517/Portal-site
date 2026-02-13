@@ -94,6 +94,12 @@ const formatDate = (value?: string | null) => {
   return `${parts.dateText} ${parts.timeText}`.trim();
 };
 
+const formatScheduleStart = (value?: string | null) => {
+  const parts = formatDateParts(value);
+  if (!parts) return value ?? "";
+  return `${parts.dateText} ${parts.timeText}`;
+};
+
 const formatScheduleDisplay = (item: {
   start_date?: string;
   end_date?: string | null;
@@ -107,32 +113,10 @@ const formatScheduleDisplay = (item: {
       note: label ? `◆${label}` : "",
     };
   }
-  let mainLabel = "";
-  let noteLabel = "";
-  if (label) {
-    const labelMatch = label.match(/(朝公演|昼公演|夜公演|マチネ|ソワレ|午前|午後)/);
-    if (labelMatch) {
-      mainLabel = labelMatch[0];
-      noteLabel = label.replace(labelMatch[0], "").trim();
-      noteLabel = noteLabel.replace(/^[：:・\s]+/, "");
-    } else {
-      noteLabel = label;
-    }
-  } else {
-    const hour = Number(startParts.timeText.split(":")[0]);
-    if (!Number.isNaN(hour)) {
-      if (hour < 11) mainLabel = "朝公演";
-      else if (hour < 17) mainLabel = "昼公演";
-      else mainLabel = "夜公演";
-    }
-  }
-  const timeText = mainLabel
-    ? `${mainLabel}: ${startParts.timeText}`
-    : startParts.timeText;
-  const startText = `${startParts.dateText} ${timeText}`.trim();
+  const startText = `${startParts.dateText} ${startParts.timeText}`.trim();
   const endText = item.end_date ? formatDate(item.end_date) : "";
   const main = endText ? `${startText} 〜 ${endText}` : startText;
-  const note = noteLabel ? `◆${noteLabel}` : "";
+  const note = label ? `◆${label}` : "";
   return { main, note };
 };
 
@@ -188,7 +172,8 @@ const pickMatchedEvent = (rows: EventRecord[] | null | undefined, category: stri
 
 const DETAIL_SELECT_ATTEMPTS: string[] = [
   "id, title, company, description, playwright, director, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, reservation_links, schedule_times, venue, venue_address, price_general, price_student, ticket_types, tags, image_url, flyer_url, ticket_url, cast",
-  "id, title, company, description, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
+  "id, title, company, description, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, reservation_links, schedule_times, ticket_types, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
+  "id, title, company, description, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, reservation_links, schedule_times, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
   "id, title, company, description, category, slug, publish_at, start_date, end_date, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
   "id, title, company, description, category, slug, start_date, end_date, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
   "id, title, company, description, category, slug, start_date, end_date, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url",
@@ -367,9 +352,13 @@ export default async function EventDetailPage({
   const end = formatDate(event.end_date);
   const dateLabel = end ? `${start} 〜 ${end}` : start;
   const image = pickEventImage(event);
-  const scheduleTimes = Array.isArray(event.schedule_times)
+  const scheduleTimesRaw = Array.isArray(event.schedule_times)
     ? event.schedule_times
     : [];
+  const scheduleTimes = scheduleTimesRaw.filter((item) =>
+    Boolean(item?.start_date)
+  );
+  const hasMultipleSchedules = scheduleTimes.length > 1;
   const ticketTypes = Array.isArray(event.ticket_types)
     ? event.ticket_types
     : [];
@@ -540,9 +529,12 @@ export default async function EventDetailPage({
                 <div className="mt-2 grid gap-1 text-sm text-zinc-700">
                   {scheduleTimes.map((item, index) => {
                     const { main, note } = formatScheduleDisplay(item);
+                    const exactStart = formatScheduleStart(item.start_date ?? "");
                     return (
                       <div key={`schedule-${index}`} className="flex flex-wrap gap-2">
-                        <span className="badge-retro bg-surface-muted">{main}</span>
+                        <span className="badge-retro bg-surface-muted">
+                          {hasMultipleSchedules ? exactStart : main}
+                        </span>
                         {note && (
                           <span className="text-[11px] text-zinc-600">{note}</span>
                         )}
@@ -550,28 +542,6 @@ export default async function EventDetailPage({
                     );
                   })}
                 </div>
-              </div>
-            )}
-            {(playwright || director) && (
-              <div className="grid gap-1 text-sm text-zinc-700">
-                {isSameStaff ? (
-                  <div>
-                    <span className="font-semibold">脚本・演出:</span> {playwright}
-                  </div>
-                ) : (
-                  <>
-                    {playwright && (
-                      <div>
-                        <span className="font-semibold">脚本:</span> {playwright}
-                      </div>
-                    )}
-                    {director && (
-                      <div>
-                        <span className="font-semibold">演出:</span> {director}
-                      </div>
-                    )}
-                  </>
-                )}
               </div>
             )}
             {event.venue && (
@@ -627,25 +597,26 @@ export default async function EventDetailPage({
                   <div className="mt-2 grid gap-1 text-sm text-zinc-700">
                     {reservationLinks.map((item, index) => (
                       <div key={`reservation-link-${index}`} className="flex flex-wrap gap-2">
-                        <span className="font-semibold">
-                          予約受付{reservationLinks.length > 1 ? ` ${index + 1}` : ""}:
-                        </span>
-                        {item.label ? <span>{item.label}</span> : null}
-                        {item.url ? (
-                          reservationOpen ? (
-                            <a
-                              className="link-retro"
-                              href={item.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              購入ページへ
-                            </a>
-                          ) : (
-                            <span className="badge-retro bg-surface-muted text-xs">
-                              予約開始前
-                            </span>
-                          )
+                        {item.url && reservationOpen ? (
+                          <a
+                            className="link-retro"
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {item.label ||
+                              `予約ページ${reservationLinks.length > 1 ? ` ${index + 1}` : ""}`}
+                          </a>
+                        ) : (
+                          <span>
+                            {item.label ||
+                              `予約ページ${reservationLinks.length > 1 ? ` ${index + 1}` : ""}`}
+                          </span>
+                        )}
+                        {!reservationOpen && item.url ? (
+                          <span className="badge-retro bg-surface-muted text-xs">
+                            予約開始前
+                          </span>
                         ) : null}
                       </div>
                     ))}
@@ -694,6 +665,32 @@ export default async function EventDetailPage({
           <p className="mt-3 whitespace-pre-wrap break-words text-base leading-relaxed text-zinc-800">
             {event.description}
           </p>
+        </div>
+      )}
+
+      {(playwright || director) && (
+        <div className="card-retro mt-8 p-6">
+          <h2 className="font-display text-xl font-black">脚本・演出</h2>
+          <div className="mt-3 grid gap-2 text-base leading-relaxed">
+            {isSameStaff ? (
+              <div>
+                <span className="font-semibold">脚本・演出:</span> {playwright}
+              </div>
+            ) : (
+              <>
+                {playwright && (
+                  <div>
+                    <span className="font-semibold">脚本:</span> {playwright}
+                  </div>
+                )}
+                {director && (
+                  <div>
+                    <span className="font-semibold">演出:</span> {director}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
 
