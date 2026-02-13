@@ -9,6 +9,8 @@ type EventUpdatePayload = {
   slug?: string;
   title?: string;
   description?: string | null;
+  playwright?: string | null;
+  director?: string | null;
   publish_at?: string | null;
   start_date?: string;
   end_date?: string | null;
@@ -74,6 +76,11 @@ const normalizeReservationLinks = (
       url: item.url?.trim() ?? "",
     }))
     .filter((item) => item.label || item.url);
+};
+
+const normalizeOptionalText = (value?: string | null) => {
+  const text = value?.trim() ?? "";
+  return text || null;
 };
 
 const deriveDateRange = (
@@ -234,6 +241,12 @@ export async function PATCH(
   if (payload.slug) update.slug = payload.slug.trim();
   if (payload.title) update.title = payload.title.trim();
   if ("description" in payload) update.description = payload.description ?? null;
+  if ("playwright" in payload) {
+    update.playwright = normalizeOptionalText(payload.playwright);
+  }
+  if ("director" in payload) {
+    update.director = normalizeOptionalText(payload.director);
+  }
   if ("publish_at" in payload) update.publish_at = payload.publish_at ?? null;
   const scheduleTimes =
     "schedule_times" in payload
@@ -303,6 +316,8 @@ export async function PATCH(
     delete retryUpdate.reservation_start_at;
     delete retryUpdate.reservation_label;
     delete retryUpdate.reservation_links;
+    delete retryUpdate.playwright;
+    delete retryUpdate.director;
 
     if (Object.keys(retryUpdate).length === 0) {
       updated = {

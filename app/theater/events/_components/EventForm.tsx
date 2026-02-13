@@ -48,6 +48,8 @@ type FormState = {
   slug: string;
   title: string;
   description: string;
+  playwright: string;
+  director: string;
   publish_at: string;
   schedule_times: ScheduleTime[];
   reservation_start_at: string;
@@ -74,6 +76,8 @@ type EventData = {
   slug?: string | null;
   title?: string | null;
   description?: string | null;
+  playwright?: string | null;
+  director?: string | null;
   publish_at?: string | null;
   start_date?: string | null;
   end_date?: string | null;
@@ -226,11 +230,21 @@ const normalizeCategories = (data?: EventData | null) => {
   return ["comedy"];
 };
 
+const deriveDirectorSameAsPlaywright = (data?: EventData | null) => {
+  const playwright = normalizeText(data?.playwright);
+  const director = normalizeText(data?.director);
+  if (!playwright && !director) return true;
+  if (!director && playwright) return true;
+  return playwright === director;
+};
+
 const buildInitialState = (data?: EventData | null): FormState => ({
   categories: normalizeCategories(data),
   slug: data?.slug ?? "",
   title: data?.title ?? "",
   description: data?.description ?? "",
+  playwright: data?.playwright ?? "",
+  director: data?.director ?? "",
   publish_at: toTokyoDateTimeInput(data?.publish_at),
   schedule_times: normalizeScheduleTimes(data?.schedule_times, data?.start_date),
   reservation_start_at: toTokyoDateTimeInput(data?.reservation_start_at),
@@ -306,6 +320,9 @@ export default function EventForm({
   onSaved,
 }: Props) {
   const [form, setForm] = useState<FormState>(buildInitialState(initialData));
+  const [directorSameAsPlaywright, setDirectorSameAsPlaywright] = useState(
+    deriveDirectorSameAsPlaywright(initialData)
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -325,6 +342,7 @@ export default function EventForm({
 
   useEffect(() => {
     setForm(buildInitialState(initialData));
+    setDirectorSameAsPlaywright(deriveDirectorSameAsPlaywright(initialData));
   }, [initialData]);
 
   useEffect(() => {
@@ -594,6 +612,10 @@ export default function EventForm({
         url: normalizeText(item.url),
       }))
       .filter((item) => item.label || item.url);
+    const playwright = normalizeText(form.playwright);
+    const director = directorSameAsPlaywright
+      ? playwright
+      : normalizeText(form.director);
 
     const primaryCategory = normalizedCategories[0] ?? "other";
     const firstReservation = reservationLinks[0] ?? null;
@@ -622,6 +644,8 @@ export default function EventForm({
       price_student: form.price_student ? Number(form.price_student) : null,
       ticket_url: firstReservation?.url || null,
       description: form.description || null,
+      playwright: playwright || null,
+      director: director || null,
       tags: form.tags || null,
       status: form.status,
       flyer_url: form.flyer_url || null,
@@ -1083,6 +1107,49 @@ export default function EventForm({
               value={form.tags}
               onChange={(e) => updateField("tags", e.target.value)}
             />
+
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              脚本（任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="例: 山田太郎"
+              value={form.playwright}
+              onChange={(e) => updateField("playwright", e.target.value)}
+            />
+
+            <div className="rounded-2xl border-2 border-ink bg-surface p-3 shadow-hard-sm">
+              <p className="text-xs font-black tracking-wide text-zinc-700">
+                演出は同じ人ですか？
+              </p>
+              <label className="mt-2 flex items-center gap-2 text-sm font-semibold">
+                <input
+                  type="checkbox"
+                  checked={directorSameAsPlaywright}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setDirectorSameAsPlaywright(checked);
+                    setForm((prev) => ({ ...prev, director: prev.playwright }));
+                  }}
+                />
+                はい
+              </label>
+              {!directorSameAsPlaywright ? (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold text-zinc-700">いいえ</p>
+                  <input
+                    className="input-retro mt-1"
+                    placeholder="演出名を入力"
+                    value={form.director}
+                    onChange={(e) => updateField("director", e.target.value)}
+                  />
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-zinc-700">
+                  表示: 脚本・演出 {normalizeText(form.playwright) || "未入力"}
+                </p>
+              )}
+            </div>
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
               キャスト

@@ -9,6 +9,8 @@ type EventPayload = {
   slug?: string;
   title?: string;
   description?: string | null;
+  playwright?: string | null;
+  director?: string | null;
   publish_at?: string | null;
   start_date?: string;
   end_date?: string | null;
@@ -74,6 +76,11 @@ const normalizeReservationLinks = (
       url: item.url?.trim() ?? "",
     }))
     .filter((item) => item.label || item.url);
+};
+
+const normalizeOptionalText = (value?: string | null) => {
+  const text = value?.trim() ?? "";
+  return text || null;
 };
 
 const deriveDateRange = (
@@ -209,6 +216,8 @@ export async function POST(req: Request) {
   const categories = normalizeCategories(payload.categories ?? null, category);
   const slug = payload.slug?.trim();
   const title = payload.title?.trim();
+  const playwright = normalizeOptionalText(payload.playwright);
+  const director = normalizeOptionalText(payload.director);
   const scheduleTimes = normalizeScheduleTimes(payload.schedule_times);
   const reservationLinks = normalizeReservationLinks(payload.reservation_links);
   const derivedDates = deriveDateRange(
@@ -266,6 +275,8 @@ export async function POST(req: Request) {
       title,
       company: theater.name,
       description: payload.description ?? null,
+      playwright,
+      director,
       publish_at: payload.publish_at ?? null,
       start_date: startDate,
       end_date: endDate ?? null,

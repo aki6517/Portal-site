@@ -13,6 +13,8 @@ type EventRecord = {
   title: string;
   company: string;
   description: string | null;
+  playwright?: string | null;
+  director?: string | null;
   category: string;
   categories?: string[] | null;
   slug: string;
@@ -187,7 +189,7 @@ const pickMatchedEvent = (rows: EventRecord[] | null | undefined, category: stri
 const getEvent = async (category: string, slug: string) => {
   const supabase = await createSupabaseServerClient();
   const selectFields =
-    "id, title, company, description, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, reservation_links, schedule_times, venue, venue_address, price_general, price_student, ticket_types, tags, image_url, flyer_url, ticket_url, cast";
+    "id, title, company, description, playwright, director, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, reservation_links, schedule_times, venue, venue_address, price_general, price_student, ticket_types, tags, image_url, flyer_url, ticket_url, cast";
   const fallbackSelect =
     "id, title, company, description, category, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast";
 
@@ -379,6 +381,9 @@ export default async function EventDetailPage({
       },
     ];
   })();
+  const playwright = (event.playwright ?? "").trim();
+  const director = (event.director ?? "").trim();
+  const isSameStaff = Boolean(playwright && director && playwright === director);
   const reservationOpen = isReservationOpen(event.reservation_start_at);
   const related = await getRelatedEvents(event.category, event.id);
 
@@ -535,6 +540,28 @@ export default async function EventDetailPage({
                     );
                   })}
                 </div>
+              </div>
+            )}
+            {(playwright || director) && (
+              <div className="grid gap-1 text-sm text-zinc-700">
+                {isSameStaff ? (
+                  <div>
+                    <span className="font-semibold">脚本・演出:</span> {playwright}
+                  </div>
+                ) : (
+                  <>
+                    {playwright && (
+                      <div>
+                        <span className="font-semibold">脚本:</span> {playwright}
+                      </div>
+                    )}
+                    {director && (
+                      <div>
+                        <span className="font-semibold">演出:</span> {director}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
             {event.venue && (

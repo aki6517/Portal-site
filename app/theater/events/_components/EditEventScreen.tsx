@@ -12,6 +12,8 @@ type EventData = {
   categories?: string[] | null;
   status: "draft" | "published" | "archived";
   description?: string | null;
+  playwright?: string | null;
+  director?: string | null;
   publish_at?: string | null;
   start_date?: string | null;
   end_date?: string | null;
