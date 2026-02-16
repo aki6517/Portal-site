@@ -85,8 +85,16 @@ const normalizeOptionalText = (value?: string | null) => {
 
 const parseMissingColumn = (message?: string | null) => {
   if (!message) return null;
-  const match = message.match(/column ["']?([a-zA-Z0-9_]+)["']?/i);
-  return match?.[1] ?? null;
+  const patterns = [
+    /["']([a-zA-Z0-9_]+)["']\s+column/i,
+    /\bcolumn\s+["']([a-zA-Z0-9_]+)["']/i,
+    /\bcolumn\s+(?:[a-zA-Z0-9_]+\.)?([a-zA-Z0-9_]+)\s+does\s+not\s+exist/i,
+  ];
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return null;
 };
 
 const deriveDateRange = (
