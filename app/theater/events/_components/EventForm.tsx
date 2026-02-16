@@ -486,10 +486,7 @@ export default function EventForm({
   }, [mode]);
 
   const flyerPreview = useMemo(() => form.flyer_url, [form.flyer_url]);
-  const displayPreview = useMemo(
-    () => form.image_url || form.flyer_url,
-    [form.image_url, form.flyer_url]
-  );
+  const displayPreview = useMemo(() => form.image_url, [form.image_url]);
   const effectiveEventId = useMemo(
     () => eventId ?? createdId,
     [eventId, createdId]
@@ -666,7 +663,6 @@ export default function EventForm({
         ...(target === "flyer"
           ? {
               flyer_url: url,
-              image_url: prev.image_url || url,
             }
           : {
               image_url: url,
@@ -1106,6 +1102,11 @@ export default function EventForm({
             <p className="text-xs text-zinc-600">
               チラシだけで不足する場合、公式の公演ページURLから販売所・予約URL・OGP画像も補助的に抽出します。
             </p>
+            {message && (
+              <p className="rounded-lg border-2 border-ink bg-surface-muted px-3 py-2 text-xs text-zinc-700">
+                {message}
+              </p>
+            )}
             <label className="text-xs font-black tracking-wide text-zinc-700">
               表示画像（トップ・詳細ページ用）
             </label>
@@ -1136,7 +1137,7 @@ export default function EventForm({
             )}
             {displayPreview && (
               <ImageWithFallback
-                srcCandidates={[form.image_url, form.flyer_url]}
+                srcCandidates={[form.image_url]}
                 alt="display image preview"
                 width={800}
                 height={600}
@@ -1148,6 +1149,11 @@ export default function EventForm({
                   </div>
                 }
               />
+            )}
+            {!displayPreview && (
+              <div className="max-h-64 rounded-2xl border-2 border-ink bg-surface p-4 text-xs text-zinc-600 shadow-hard-sm">
+                表示画像は未設定です。上の「表示画像（トップ・詳細ページ用）」から画像をアップロードしてください。
+              </div>
             )}
             {uploadingTarget && (
               <p className="text-xs text-zinc-600">
@@ -1651,7 +1657,9 @@ export default function EventForm({
           作成後の編集はこちら: /events/{primaryCategory}/{form.slug}/edit
         </p>
       )}
-      {message && <p className="mt-2 text-xs text-zinc-700">{message}</p>}
+      {message && (!isWizard || createStep !== 0) && (
+        <p className="mt-2 text-xs text-zinc-700">{message}</p>
+      )}
 
       <div className="mt-6 rounded-2xl border-2 border-ink bg-surface-muted p-4 shadow-hard-sm">
         <h3 className="text-sm font-black">SNS宣伝文生成</h3>

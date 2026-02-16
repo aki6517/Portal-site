@@ -94,14 +94,22 @@ export async function POST(req: Request) {
     }
 
     const file = formData.get("file");
-    if (!(file instanceof File)) {
+    const isBlobLike =
+      !!file &&
+      typeof file === "object" &&
+      "arrayBuffer" in file &&
+      "size" in file &&
+      "type" in file;
+
+    if (!isBlobLike) {
       return NextResponse.json(
         { error: { code: "VALIDATION_ERROR", message: "file is required" } },
         { status: 400 }
       );
     }
+    const uploadFile = file as Blob & { name?: string };
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
+    if (uploadFile.size > MAX_FILE_SIZE_BYTES) {
       return NextResponse.json(
         {
           error: {
@@ -113,9 +121,9 @@ export async function POST(req: Request) {
       );
     }
 
-    let ext = file.type ? EXT_BY_CONTENT_TYPE[file.type] : undefined;
+    let ext = uploadFile.type ? EXT_BY_CONTENT_TYPE[uploadFile.type] : undefined;
     if (!ext) {
-      const guessed = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const guessed = (uploadFile.name ?? "").split(".").pop()?.toLowerCase() ?? "";
       if (guessed && CONTENT_TYPE_BY_EXT[guessed]) {
         ext = guessed === "jpeg" ? "jpg" : guessed;
       }
@@ -136,10 +144,10 @@ export async function POST(req: Request) {
     const safeExt = ext.replace(/[^a-z0-9]/g, "") || "jpg";
     const path = `flyers/${crypto.randomUUID()}.${safeExt}`;
     const contentType =
-      EXT_BY_CONTENT_TYPE[file.type] ??
+      EXT_BY_CONTENT_TYPE[uploadFile.type] ??
       CONTENT_TYPE_BY_EXT[safeExt] ??
       "image/jpeg";
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const buffer = Buffer.from(await uploadFile.arrayBuffer());
 
     const clients = [supabase];
     if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
