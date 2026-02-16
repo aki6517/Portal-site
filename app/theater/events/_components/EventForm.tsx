@@ -429,6 +429,8 @@ type Props = {
   onSaved?: () => void;
 };
 
+type UploadTarget = "flyer" | "display";
+
 export default function EventForm({
   mode,
   eventId,
@@ -441,7 +443,9 @@ export default function EventForm({
   );
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingTarget, setUploadingTarget] = useState<UploadTarget | null>(
+    null
+  );
   const [analyzing, setAnalyzing] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [promotionPlatforms, setPromotionPlatforms] = useState<string[]>([
@@ -465,9 +469,10 @@ export default function EventForm({
     if (mode === "create") setCreateStep(0);
   }, [mode]);
 
-  const flyerPreview = useMemo(
-    () => form.flyer_url || form.image_url,
-    [form.flyer_url, form.image_url]
+  const flyerPreview = useMemo(() => form.flyer_url, [form.flyer_url]);
+  const displayPreview = useMemo(
+    () => form.image_url || form.flyer_url,
+    [form.image_url, form.flyer_url]
   );
   const effectiveEventId = useMemo(
     () => eventId ?? createdId,
@@ -613,13 +618,17 @@ export default function EventForm({
     );
   };
 
-  const uploadFlyer = async (file: File) => {
-    setUploading(true);
+  const uploadImageAsset = async (file: File, target: UploadTarget) => {
+    setUploadingTarget(target);
     setMessage(null);
     try {
       const { blob, ext } = await sanitizeImage(file);
       const formData = new FormData();
-      formData.append("file", blob, `flyer.${ext}`);
+      formData.append(
+        "file",
+        blob,
+        `${target === "flyer" ? "flyer" : "event-image"}.${ext}`
+      );
       formData.append("ext", ext);
       const res = await fetch("/api/storage/flyers", {
         method: "POST",
@@ -637,16 +646,26 @@ export default function EventForm({
       }
       setForm((prev) => ({
         ...prev,
-        flyer_url: url,
-        image_url: prev.image_url || url,
+        ...(target === "flyer"
+          ? {
+              flyer_url: url,
+              image_url: prev.image_url || url,
+            }
+          : {
+              image_url: url,
+            }),
       }));
-      setMessage(`アップロード完了（${FLYER_BUCKET}）`);
+      setMessage(
+        target === "flyer"
+          ? `チラシ画像をアップロードしました（${FLYER_BUCKET}）`
+          : `表示画像をアップロードしました（${FLYER_BUCKET}）`
+      );
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "アップロードに失敗しました"
       );
     } finally {
-      setUploading(false);
+      setUploadingTarget(null);
     }
   };
 
@@ -1035,8 +1054,14 @@ export default function EventForm({
               className="input-retro"
               onChange={(event) => {
                 const file = event.target.files?.[0];
-                if (file) void uploadFlyer(file);
+                if (file) void uploadImageAsset(file, "flyer");
               }}
+            />
+            <input
+              className="input-retro bg-surface-muted text-xs text-zinc-600"
+              placeholder="チラシURL（アップロード後に自動入力）"
+              value={form.flyer_url}
+              readOnly
             />
             <div className="flex flex-wrap gap-2">
               <button
@@ -1044,18 +1069,13 @@ export default function EventForm({
                 onClick={runAnalyze}
                 disabled={
                   analyzing ||
+                  uploadingTarget !== null ||
                   (!form.flyer_url && !normalizeText(form.analyze_page_url))
                 }
                 className="btn-retro btn-surface text-xs disabled:opacity-50"
               >
                 {analyzing ? "AI解析中..." : "AI解析を実行"}
               </button>
-              <input
-                className="input-retro flex-1"
-                placeholder="flyer_url（自動入力）"
-                value={form.flyer_url}
-                onChange={(e) => updateField("flyer_url", e.target.value)}
-              />
             </div>
             <label className="text-xs font-black tracking-wide text-zinc-700">
               公演ページURL（AI解析用・任意）
@@ -1069,6 +1089,24 @@ export default function EventForm({
             <p className="text-xs text-zinc-600">
               チラシだけで不足する場合、公式の公演ページURLから販売所・予約URL・OGP画像も補助的に抽出します。
             </p>
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              表示画像（トップ・詳細ページ用）
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              className="input-retro"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void uploadImageAsset(file, "display");
+              }}
+            />
+            <input
+              className="input-retro bg-surface-muted text-xs text-zinc-600"
+              placeholder="表示画像URL（アップロード後に自動入力）"
+              value={form.image_url}
+              readOnly
+            />
             {flyerPreview && (
               <NextImage
                 src={flyerPreview}
@@ -1079,16 +1117,23 @@ export default function EventForm({
                 className="max-h-64 rounded-2xl border-2 border-ink bg-surface object-contain shadow-hard-sm"
               />
             )}
-            {uploading && <p className="text-xs text-zinc-600">アップロード中...</p>}
-            <label className="text-xs font-black tracking-wide text-zinc-700">
-              OGP画像URL（任意）
-            </label>
-            <input
-              className="input-retro"
-              placeholder="image_url"
-              value={form.image_url}
-              onChange={(e) => updateField("image_url", e.target.value)}
-            />
+            {displayPreview && (
+              <NextImage
+                src={displayPreview}
+                alt="display image preview"
+                width={800}
+                height={600}
+                unoptimized
+                className="max-h-64 rounded-2xl border-2 border-ink bg-surface object-contain shadow-hard-sm"
+              />
+            )}
+            {uploadingTarget && (
+              <p className="text-xs text-zinc-600">
+                {uploadingTarget === "flyer"
+                  ? "チラシ画像をアップロード中..."
+                  : "表示画像をアップロード中..."}
+              </p>
+            )}
           </>
         )}
 
