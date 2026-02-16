@@ -319,6 +319,9 @@ const normalizeAiReservationLinks = (value: unknown) => {
     .filter((item) => item.label || item.url);
 };
 
+const hasReservationValue = (links: ReservationLink[]) =>
+  links.some((item) => normalizeText(item.label) || normalizeText(item.url));
+
 const normalizeAiTicketTypes = (value: unknown) => {
   if (!Array.isArray(value)) return [];
   return value
@@ -685,6 +688,17 @@ export default function EventForm({
         const aiReservationLinks = normalizeAiReservationLinks(
           result.reservation_links
         );
+        const pageFallbackLinks = pageUrl
+          ? [{ label: "公式公演ページ", url: pageUrl }]
+          : [];
+        const nextReservationLinks =
+          aiReservationLinks.length > 0
+            ? aiReservationLinks
+            : hasReservationValue(prev.reservation_links)
+              ? prev.reservation_links
+              : pageFallbackLinks.length > 0
+                ? pageFallbackLinks
+                : prev.reservation_links;
         const aiTicketTypes = normalizeAiTicketTypes(result.ticket_types);
         const legacyTicketTypes = [
           result.price_general !== null && result.price_general !== undefined
@@ -706,12 +720,13 @@ export default function EventForm({
           title: result.title ?? prev.title,
           description: result.description ?? prev.description,
           schedule_times: aiSchedules.length > 0 ? aiSchedules : prev.schedule_times,
-          reservation_links:
-            aiReservationLinks.length > 0
-              ? aiReservationLinks
-              : prev.reservation_links,
+          reservation_links: nextReservationLinks,
           venue: result.venue ?? prev.venue,
           venue_address: result.venue_address ?? prev.venue_address,
+          image_url:
+            typeof result.image_url === "string" && normalizeText(result.image_url)
+              ? normalizeText(result.image_url)
+              : prev.image_url,
           playwright:
             typeof result.playwright === "string"
               ? result.playwright
@@ -1052,7 +1067,7 @@ export default function EventForm({
               onChange={(e) => updateField("analyze_page_url", e.target.value)}
             />
             <p className="text-xs text-zinc-600">
-              チラシだけで不足する場合、公式の公演ページURLも一緒に解析できます。
+              チラシだけで不足する場合、公式の公演ページURLから販売所・予約URL・OGP画像も補助的に抽出します。
             </p>
             {flyerPreview && (
               <NextImage
@@ -1310,7 +1325,7 @@ export default function EventForm({
             />
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
-              予約窓口（複数）
+              販売所・予約窓口（複数）
             </label>
             <div className="space-y-3 rounded-2xl border-2 border-ink bg-surface p-3 shadow-hard-sm">
               {form.reservation_links.map((item, index) => (
@@ -1321,11 +1336,11 @@ export default function EventForm({
                   <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end">
                     <div>
                       <label className="text-[11px] font-bold text-zinc-700">
-                        予約受付先
+                        販売所名
                       </label>
                       <input
                         className="input-retro"
-                        placeholder="チケットぴあ / 劇団公式サイト"
+                        placeholder="チケットぴあ / ローチケ / 劇団公式サイト"
                         value={item.label}
                         onChange={(e) =>
                           updateReservationLink(index, "label", e.target.value)
@@ -1334,7 +1349,7 @@ export default function EventForm({
                     </div>
                     <div>
                       <label className="text-[11px] font-bold text-zinc-700">
-                        予約ページURL
+                        販売ページURL
                       </label>
                       <input
                         className="input-retro"
@@ -1361,7 +1376,7 @@ export default function EventForm({
                 className="btn-retro btn-surface text-xs"
                 onClick={addReservationLink}
               >
-                予約窓口を追加
+                販売所を追加
               </button>
             </div>
           </>

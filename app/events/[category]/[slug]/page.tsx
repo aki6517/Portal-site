@@ -1,6 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
+import ImageWithFallback from "@/app/_components/ImageWithFallback";
+import { buildEventImageCandidates } from "@/lib/events/image";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import ViewCounter from "./ViewCounter";
@@ -191,22 +192,10 @@ const isReservationOpen = (reservationStartAt?: string | null) => {
   return date.getTime() <= Date.now();
 };
 
-const normalizeImageUrl = (value?: string | null) => {
-  const trimmed = (value ?? "").trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith("/")) return trimmed;
-  if (trimmed.startsWith("//")) return `https:${trimmed}`;
-  try {
-    return new URL(trimmed).toString();
-  } catch {
-    return null;
-  }
-};
-
-const pickEventImage = (event: {
+const getEventImageCandidates = (event: {
   image_url?: string | null;
   flyer_url?: string | null;
-}) => normalizeImageUrl(event.image_url) ?? normalizeImageUrl(event.flyer_url);
+}) => buildEventImageCandidates(event.image_url, event.flyer_url);
 
 const pickMatchedEvent = (rows: EventRecord[] | null | undefined, category: string) => {
   const released = (rows ?? []).filter((item) => isReleased(item.publish_at));
@@ -342,7 +331,7 @@ export async function generateMetadata({
   if (!event) {
     return buildMetadata({ title: "公演詳細", path });
   }
-  const image = pickEventImage(event) ?? undefined;
+  const image = getEventImageCandidates(event)[0] ?? undefined;
   return buildMetadata({
     title: event.title,
     description: event.description ?? undefined,
@@ -378,7 +367,8 @@ export default async function EventDetailPage({
     icon: "🎟️",
   };
   const siteUrl = getSiteUrl();
-  const image = pickEventImage(event);
+  const imageCandidates = getEventImageCandidates(event);
+  const primaryImage = imageCandidates[0] ?? null;
   const scheduleTimes = normalizeScheduleRows(event.schedule_times, event.start_date);
   const firstSchedule = scheduleTimes[0];
   const lastSchedule = scheduleTimes[scheduleTimes.length - 1];
@@ -458,7 +448,7 @@ export default async function EventDetailPage({
       name: event.venue ?? "未設定",
       address: event.venue_address ?? undefined,
     },
-    image: image ? [image] : undefined,
+    image: primaryImage ? [primaryImage] : undefined,
     organizer: {
       "@type": "Organization",
       name: event.company,
@@ -671,21 +661,20 @@ export default async function EventDetailPage({
         </div>
 
         <div className="card-retro overflow-hidden">
-          {image ? (
-            <Image
-              src={image}
-              alt={event.title}
-              width={800}
-              height={1000}
-              sizes="(min-width: 1024px) 40vw, 100vw"
-              unoptimized
-              className="h-full w-full bg-surface object-cover"
-            />
-          ) : (
-            <div className="flex h-80 items-center justify-center bg-surface text-sm text-zinc-600">
-              画像は未登録です
-            </div>
-          )}
+          <ImageWithFallback
+            srcCandidates={imageCandidates}
+            alt={event.title}
+            width={800}
+            height={1000}
+            sizes="(min-width: 1024px) 40vw, 100vw"
+            unoptimized
+            className="h-full w-full bg-surface object-cover"
+            fallback={
+              <div className="flex h-80 items-center justify-center bg-surface text-sm text-zinc-600">
+                画像は未登録です
+              </div>
+            }
+          />
         </div>
       </div>
 
@@ -698,31 +687,32 @@ export default async function EventDetailPage({
         </div>
       )}
 
-      {(playwright || director) && (
-        <div className="card-retro mt-8 p-6">
-          <h2 className="font-display text-xl font-black">脚本・演出</h2>
-          <div className="mt-3 grid gap-2 text-base leading-relaxed">
-            {isSameStaff ? (
-              <div>
-                <span className="font-semibold">脚本・演出:</span> {playwright}
-              </div>
-            ) : (
-              <>
-                {playwright && (
-                  <div>
-                    <span className="font-semibold">脚本:</span> {playwright}
-                  </div>
-                )}
-                {director && (
-                  <div>
-                    <span className="font-semibold">演出:</span> {director}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+      <div className="card-retro mt-8 p-6">
+        <h2 className="font-display text-xl font-black">脚本・演出</h2>
+        <div className="mt-3 grid gap-2 text-base leading-relaxed">
+          {!playwright && !director && (
+            <div className="text-zinc-600">脚本・演出情報は準備中です。</div>
+          )}
+          {isSameStaff ? (
+            <div>
+              <span className="font-semibold">脚本・演出:</span> {playwright}
+            </div>
+          ) : (
+            <>
+              {playwright && (
+                <div>
+                  <span className="font-semibold">脚本:</span> {playwright}
+                </div>
+              )}
+              {director && (
+                <div>
+                  <span className="font-semibold">演出:</span> {director}
+                </div>
+              )}
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {event.cast && event.cast.length > 0 && (
         <div className="card-retro mt-8 p-6">
@@ -748,7 +738,7 @@ export default async function EventDetailPage({
           <h2 className="font-display text-xl font-black">関連の公演</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             {related.map((item) => {
-              const thumb = pickEventImage(item);
+              const thumbCandidates = getEventImageCandidates(item);
               return (
                 <Link
                   key={item.id}
@@ -758,17 +748,15 @@ export default async function EventDetailPage({
                   className="card-retro block overflow-hidden transition-transform hover:-translate-y-0.5"
                 >
                   <div className="aspect-[4/3] bg-surface-muted">
-                    {thumb ? (
-                      <Image
-                        src={thumb}
-                        alt={item.title}
-                        width={800}
-                        height={600}
-                        sizes="(min-width: 1024px) 20vw, (min-width: 768px) 33vw, 100vw"
-                        unoptimized
-                        className="h-full w-full object-cover"
-                      />
-                    ) : null}
+                    <ImageWithFallback
+                      srcCandidates={thumbCandidates}
+                      alt={item.title}
+                      width={800}
+                      height={600}
+                      sizes="(min-width: 1024px) 20vw, (min-width: 768px) 33vw, 100vw"
+                      unoptimized
+                      className="h-full w-full object-cover"
+                    />
                   </div>
                   <div className="p-4">
                     <div className="text-sm font-black">{item.title}</div>

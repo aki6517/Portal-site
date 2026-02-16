@@ -113,6 +113,49 @@ type PageContext = {
   title: string;
   description: string;
   bodyText: string;
+  ogImageUrl: string | null;
+  reservationLinkHints: { label: string; url: string }[];
+};
+
+const resolveUrl = (value: string, baseUrl: string) => {
+  try {
+    return new URL(value, baseUrl).toString();
+  } catch {
+    return null;
+  }
+};
+
+const TICKET_LINK_HINT_PATTERN =
+  /(予約|チケット|ticket|teket|peatix|ぴあ|pia|e\+|イープラス|ローチケ|lawson|confetti|livepocket|passmarket|販売)/i;
+
+const extractReservationLinkHints = (html: string, baseUrl: string) => {
+  const hints: { label: string; url: string }[] = [];
+  const seen = new Set<string>();
+  const anchorRegex =
+    /<a\b[^>]*href=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null = null;
+
+  while ((match = anchorRegex.exec(html)) && hints.length < 12) {
+    const hrefRaw = decodeHtml(match[2] ?? "").trim();
+    if (!hrefRaw) continue;
+    if (/^(mailto:|tel:|javascript:|#)/i.test(hrefRaw)) continue;
+
+    const resolved = resolveUrl(hrefRaw, baseUrl);
+    const url = resolved ? normalizeUrl(resolved) : null;
+    if (!url || seen.has(url)) continue;
+
+    const label = stripHtml(match[3] ?? "").slice(0, 80).trim();
+    const sourceText = `${label} ${url}`;
+    if (!TICKET_LINK_HINT_PATTERN.test(sourceText)) continue;
+
+    seen.add(url);
+    hints.push({
+      label: label || `予約ページ ${hints.length + 1}`,
+      url,
+    });
+  }
+
+  return hints;
 };
 
 const fetchPageContext = async (pageUrl: string): Promise<PageContext> => {
@@ -142,9 +185,25 @@ const fetchPageContext = async (pageUrl: string): Promise<PageContext> => {
         )?.[1] ?? ""
       ).trim() || "";
 
+    const ogImageRaw = decodeHtml(
+      html.match(
+        /<meta[^>]+(?:name|property)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']*)["'][^>]*>/i
+      )?.[1] ?? ""
+    ).trim();
+    const ogImageCandidate = ogImageRaw ? resolveUrl(ogImageRaw, pageUrl) : null;
+    const ogImageUrl = ogImageCandidate ? normalizeUrl(ogImageCandidate) : null;
+
+    const reservationLinkHints = extractReservationLinkHints(html, pageUrl);
     const bodyText = stripHtml(html).slice(0, 12_000);
 
-    return { url: pageUrl, title, description, bodyText };
+    return {
+      url: pageUrl,
+      title,
+      description,
+      bodyText,
+      ogImageUrl,
+      reservationLinkHints,
+    };
   } finally {
     clearTimeout(timeout);
   }
@@ -303,9 +362,10 @@ const normalizeReservationLinks = (value: unknown) => {
     .map((entry) => {
       if (!entry || typeof entry !== "object") return null;
       const record = entry as Record<string, unknown>;
+      const normalizedUrl = normalizeUrl(String(record.url ?? "").trim());
       return {
         label: String(record.label ?? "").trim(),
-        url: String(record.url ?? "").trim(),
+        url: normalizedUrl ?? "",
       };
     })
     .filter(
@@ -314,6 +374,22 @@ const normalizeReservationLinks = (value: unknown) => {
         return Boolean(item.label || item.url);
       }
     );
+};
+
+const mergeReservationLinks = (
+  ...groups: Array<Array<{ label: string; url: string }>>
+) => {
+  const merged: { label: string; url: string }[] = [];
+  const seen = new Set<string>();
+  for (const group of groups) {
+    for (const item of group) {
+      const key = `${item.url}::${item.label}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+  }
+  return merged;
 };
 
 const normalizeTicketTypes = (value: unknown) => {
@@ -351,9 +427,18 @@ const normalizeCategory = (value: unknown) => {
   return CATEGORY_IDS.has(category) ? category : "other";
 };
 
-const normalizeResult = (raw: Record<string, unknown>) => {
+const normalizeResult = (
+  raw: Record<string, unknown>,
+  pageContext?: PageContext | null
+) => {
   const scheduleTimes = normalizeScheduleTimes(raw.schedule_times);
-  const reservationLinks = normalizeReservationLinks(raw.reservation_links);
+  const reservationLinks = mergeReservationLinks(
+    normalizeReservationLinks(raw.reservation_links),
+    pageContext?.reservationLinkHints ?? []
+  );
+  const normalizedImageUrl = normalizeUrl(
+    typeof raw.image_url === "string" ? raw.image_url : null
+  );
   const ticketTypes = normalizeTicketTypes(raw.ticket_types);
   const aiConfidenceRaw = Number(raw.ai_confidence);
   const aiConfidence = Number.isFinite(aiConfidenceRaw)
@@ -371,12 +456,18 @@ const normalizeResult = (raw: Record<string, unknown>) => {
   return {
     title: typeof raw.title === "string" ? raw.title : null,
     description: typeof raw.description === "string" ? raw.description : null,
+    image_url: normalizedImageUrl ?? pageContext?.ogImageUrl ?? null,
     playwright: typeof raw.playwright === "string" ? raw.playwright : null,
     director: typeof raw.director === "string" ? raw.director : null,
     start_date: startDateRaw || fallbackStart,
     end_date: endDateRaw || fallbackEnd,
     schedule_times: scheduleTimes,
-    reservation_links: reservationLinks,
+    reservation_links:
+      reservationLinks.length > 0
+        ? reservationLinks
+        : pageContext?.url
+          ? [{ label: "公式公演ページ", url: pageContext.url }]
+          : [],
     venue: typeof raw.venue === "string" ? raw.venue : null,
     venue_address:
       typeof raw.venue_address === "string" ? raw.venue_address : null,
@@ -395,12 +486,22 @@ const normalizeResult = (raw: Record<string, unknown>) => {
 };
 
 const buildPrompt = (pageContext?: PageContext | null) => {
+  const reservationHints = pageContext?.reservationLinkHints ?? [];
+  const reservationHintText =
+    reservationHints.length > 0
+      ? reservationHints
+          .map((item, index) => `${index + 1}. ${item.label} | ${item.url}`)
+          .join("\n")
+      : "なし";
   const pageHint = pageContext
     ? `
 補助情報（公演ページ）:
 - URL: ${pageContext.url}
 - タイトル: ${pageContext.title || "不明"}
 - 説明: ${pageContext.description || "不明"}
+- OGP画像候補: ${pageContext.ogImageUrl || "不明"}
+- 予約リンク候補:
+${reservationHintText}
 `
     : "";
 
@@ -412,6 +513,7 @@ ${pageHint}
 {
   "title": string | null,
   "description": string | null,
+  "image_url": string | null,
   "playwright": string | null,
   "director": string | null,
   "start_date": "YYYY-MM-DDTHH:mm:ss+09:00" | null,
@@ -434,7 +536,8 @@ ${pageHint}
 - 日付が日付のみの場合、時刻は 00:00:00+09:00 を補完
 - 複数日程がある場合は schedule_times に全て格納（最低でも start_date を設定）
 - start_date は最も早い schedule_times.start_date、end_date は最も遅い日程の end_date（なければ null）
-- 予約窓口は reservation_links に複数入れる
+- 予約窓口は reservation_links に複数入れる（label は販売所名、url は予約/購入先URL）
+- image_url は公演詳細で使えるURLを返す（不明なら null）
 - 料金は ticket_types を優先し、価格不明は null
 - カテゴリ不明は "other"
 - ai_confidence は 0.0〜1.0
@@ -524,11 +627,13 @@ export async function POST(req: Request) {
           prompt,
           imageUrl: flyerUrl,
           pageContextText: pageContext
-            ? `URL: ${pageContext.url}\nTitle: ${pageContext.title}\nDescription: ${pageContext.description}\nBody: ${pageContext.bodyText}`
+            ? `URL: ${pageContext.url}\nTitle: ${pageContext.title}\nDescription: ${pageContext.description}\nOG Image: ${pageContext.ogImageUrl ?? "N/A"}\nReservation Link Hints:\n${pageContext.reservationLinkHints
+                .map((item, index) => `${index + 1}. ${item.label} | ${item.url}`)
+                .join("\n")}\nBody: ${pageContext.bodyText}`
             : null,
         })) as Record<string, unknown>;
 
-        const normalized = normalizeResult(raw);
+        const normalized = normalizeResult(raw, pageContext);
         return NextResponse.json({
           data: {
             result: normalized,

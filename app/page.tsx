@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -12,6 +11,8 @@ import {
 } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import ImageWithFallback from "@/app/_components/ImageWithFallback";
+import { buildEventImageCandidates } from "@/lib/events/image";
 
 type TrendingEvent = {
   id: string;
@@ -60,23 +61,11 @@ const isReleased = (publishAt?: string | null) => {
   return date.getTime() <= Date.now();
 };
 
-const normalizeImageUrl = (value?: string | null) => {
-  const trimmed = (value ?? "").trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith("/")) return trimmed;
-  if (trimmed.startsWith("//")) return `https:${trimmed}`;
-  try {
-    return new URL(trimmed).toString();
-  } catch {
-    return null;
-  }
-};
-
-const pickEventImage = (event?: {
+const getEventImageCandidates = (event?: {
   image_url?: string | null;
   flyer_url?: string | null;
 } | null) =>
-  normalizeImageUrl(event?.image_url) ?? normalizeImageUrl(event?.flyer_url);
+  buildEventImageCandidates(event?.image_url, event?.flyer_url);
 
 const getReservationBadge = (event: TrendingEvent) => {
   if (!event.ticket_url) return null;
@@ -184,7 +173,7 @@ export default async function Home() {
     categoriesList.map((category) => [category.id, category])
   );
   const featured = trending[0];
-  const featuredImage = pickEventImage(featured);
+  const featuredImageCandidates = getEventImageCandidates(featured);
   const featuredHref = featured
     ? `/events/${encodeURIComponent(featured.category)}/${encodeURIComponent(
         featured.slug
@@ -284,21 +273,20 @@ export default async function Home() {
             <Link href={featuredHref} className="group relative mt-4 lg:mt-0">
               <div className="absolute inset-0 translate-x-2 translate-y-2 rounded-xl bg-ink" />
               <div className="relative aspect-video overflow-hidden rounded-xl border-2 border-ink bg-white transition-transform group-hover:-translate-x-1 group-hover:-translate-y-1">
-                {featuredImage ? (
-                  <Image
-                    src={featuredImage}
-                    alt={featured?.title ?? "ピックアップ公演"}
-                    fill
-                    priority
-                    sizes="(min-width: 1024px) 50vw, 100vw"
-                    unoptimized
-                    className="object-cover transition-all duration-500"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-surface-muted text-xs font-bold text-zinc-600">
-                    公演画像を準備中
-                  </div>
-                )}
+                <ImageWithFallback
+                  srcCandidates={featuredImageCandidates}
+                  alt={featured?.title ?? "ピックアップ公演"}
+                  fill
+                  priority
+                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  unoptimized
+                  className="object-cover transition-all duration-500"
+                  fallback={
+                    <div className="flex h-full w-full items-center justify-center bg-surface-muted text-xs font-bold text-zinc-600">
+                      公演画像を準備中
+                    </div>
+                  }
+                />
                 <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4 pt-12 text-white">
                   <span className="inline-block rounded border-2 border-ink bg-pop-yellow px-2 py-0.5 text-[10px] font-black text-ink shadow-hard-sm">
                     PICK UP
@@ -408,7 +396,7 @@ export default async function Home() {
         ) : (
           <div className="grid gap-6 md:grid-cols-3">
             {trending.map((event) => {
-              const image = pickEventImage(event);
+              const imageCandidates = getEventImageCandidates(event);
               const categoryLabel =
                 categoryMap.get(event.category)?.name ?? event.category;
               const reservationBadge = getReservationBadge(event);
@@ -421,20 +409,19 @@ export default async function Home() {
                   className="group cursor-pointer rounded-lg border-2 border-ink bg-white p-3 shadow-hard transition-all hover:-translate-y-1 hover-shadow-hard-lg"
                 >
                   <div className="relative mb-4 aspect-[4/3] overflow-hidden rounded border-2 border-ink bg-surface-muted">
-                    {image ? (
-                      <Image
-                        src={image}
-                        alt={event.title}
-                        fill
-                        sizes="(min-width: 1024px) 30vw, (min-width: 768px) 33vw, 100vw"
-                        unoptimized
-                        className="object-cover transition-all duration-500"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs font-bold text-zinc-600">
-                        画像準備中
-                      </div>
-                    )}
+                    <ImageWithFallback
+                      srcCandidates={imageCandidates}
+                      alt={event.title}
+                      fill
+                      sizes="(min-width: 1024px) 30vw, (min-width: 768px) 33vw, 100vw"
+                      unoptimized
+                      className="object-cover transition-all duration-500"
+                      fallback={
+                        <div className="flex h-full w-full items-center justify-center text-xs font-bold text-zinc-600">
+                          画像準備中
+                        </div>
+                      }
+                    />
                     <div className="absolute right-2 top-2 rounded border border-ink bg-pop-yellow px-2 py-1 text-[10px] font-bold text-ink shadow-hard-sm">
                       {categoryLabel}
                     </div>

@@ -1,5 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
+import ImageWithFallback from "@/app/_components/ImageWithFallback";
+import { buildEventImageCandidates } from "@/lib/events/image";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { buildIlikeFilter } from "@/lib/search";
@@ -50,20 +51,10 @@ const isReleased = (publishAt?: string | null) => {
   return date.getTime() <= Date.now();
 };
 
-const normalizeImageUrl = (value?: string | null) => {
-  const trimmed = (value ?? "").trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith("/")) return trimmed;
-  if (trimmed.startsWith("//")) return `https:${trimmed}`;
-  try {
-    return new URL(trimmed).toString();
-  } catch {
-    return null;
-  }
-};
-
-const pickEventImage = (event: { image_url?: string | null; flyer_url?: string | null }) =>
-  normalizeImageUrl(event.image_url) ?? normalizeImageUrl(event.flyer_url);
+const getEventImageCandidates = (event: {
+  image_url?: string | null;
+  flyer_url?: string | null;
+}) => buildEventImageCandidates(event.image_url, event.flyer_url);
 
 const getCategories = async () => {
   const supabase = await createSupabaseServerClient();
@@ -229,7 +220,7 @@ export default async function EventsPage({
           </div>
         )}
         {sortedEvents.map((event) => {
-          const image = pickEventImage(event);
+          const imageCandidates = getEventImageCandidates(event);
           const views = viewsMap.get(event.id) ?? 0;
           return (
             <div key={event.id} className="card-retro p-5">
@@ -258,17 +249,15 @@ export default async function EventsPage({
                     </div>
                   )}
                 </div>
-                {image && (
-                  <Image
-                    src={image}
-                    alt={event.title}
-                    width={128}
-                    height={80}
-                    sizes="128px"
-                    unoptimized
-                    className="h-20 w-32 rounded-xl border-2 border-ink object-cover shadow-hard-sm"
-                  />
-                )}
+                <ImageWithFallback
+                  srcCandidates={imageCandidates}
+                  alt={event.title}
+                  width={128}
+                  height={80}
+                  sizes="128px"
+                  unoptimized
+                  className="h-20 w-32 rounded-xl border-2 border-ink object-cover shadow-hard-sm"
+                />
               </div>
             </div>
           );
