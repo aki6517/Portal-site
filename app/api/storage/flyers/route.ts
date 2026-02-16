@@ -4,7 +4,10 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
 
-const BUCKET = "flyers-public";
+const PRIMARY_BUCKET = "flyers-public";
+const BUCKET_CANDIDATES = Array.from(
+  new Set([PRIMARY_BUCKET, "flyers"])
+).filter(Boolean);
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 10;
@@ -34,33 +37,48 @@ const isBucketNotFound = (message?: string | null) =>
   typeof message === "string" &&
   /bucket.*not.*found|not\s+found/i.test(message);
 
+const isAlreadyExistsError = (message?: string | null) =>
+  typeof message === "string" && /(already exists|duplicate)/i.test(message);
+
 const ensureBucketReady = async (
-  serviceClient: ReturnType<typeof createSupabaseServiceClient>
+  serviceClient: ReturnType<typeof createSupabaseServiceClient>,
+  bucket: string
 ) => {
-  const { data, error } = await serviceClient.storage.getBucket(BUCKET);
+  const { data, error } = await serviceClient.storage.getBucket(bucket);
   if (!error && data) {
     if (data.public) return;
-    const updated = await serviceClient.storage.updateBucket(BUCKET, {
+    const updated = await serviceClient.storage.updateBucket(bucket, {
       public: true,
     });
     if (updated.error) {
-      console.error("[storage/flyers] updateBucket failed", updated.error.message);
+      console.error("[storage/flyers] updateBucket failed", {
+        bucket,
+        message: updated.error.message,
+      });
     }
     return;
   }
 
   if (!isBucketNotFound(error?.message)) {
     if (error) {
-      console.error("[storage/flyers] getBucket failed", error.message);
+      console.error("[storage/flyers] getBucket failed", {
+        bucket,
+        message: error.message,
+      });
     }
     return;
   }
 
-  const created = await serviceClient.storage.createBucket(BUCKET, {
+  const created = await serviceClient.storage.createBucket(bucket, {
     public: true,
+    allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+    fileSizeLimit: "5MB",
   });
-  if (created.error) {
-    console.error("[storage/flyers] createBucket failed", created.error.message);
+  if (created.error && !isAlreadyExistsError(created.error.message)) {
+    console.error("[storage/flyers] createBucket failed", {
+      bucket,
+      message: created.error.message,
+    });
   }
 };
 
@@ -181,59 +199,94 @@ export async function POST(req: Request) {
       EXT_BY_CONTENT_TYPE[uploadFile.type] ??
       CONTENT_TYPE_BY_EXT[safeExt] ??
       "image/jpeg";
-    const buffer = Buffer.from(await uploadFile.arrayBuffer());
 
     const serviceClient = process.env.SUPABASE_SERVICE_ROLE_KEY
       ? createSupabaseServiceClient()
       : null;
     if (serviceClient) {
-      await ensureBucketReady(serviceClient);
+      for (const bucket of BUCKET_CANDIDATES) {
+        await ensureBucketReady(serviceClient, bucket);
+      }
     }
     const clients = serviceClient ? [serviceClient, supabase] : [supabase];
+    const uploadBuckets = serviceClient ? BUCKET_CANDIDATES : [PRIMARY_BUCKET];
 
-    let uploadError:
-      | { statusCode?: string | number; message?: string }
-      | null = null;
+    const uploadErrors: Array<{
+      bucket: string;
+      statusCode?: string | number;
+      message?: string;
+    }> = [];
 
-    for (const client of clients) {
-      const { error } = await client.storage
-        .from(BUCKET)
-        .upload(path, buffer, { contentType, upsert: false });
-      if (!error) {
-        const { data } = client.storage.from(BUCKET).getPublicUrl(path);
-        return NextResponse.json({
-          data: {
-            bucket: BUCKET,
-            path,
-            public_url: data.publicUrl,
-          },
-        });
+    for (const bucket of uploadBuckets) {
+      for (const client of clients) {
+        try {
+          const { error } = await client.storage.from(bucket).upload(path, uploadFile, {
+            contentType,
+            upsert: false,
+          });
+          if (!error) {
+            const { data } = client.storage.from(bucket).getPublicUrl(path);
+            return NextResponse.json({
+              data: {
+                bucket,
+                path,
+                public_url: data.publicUrl,
+              },
+            });
+          }
+          uploadErrors.push({
+            bucket,
+            statusCode: error.statusCode,
+            message: error.message,
+          });
+        } catch (error) {
+          uploadErrors.push({
+            bucket,
+            message: error instanceof Error ? error.message : "unknown upload error",
+          });
+        }
       }
-      uploadError = { statusCode: error.statusCode, message: error.message };
     }
 
-    const statusCode = toNumericStatusCode(uploadError?.statusCode);
+    const lastError = uploadErrors.at(-1) ?? null;
+    const statusCode = toNumericStatusCode(lastError?.statusCode);
     const status =
       statusCode === 409
         ? 409
         : statusCode === 400
           ? 400
+          : statusCode === 404
+            ? 404
+            : statusCode === 413
+              ? 413
+              : statusCode === 429
+                ? 429
           : statusCode === 401 || statusCode === 403
             ? 403
             : 500;
 
     console.error("[storage/flyers] upload failed", {
-      statusCode: uploadError?.statusCode,
-      message: uploadError?.message,
+      path,
+      statusCode: lastError?.statusCode,
+      message: lastError?.message,
+      attempts: uploadErrors,
     });
+
+    const missingBucketMessage =
+      status === 404
+        ? serviceClient
+          ? "Storage bucket not found. Confirm bucket configuration in Supabase."
+          : "Storage bucket not found. Configure SUPABASE_SERVICE_ROLE_KEY or create bucket flyers-public."
+        : null;
 
     return NextResponse.json(
       {
         error: {
           code: "STORAGE_ERROR",
-          message:
-            uploadError?.message ??
-            "Storage upload failed. Check bucket name/policy/env settings.",
+          message: missingBucketMessage
+            ? `${missingBucketMessage} (${lastError?.message ?? "no detail"})`
+            : lastError?.message ??
+              "Storage upload failed. Check bucket name/policy/env settings.",
           status_code: statusCode,
         },
       },

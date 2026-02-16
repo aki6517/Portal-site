@@ -39,7 +39,9 @@ export default function ImageWithFallback({
       {...imageProps}
       src={src}
       alt={alt}
-      onError={() => setIndex((prev) => (prev + 1 < candidates.length ? prev + 1 : prev))}
+      onError={() =>
+        setIndex((prev) => (prev + 1 < candidates.length ? prev + 1 : candidates.length))
+      }
     />
   );
 }

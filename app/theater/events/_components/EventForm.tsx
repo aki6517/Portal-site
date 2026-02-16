@@ -446,6 +446,7 @@ type Props = {
 };
 
 type UploadTarget = "flyer" | "display";
+type UploadNoticeType = "error" | "success" | "info";
 
 export default function EventForm({
   mode,
@@ -458,6 +459,10 @@ export default function EventForm({
     deriveDirectorSameAsPlaywright(initialData)
   );
   const [message, setMessage] = useState<string | null>(null);
+  const [uploadNotice, setUploadNotice] = useState<{
+    type: UploadNoticeType;
+    text: string;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingTarget, setUploadingTarget] = useState<UploadTarget | null>(
     null
@@ -633,6 +638,7 @@ export default function EventForm({
 
   const uploadImageAsset = async (file: File, target: UploadTarget) => {
     setUploadingTarget(target);
+    setUploadNotice(null);
     setMessage(null);
     try {
       const { blob, ext } = await sanitizeImage(file);
@@ -649,13 +655,18 @@ export default function EventForm({
       });
       if (!res.ok) {
         const errorMessage = await parseErrorResponse(res);
-        setMessage(`アップロードに失敗しました: ${errorMessage}`);
+        const targetLabel = target === "flyer" ? "チラシ画像" : "表示画像";
+        const detail = `${targetLabel}のアップロードに失敗しました: ${errorMessage}`;
+        setUploadNotice({ type: "error", text: detail });
+        setMessage(detail);
         return;
       }
       const json = await res.json();
       const url = json?.data?.public_url;
       if (!url) {
-        setMessage("画像URLの取得に失敗しました");
+        const detail = "画像URLの取得に失敗しました";
+        setUploadNotice({ type: "error", text: detail });
+        setMessage(detail);
         return;
       }
       setForm((prev) => ({
@@ -668,15 +679,17 @@ export default function EventForm({
               image_url: url,
             }),
       }));
-      setMessage(
+      const successMessage =
         target === "flyer"
           ? `チラシ画像をアップロードしました（${FLYER_BUCKET}）`
-          : `表示画像をアップロードしました（${FLYER_BUCKET}）`
-      );
+          : `表示画像をアップロードしました（${FLYER_BUCKET}）`;
+      setUploadNotice({ type: "success", text: successMessage });
+      setMessage(successMessage);
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "アップロードに失敗しました"
-      );
+      const detail =
+        error instanceof Error ? error.message : "アップロードに失敗しました";
+      setUploadNotice({ type: "error", text: detail });
+      setMessage(detail);
     } finally {
       setUploadingTarget(null);
     }
@@ -689,6 +702,7 @@ export default function EventForm({
       return;
     }
     setAnalyzing(true);
+    setUploadNotice(null);
     setMessage(null);
     try {
       const res = await fetch("/api/ai/analyze-flyer", {
@@ -880,6 +894,7 @@ export default function EventForm({
     );
 
     setSaving(true);
+    setUploadNotice(null);
     setMessage(null);
     setCreatedId(null);
 
@@ -1102,9 +1117,17 @@ export default function EventForm({
             <p className="text-xs text-zinc-600">
               チラシだけで不足する場合、公式の公演ページURLから販売所・予約URL・OGP画像も補助的に抽出します。
             </p>
-            {message && (
-              <p className="rounded-lg border-2 border-ink bg-surface-muted px-3 py-2 text-xs text-zinc-700">
-                {message}
+            {uploadNotice && (
+              <p
+                className={`rounded-lg border-2 px-3 py-2 text-xs ${
+                  uploadNotice.type === "error"
+                    ? "border-red-500 bg-red-50 text-red-700"
+                    : uploadNotice.type === "success"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                      : "border-ink bg-surface-muted text-zinc-700"
+                }`}
+              >
+                {uploadNotice.text}
               </p>
             )}
             <label className="text-xs font-black tracking-wide text-zinc-700">
