@@ -423,6 +423,21 @@ const sanitizeImage = async (file: File) => {
   return { blob, ext };
 };
 
+const parseErrorResponse = async (res: Response) => {
+  const cloned = res.clone();
+  try {
+    const json = await res.json();
+    const message =
+      json?.error?.message ||
+      json?.message ||
+      `${res.status} ${res.statusText || "Request failed"}`;
+    return String(message);
+  } catch {
+    const text = (await cloned.text()).trim();
+    return text || `${res.status} ${res.statusText || "Request failed"}`;
+  }
+};
+
 type Props = {
   mode: "create" | "edit";
   eventId?: string;
@@ -635,11 +650,12 @@ export default function EventForm({
         method: "POST",
         body: formData,
       });
-      const json = await res.json();
       if (!res.ok) {
-        setMessage(json?.error?.message ?? "アップロードに失敗しました");
+        const errorMessage = await parseErrorResponse(res);
+        setMessage(`アップロードに失敗しました: ${errorMessage}`);
         return;
       }
+      const json = await res.json();
       const url = json?.data?.public_url;
       if (!url) {
         setMessage("画像URLの取得に失敗しました");

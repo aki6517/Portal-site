@@ -21,6 +21,15 @@ const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   webp: "image/webp",
 };
 
+const toNumericStatusCode = (value?: string | number | null) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
 const getClientKey = (req: Request, userId: string) => {
   const forwarded = req.headers.get("x-forwarded-for") ?? "";
   const ip =
@@ -138,7 +147,7 @@ export async function POST(req: Request) {
     }
 
     let uploadError:
-      | { statusCode?: string; message?: string }
+      | { statusCode?: string | number; message?: string }
       | null = null;
 
     for (const client of clients) {
@@ -158,14 +167,20 @@ export async function POST(req: Request) {
       uploadError = { statusCode: error.statusCode, message: error.message };
     }
 
+    const statusCode = toNumericStatusCode(uploadError?.statusCode);
     const status =
-      uploadError?.statusCode === "409"
+      statusCode === 409
         ? 409
-        : uploadError?.statusCode === "400"
+        : statusCode === 400
           ? 400
-          : uploadError?.statusCode === "401" || uploadError?.statusCode === "403"
+          : statusCode === 401 || statusCode === 403
             ? 403
             : 500;
+
+    console.error("[storage/flyers] upload failed", {
+      statusCode: uploadError?.statusCode,
+      message: uploadError?.message,
+    });
 
     return NextResponse.json(
       {
@@ -174,11 +189,13 @@ export async function POST(req: Request) {
           message:
             uploadError?.message ??
             "Storage upload failed. Check bucket name/policy/env settings.",
+          status_code: statusCode,
         },
       },
       { status }
     );
   } catch (error) {
+    console.error("[storage/flyers] fatal error", error);
     return NextResponse.json(
       {
         error: {
