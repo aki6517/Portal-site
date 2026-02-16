@@ -309,8 +309,10 @@ const normalizeReservationLinks = (value: unknown) => {
       };
     })
     .filter(
-      (item): item is { label: string; url: string } =>
-        Boolean(item) && Boolean(item.label || item.url)
+      (item): item is { label: string; url: string } => {
+        if (!item) return false;
+        return Boolean(item.label || item.url);
+      }
     );
 };
 
@@ -329,8 +331,10 @@ const normalizeTicketTypes = (value: unknown) => {
     .filter(
       (
         item
-      ): item is { label: string; price: number | null; note: string } =>
-        Boolean(item) && Boolean(item.label || item.price !== null || item.note)
+      ): item is { label: string; price: number | null; note: string } => {
+        if (!item) return false;
+        return Boolean(item.label || item.price !== null || item.note);
+      }
     );
 };
 
