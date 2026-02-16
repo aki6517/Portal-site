@@ -2,6 +2,7 @@
 
 import NextImage from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import ImageWithFallback from "@/app/_components/ImageWithFallback";
 
 const CATEGORY_OPTIONS = [
   { id: "comedy", label: "コメディ" },
@@ -1118,13 +1119,18 @@ export default function EventForm({
               />
             )}
             {displayPreview && (
-              <NextImage
-                src={displayPreview}
+              <ImageWithFallback
+                srcCandidates={[form.image_url, form.flyer_url]}
                 alt="display image preview"
                 width={800}
                 height={600}
                 unoptimized
                 className="max-h-64 rounded-2xl border-2 border-ink bg-surface object-contain shadow-hard-sm"
+                fallback={
+                  <div className="max-h-64 rounded-2xl border-2 border-ink bg-surface p-4 text-xs text-zinc-600 shadow-hard-sm">
+                    表示画像プレビューを表示できません。画像ファイルを再アップロードしてください。
+                  </div>
+                }
               />
             )}
             {uploadingTarget && (

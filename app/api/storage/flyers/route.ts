@@ -47,110 +47,146 @@ const checkRateLimit = (key: string) => {
 };
 
 export async function POST(req: Request) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json(
-      { error: { code: "UNAUTHORIZED", message: "Login required" } },
-      { status: 401 }
-    );
-  }
-
-  const rateKey = getClientKey(req, user.id);
-  const limit = checkRateLimit(rateKey);
-  if (!limit.ok) {
-    return NextResponse.json(
-      {
-        error: {
-          code: "RATE_LIMITED",
-          message: "Too many requests",
-        },
-      },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
-    );
-  }
-
-  let formData: FormData;
   try {
-    formData = await req.formData();
-  } catch {
-    return NextResponse.json(
-      { error: { code: "INVALID_FORM", message: "Invalid form data" } },
-      { status: 400 }
-    );
-  }
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const file = formData.get("file");
-  if (!(file instanceof File)) {
-    return NextResponse.json(
-      { error: { code: "VALIDATION_ERROR", message: "file is required" } },
-      { status: 400 }
-    );
-  }
-
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    return NextResponse.json(
-      {
-        error: {
-          code: "FILE_TOO_LARGE",
-          message: "file size must be 5MB or less",
-        },
-      },
-      { status: 413 }
-    );
-  }
-
-  let ext = file.type ? EXT_BY_CONTENT_TYPE[file.type] : undefined;
-  if (!ext) {
-    const guessed = file.name.split(".").pop()?.toLowerCase() ?? "";
-    if (guessed && CONTENT_TYPE_BY_EXT[guessed]) {
-      ext = guessed === "jpeg" ? "jpg" : guessed;
+    if (!user) {
+      return NextResponse.json(
+        { error: { code: "UNAUTHORIZED", message: "Login required" } },
+        { status: 401 }
+      );
     }
-  }
 
-  if (!ext) {
+    const rateKey = getClientKey(req, user.id);
+    const limit = checkRateLimit(rateKey);
+    if (!limit.ok) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "RATE_LIMITED",
+            message: "Too many requests",
+          },
+        },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+      );
+    }
+
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch {
+      return NextResponse.json(
+        { error: { code: "INVALID_FORM", message: "Invalid form data" } },
+        { status: 400 }
+      );
+    }
+
+    const file = formData.get("file");
+    if (!(file instanceof File)) {
+      return NextResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: "file is required" } },
+        { status: 400 }
+      );
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "FILE_TOO_LARGE",
+            message: "file size must be 5MB or less",
+          },
+        },
+        { status: 413 }
+      );
+    }
+
+    let ext = file.type ? EXT_BY_CONTENT_TYPE[file.type] : undefined;
+    if (!ext) {
+      const guessed = file.name.split(".").pop()?.toLowerCase() ?? "";
+      if (guessed && CONTENT_TYPE_BY_EXT[guessed]) {
+        ext = guessed === "jpeg" ? "jpg" : guessed;
+      }
+    }
+
+    if (!ext) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "UNSUPPORTED_TYPE",
+            message: "Only jpg, png, webp files are allowed",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const safeExt = ext.replace(/[^a-z0-9]/g, "") || "jpg";
+    const path = `flyers/${crypto.randomUUID()}.${safeExt}`;
+    const contentType =
+      EXT_BY_CONTENT_TYPE[file.type] ??
+      CONTENT_TYPE_BY_EXT[safeExt] ??
+      "image/jpeg";
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    const clients = [supabase];
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      clients.unshift(createSupabaseServiceClient());
+    }
+
+    let uploadError:
+      | { statusCode?: string; message?: string }
+      | null = null;
+
+    for (const client of clients) {
+      const { error } = await client.storage
+        .from(BUCKET)
+        .upload(path, buffer, { contentType, upsert: false });
+      if (!error) {
+        const { data } = client.storage.from(BUCKET).getPublicUrl(path);
+        return NextResponse.json({
+          data: {
+            bucket: BUCKET,
+            path,
+            public_url: data.publicUrl,
+          },
+        });
+      }
+      uploadError = { statusCode: error.statusCode, message: error.message };
+    }
+
+    const status =
+      uploadError?.statusCode === "409"
+        ? 409
+        : uploadError?.statusCode === "400"
+          ? 400
+          : uploadError?.statusCode === "401" || uploadError?.statusCode === "403"
+            ? 403
+            : 500;
+
     return NextResponse.json(
       {
         error: {
-          code: "UNSUPPORTED_TYPE",
-          message: "Only jpg, png, webp files are allowed",
+          code: "STORAGE_ERROR",
+          message:
+            uploadError?.message ??
+            "Storage upload failed. Check bucket name/policy/env settings.",
         },
       },
-      { status: 400 }
-    );
-  }
-
-  const safeExt = ext.replace(/[^a-z0-9]/g, "") || "jpg";
-  const path = `flyers/${crypto.randomUUID()}.${safeExt}`;
-  const contentType =
-    EXT_BY_CONTENT_TYPE[file.type] ??
-    CONTENT_TYPE_BY_EXT[safeExt] ??
-    "image/jpeg";
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const service = createSupabaseServiceClient();
-  const { error } = await service.storage
-    .from(BUCKET)
-    .upload(path, buffer, { contentType, upsert: false });
-
-  if (error) {
-    const status = error.statusCode === "409" ? 409 : 500;
-    return NextResponse.json(
-      { error: { code: "STORAGE_ERROR", message: error.message } },
       { status }
     );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "STORAGE_FATAL",
+          message: error instanceof Error ? error.message : "Unexpected storage error",
+        },
+      },
+      { status: 500 }
+    );
   }
-
-  const { data } = service.storage.from(BUCKET).getPublicUrl(path);
-
-  return NextResponse.json({
-    data: {
-      bucket: BUCKET,
-      path,
-      public_url: data.publicUrl,
-    },
-  });
 }
