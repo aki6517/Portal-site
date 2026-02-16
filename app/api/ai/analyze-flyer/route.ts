@@ -258,8 +258,10 @@ const normalizeCast = (value: unknown) => {
       return null;
     })
     .filter(
-      (item): item is { name: string; role: string; image_url: string } =>
-        Boolean(item) && Boolean(item.name || item.role || item.image_url)
+      (item): item is { name: string; role: string; image_url: string } => {
+        if (!item) return false;
+        return Boolean(item.name || item.role || item.image_url);
+      }
     );
 };
 
