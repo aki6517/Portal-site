@@ -30,6 +30,40 @@ const toNumericStatusCode = (value?: string | number | null) => {
   return null;
 };
 
+const isBucketNotFound = (message?: string | null) =>
+  typeof message === "string" &&
+  /bucket.*not.*found|not\s+found/i.test(message);
+
+const ensureBucketReady = async (
+  serviceClient: ReturnType<typeof createSupabaseServiceClient>
+) => {
+  const { data, error } = await serviceClient.storage.getBucket(BUCKET);
+  if (!error && data) {
+    if (data.public) return;
+    const updated = await serviceClient.storage.updateBucket(BUCKET, {
+      public: true,
+    });
+    if (updated.error) {
+      console.error("[storage/flyers] updateBucket failed", updated.error.message);
+    }
+    return;
+  }
+
+  if (!isBucketNotFound(error?.message)) {
+    if (error) {
+      console.error("[storage/flyers] getBucket failed", error.message);
+    }
+    return;
+  }
+
+  const created = await serviceClient.storage.createBucket(BUCKET, {
+    public: true,
+  });
+  if (created.error) {
+    console.error("[storage/flyers] createBucket failed", created.error.message);
+  }
+};
+
 const getClientKey = (req: Request, userId: string) => {
   const forwarded = req.headers.get("x-forwarded-for") ?? "";
   const ip =
@@ -149,10 +183,13 @@ export async function POST(req: Request) {
       "image/jpeg";
     const buffer = Buffer.from(await uploadFile.arrayBuffer());
 
-    const clients = [supabase];
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      clients.unshift(createSupabaseServiceClient());
+    const serviceClient = process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? createSupabaseServiceClient()
+      : null;
+    if (serviceClient) {
+      await ensureBucketReady(serviceClient);
     }
+    const clients = serviceClient ? [serviceClient, supabase] : [supabase];
 
     let uploadError:
       | { statusCode?: string | number; message?: string }
