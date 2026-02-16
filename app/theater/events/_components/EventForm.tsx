@@ -43,6 +43,12 @@ type ReservationLink = {
   url: string;
 };
 
+type TicketType = {
+  label: string;
+  price: string;
+  note: string;
+};
+
 type FormState = {
   categories: string[];
   slug: string;
@@ -56,12 +62,14 @@ type FormState = {
   reservation_links: ReservationLink[];
   venue: string;
   venue_address: string;
+  ticket_types: TicketType[];
   price_general: string;
   price_student: string;
   tags: string;
   cast: CastMember[];
   flyer_url: string;
   image_url: string;
+  analyze_page_url: string;
   ai_confidence: string;
   status: "draft" | "published" | "archived";
 };
@@ -89,6 +97,7 @@ type EventData = {
   venue_address?: string | null;
   price_general?: number | null;
   price_student?: number | null;
+  ticket_types?: { label?: string | null; price?: number | null; note?: string | null }[] | null;
   ticket_url?: string | null;
   tags?: string[] | null;
   cast?: unknown[] | null;
@@ -112,6 +121,12 @@ const emptyScheduleTime = (): ScheduleTime => ({
 const emptyReservationLink = (): ReservationLink => ({
   label: "",
   url: "",
+});
+
+const emptyTicketType = (): TicketType => ({
+  label: "",
+  price: "",
+  note: "",
 });
 
 const normalizeText = (value?: string | null) => (value ?? "").trim();
@@ -219,6 +234,41 @@ const normalizeReservationLinks = (data?: EventData | null) => {
   return [emptyReservationLink()];
 };
 
+const normalizeTicketTypes = (data?: EventData | null) => {
+  const fromArray = Array.isArray(data?.ticket_types)
+    ? data.ticket_types
+        .map((item) => ({
+          label: normalizeText(item?.label),
+          price:
+            item?.price !== null && item?.price !== undefined
+              ? String(item.price)
+              : "",
+          note: normalizeText(item?.note),
+        }))
+        .filter((item) => item.label || item.price || item.note)
+    : [];
+
+  if (fromArray.length > 0) return fromArray;
+
+  const legacy: TicketType[] = [];
+  if (data?.price_general !== null && data?.price_general !== undefined) {
+    legacy.push({
+      label: "一般",
+      price: String(data.price_general),
+      note: "",
+    });
+  }
+  if (data?.price_student !== null && data?.price_student !== undefined) {
+    legacy.push({
+      label: "学生",
+      price: String(data.price_student),
+      note: "",
+    });
+  }
+  if (legacy.length > 0) return legacy;
+  return [emptyTicketType()];
+};
+
 const normalizeCategories = (data?: EventData | null) => {
   const list = Array.isArray(data?.categories)
     ? data.categories.map((item) => normalizeText(item))
@@ -228,6 +278,67 @@ const normalizeCategories = (data?: EventData | null) => {
   const unique = Array.from(new Set(merged));
   if (unique.length > 0) return unique;
   return ["comedy"];
+};
+
+const normalizeAiScheduleTimes = (
+  value: unknown,
+  fallbackStartDate?: string | null
+) => {
+  const rows = Array.isArray(value)
+    ? value
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const record = item as Record<string, unknown>;
+          const start = toTokyoDateTimeInput(String(record.start_date ?? ""));
+          if (!start) return null;
+          return {
+            start_date: start,
+            label: normalizeText(String(record.label ?? "")),
+          } satisfies ScheduleTime;
+        })
+        .filter((item): item is ScheduleTime => Boolean(item))
+    : [];
+  if (rows.length > 0) return rows;
+  if (!fallbackStartDate) return [];
+  const start = toTokyoDateTimeInput(fallbackStartDate);
+  return start ? [{ start_date: start, label: "" }] : [];
+};
+
+const normalizeAiReservationLinks = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const record = item as Record<string, unknown>;
+      return {
+        label: normalizeText(String(record.label ?? "")),
+        url: normalizeText(String(record.url ?? "")),
+      } satisfies ReservationLink;
+    })
+    .filter((item): item is ReservationLink => Boolean(item))
+    .filter((item) => item.label || item.url);
+};
+
+const normalizeAiTicketTypes = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const record = item as Record<string, unknown>;
+      const priceValue = record.price;
+      let price = "";
+      if (priceValue !== null && priceValue !== undefined && priceValue !== "") {
+        const parsed = Number(priceValue);
+        if (Number.isFinite(parsed)) price = String(parsed);
+      }
+      return {
+        label: normalizeText(String(record.label ?? "")),
+        price,
+        note: normalizeText(String(record.note ?? "")),
+      } satisfies TicketType;
+    })
+    .filter((item): item is TicketType => Boolean(item))
+    .filter((item) => item.label || item.price || item.note);
 };
 
 const deriveDirectorSameAsPlaywright = (data?: EventData | null) => {
@@ -251,6 +362,7 @@ const buildInitialState = (data?: EventData | null): FormState => ({
   reservation_links: normalizeReservationLinks(data),
   venue: data?.venue ?? "",
   venue_address: data?.venue_address ?? "",
+  ticket_types: normalizeTicketTypes(data),
   price_general:
     data?.price_general !== null && data?.price_general !== undefined
       ? String(data.price_general)
@@ -263,6 +375,7 @@ const buildInitialState = (data?: EventData | null): FormState => ({
   cast: normalizeCastMembers(data?.cast),
   flyer_url: data?.flyer_url ?? "",
   image_url: data?.image_url ?? "",
+  analyze_page_url: data?.ticket_url ?? "",
   ai_confidence:
     data?.ai_confidence !== null && data?.ai_confidence !== undefined
       ? String(data.ai_confidence)
@@ -463,6 +576,32 @@ export default function EventForm({
     });
   };
 
+  const updateTicketType = (index: number, key: keyof TicketType, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      ticket_types: prev.ticket_types.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [key]: value } : row
+      ),
+    }));
+  };
+
+  const addTicketType = () => {
+    setForm((prev) => ({
+      ...prev,
+      ticket_types: [...prev.ticket_types, emptyTicketType()],
+    }));
+  };
+
+  const removeTicketType = (index: number) => {
+    setForm((prev) => {
+      if (prev.ticket_types.length <= 1) return prev;
+      return {
+        ...prev,
+        ticket_types: prev.ticket_types.filter((_, rowIndex) => rowIndex !== index),
+      };
+    });
+  };
+
   const togglePlatform = (platform: string) => {
     setPromotionPlatforms((prev) =>
       prev.includes(platform)
@@ -509,8 +648,9 @@ export default function EventForm({
   };
 
   const runAnalyze = async () => {
-    if (!form.flyer_url) {
-      setMessage("先にチラシ画像をアップロードしてください");
+    const pageUrl = normalizeText(form.analyze_page_url);
+    if (!form.flyer_url && !pageUrl) {
+      setMessage("チラシ画像または公演ページURLを入力してください");
       return;
     }
     setAnalyzing(true);
@@ -519,7 +659,10 @@ export default function EventForm({
       const res = await fetch("/api/ai/analyze-flyer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flyer_url: form.flyer_url }),
+        body: JSON.stringify({
+          flyer_url: normalizeText(form.flyer_url) || undefined,
+          page_url: pageUrl || undefined,
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -527,23 +670,57 @@ export default function EventForm({
         return;
       }
       const result = json?.data?.result ?? {};
+      const warnings = Array.isArray(json?.data?.warnings)
+        ? json.data.warnings.filter((item: unknown) => typeof item === "string")
+        : [];
       setForm((prev) => {
         const aiCategory = normalizeText(result.category);
         const nextCategories = aiCategory
           ? [aiCategory, ...prev.categories.filter((item) => item !== aiCategory)]
           : prev.categories;
-        const aiStartDate = toTokyoDateTimeInput(result.start_date ?? "");
+        const aiSchedules = normalizeAiScheduleTimes(
+          result.schedule_times,
+          result.start_date
+        );
+        const aiReservationLinks = normalizeAiReservationLinks(
+          result.reservation_links
+        );
+        const aiTicketTypes = normalizeAiTicketTypes(result.ticket_types);
+        const legacyTicketTypes = [
+          result.price_general !== null && result.price_general !== undefined
+            ? { label: "一般", price: String(result.price_general), note: "" }
+            : null,
+          result.price_student !== null && result.price_student !== undefined
+            ? { label: "学生", price: String(result.price_student), note: "" }
+            : null,
+        ].filter((item): item is TicketType => Boolean(item));
+        const nextTicketTypes =
+          aiTicketTypes.length > 0
+            ? aiTicketTypes
+            : legacyTicketTypes.length > 0
+              ? legacyTicketTypes
+              : prev.ticket_types;
 
         return {
           ...prev,
           title: result.title ?? prev.title,
           description: result.description ?? prev.description,
-          schedule_times:
-            aiStartDate && prev.schedule_times.every((item) => !item.start_date)
-              ? [{ start_date: aiStartDate, label: "" }]
-              : prev.schedule_times,
+          schedule_times: aiSchedules.length > 0 ? aiSchedules : prev.schedule_times,
+          reservation_links:
+            aiReservationLinks.length > 0
+              ? aiReservationLinks
+              : prev.reservation_links,
           venue: result.venue ?? prev.venue,
           venue_address: result.venue_address ?? prev.venue_address,
+          playwright:
+            typeof result.playwright === "string"
+              ? result.playwright
+              : prev.playwright,
+          director:
+            typeof result.director === "string"
+              ? result.director
+              : prev.director,
+          ticket_types: nextTicketTypes,
           price_general:
             result.price_general !== null && result.price_general !== undefined
               ? String(result.price_general)
@@ -565,7 +742,23 @@ export default function EventForm({
               : prev.ai_confidence,
         };
       });
-      setMessage("AI解析が完了しました。内容を確認してください。");
+      if (typeof result.director === "string" || typeof result.playwright === "string") {
+        const playwright = normalizeText(
+          typeof result.playwright === "string" ? result.playwright : form.playwright
+        );
+        const director = normalizeText(
+          typeof result.director === "string" ? result.director : form.director
+        );
+        setDirectorSameAsPlaywright(
+          Boolean(playwright && director && playwright === director) ||
+            Boolean(playwright && !director)
+        );
+      }
+      setMessage(
+        warnings.length > 0
+          ? `AI解析が完了しました（注意: ${warnings.join(" / ")}）。内容を確認してください。`
+          : "AI解析が完了しました。内容を確認してください。"
+      );
     } finally {
       setAnalyzing(false);
     }
@@ -612,6 +805,19 @@ export default function EventForm({
         url: normalizeText(item.url),
       }))
       .filter((item) => item.label || item.url);
+    const ticketTypes = form.ticket_types
+      .map((item) => {
+        const label = normalizeText(item.label);
+        const note = normalizeText(item.note);
+        const priceText = normalizeText(item.price);
+        const price = priceText ? Number(priceText) : null;
+        return {
+          label,
+          price: Number.isFinite(price) ? price : null,
+          note,
+        };
+      })
+      .filter((item) => item.label || item.price !== null || item.note);
     const playwright = normalizeText(form.playwright);
     const director = directorSameAsPlaywright
       ? playwright
@@ -619,6 +825,12 @@ export default function EventForm({
 
     const primaryCategory = normalizedCategories[0] ?? "other";
     const firstReservation = reservationLinks[0] ?? null;
+    const generalTicket = ticketTypes.find((item) =>
+      /一般|general/i.test(item.label)
+    );
+    const studentTicket = ticketTypes.find((item) =>
+      /学生|student/i.test(item.label)
+    );
 
     setSaving(true);
     setMessage(null);
@@ -640,8 +852,13 @@ export default function EventForm({
       reservation_links: reservationLinks,
       venue: form.venue || null,
       venue_address: form.venue_address || null,
-      price_general: form.price_general ? Number(form.price_general) : null,
-      price_student: form.price_student ? Number(form.price_student) : null,
+      price_general:
+        generalTicket?.price ??
+        (form.price_general ? Number(form.price_general) : null),
+      price_student:
+        studentTicket?.price ??
+        (form.price_student ? Number(form.price_student) : null),
+      ticket_types: ticketTypes,
       ticket_url: firstReservation?.url || null,
       description: form.description || null,
       playwright: playwright || null,
@@ -762,7 +979,7 @@ export default function EventForm({
         {mode === "create" ? "新規公演作成" : "公演編集"}
       </h2>
       <p className="mt-2 text-sm text-zinc-700">
-        チラシ画像アップロード → AI解析 → 内容確認の流れです。
+        チラシ画像 / 公演ページURLの解析 → 内容確認の流れです。
       </p>
       {form.ai_confidence && (
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
@@ -810,7 +1027,10 @@ export default function EventForm({
               <button
                 type="button"
                 onClick={runAnalyze}
-                disabled={analyzing || !form.flyer_url}
+                disabled={
+                  analyzing ||
+                  (!form.flyer_url && !normalizeText(form.analyze_page_url))
+                }
                 className="btn-retro btn-surface text-xs disabled:opacity-50"
               >
                 {analyzing ? "AI解析中..." : "AI解析を実行"}
@@ -822,6 +1042,18 @@ export default function EventForm({
                 onChange={(e) => updateField("flyer_url", e.target.value)}
               />
             </div>
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              公演ページURL（AI解析用・任意）
+            </label>
+            <input
+              className="input-retro"
+              placeholder="https://example.com/event"
+              value={form.analyze_page_url}
+              onChange={(e) => updateField("analyze_page_url", e.target.value)}
+            />
+            <p className="text-xs text-zinc-600">
+              チラシだけで不足する場合、公式の公演ページURLも一緒に解析できます。
+            </p>
             {flyerPreview && (
               <NextImage
                 src={flyerPreview}
@@ -999,24 +1231,73 @@ export default function EventForm({
             />
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
-              一般料金（円・任意）
+              料金（券種ごとに複数設定）
             </label>
-            <input
-              className="input-retro"
-              placeholder="2500"
-              value={form.price_general}
-              onChange={(e) => updateField("price_general", e.target.value)}
-            />
-
-            <label className="text-xs font-black tracking-wide text-zinc-700">
-              学生料金（円・任意）
-            </label>
-            <input
-              className="input-retro"
-              placeholder="2000"
-              value={form.price_student}
-              onChange={(e) => updateField("price_student", e.target.value)}
-            />
+            <div className="space-y-3 rounded-2xl border-2 border-ink bg-surface p-3 shadow-hard-sm">
+              {form.ticket_types.map((item, index) => (
+                <div
+                  key={`ticket-type-${index}`}
+                  className="rounded-xl border-2 border-ink/20 bg-white p-3"
+                >
+                  <div className="grid gap-2 md:grid-cols-[1fr_180px_1fr_auto] md:items-end">
+                    <div>
+                      <label className="text-[11px] font-bold text-zinc-700">
+                        券名
+                      </label>
+                      <input
+                        className="input-retro"
+                        placeholder="一般 / 学生 / U25 / 当日券"
+                        value={item.label}
+                        onChange={(e) =>
+                          updateTicketType(index, "label", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-zinc-700">
+                        金額（円）
+                      </label>
+                      <input
+                        className="input-retro"
+                        placeholder="3000"
+                        value={item.price}
+                        onChange={(e) =>
+                          updateTicketType(index, "price", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-zinc-700">
+                        補足（任意）
+                      </label>
+                      <input
+                        className="input-retro"
+                        placeholder="前売のみ / 要証明書"
+                        value={item.note}
+                        onChange={(e) =>
+                          updateTicketType(index, "note", e.target.value)
+                        }
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-retro btn-surface h-11 border-red-500 text-red-700 disabled:opacity-40"
+                      disabled={form.ticket_types.length <= 1}
+                      onClick={() => removeTicketType(index)}
+                    >
+                      削除
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn-retro btn-surface text-xs"
+                onClick={addTicketType}
+              >
+                料金行を追加
+              </button>
+            </div>
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
               予約開始日時（任意）
@@ -1129,7 +1410,9 @@ export default function EventForm({
                   onChange={(event) => {
                     const checked = event.target.checked;
                     setDirectorSameAsPlaywright(checked);
-                    setForm((prev) => ({ ...prev, director: prev.playwright }));
+                    if (checked) {
+                      setForm((prev) => ({ ...prev, director: prev.playwright }));
+                    }
                   }}
                 />
                 はい

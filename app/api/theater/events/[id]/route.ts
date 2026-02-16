@@ -83,6 +83,12 @@ const normalizeOptionalText = (value?: string | null) => {
   return text || null;
 };
 
+const parseMissingColumn = (message?: string | null) => {
+  if (!message) return null;
+  const match = message.match(/column ["']?([a-zA-Z0-9_]+)["']?/i);
+  return match?.[1] ?? null;
+};
+
 const deriveDateRange = (
   scheduleTimes: { start_date: string; end_date: string | null }[],
   fallbackStart?: string,
@@ -309,17 +315,33 @@ export async function PATCH(
       updateError.message.includes("does not exist"));
   if (missingColumns) {
     const retryUpdate: Record<string, unknown> = { ...update };
-    delete retryUpdate.categories;
-    delete retryUpdate.schedule_times;
-    delete retryUpdate.ticket_types;
-    delete retryUpdate.publish_at;
-    delete retryUpdate.reservation_start_at;
-    delete retryUpdate.reservation_label;
-    delete retryUpdate.reservation_links;
-    delete retryUpdate.playwright;
-    delete retryUpdate.director;
+    let retries = 0;
+    let retryError = updateError;
+    let retryData = updated;
 
-    if (Object.keys(retryUpdate).length === 0) {
+    while (retryError && retries < 12) {
+      const missingColumn = parseMissingColumn(retryError.message);
+      if (!missingColumn || !(missingColumn in retryUpdate)) break;
+      delete retryUpdate[missingColumn];
+
+      if (Object.keys(retryUpdate).length === 0) {
+        retryError = null;
+        break;
+      }
+
+      const retry = await service
+        .from("events")
+        .update(retryUpdate)
+        .eq("id", id)
+        .eq("theater_id", resolved.activeTheaterId)
+        .select("id, category, slug, status")
+        .single();
+      retryData = retry.data;
+      retryError = retry.error;
+      retries += 1;
+    }
+
+    if (!retryError && !retryData) {
       updated = {
         id: current.id,
         category: current.category,
@@ -328,15 +350,8 @@ export async function PATCH(
       };
       updateError = null;
     } else {
-      const retry = await service
-        .from("events")
-        .update(retryUpdate)
-        .eq("id", id)
-        .eq("theater_id", resolved.activeTheaterId)
-        .select("id, category, slug, status")
-        .single();
-      updated = retry.data;
-      updateError = retry.error;
+      updated = retryData;
+      updateError = retryError;
     }
   }
 

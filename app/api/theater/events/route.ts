@@ -83,6 +83,12 @@ const normalizeOptionalText = (value?: string | null) => {
   return text || null;
 };
 
+const parseMissingColumn = (message?: string | null) => {
+  if (!message) return null;
+  const match = message.match(/column ["']?([a-zA-Z0-9_]+)["']?/i);
+  return match?.[1] ?? null;
+};
+
 const deriveDateRange = (
   scheduleTimes: { start_date: string; end_date: string | null }[],
   fallbackStart?: string,
@@ -266,42 +272,44 @@ export async function POST(req: Request) {
     );
   }
 
+  const insertPayload: Record<string, unknown> = {
+    theater_id: theater.id,
+    category,
+    slug,
+    title,
+    company: theater.name,
+    description: payload.description ?? null,
+    playwright,
+    director,
+    publish_at: payload.publish_at ?? null,
+    start_date: startDate,
+    end_date: endDate ?? null,
+    reservation_start_at: payload.reservation_start_at ?? null,
+    reservation_label: payload.reservation_label ?? null,
+    reservation_links: reservationLinks,
+    schedule_times: scheduleTimes,
+    venue_id: payload.venue_id ?? null,
+    venue: payload.venue ?? null,
+    venue_address: payload.venue_address ?? null,
+    venue_lat: payload.venue_lat ?? null,
+    venue_lng: payload.venue_lng ?? null,
+    price_general: payload.price_general ?? null,
+    price_student: payload.price_student ?? null,
+    ticket_types: payload.ticket_types ?? [],
+    tags: normalizeTags(payload.tags),
+    image_url: payload.image_url ?? null,
+    flyer_url: payload.flyer_url ?? null,
+    ticket_url: payload.ticket_url ?? null,
+    "cast": payload.cast ?? [],
+    ai_confidence:
+      payload.ai_confidence !== undefined ? payload.ai_confidence : null,
+    status: payload.status ?? "draft",
+    categories,
+  };
+
   const { data: event, error: insertError } = await service
     .from("events")
-    .insert({
-      theater_id: theater.id,
-      category,
-      slug,
-      title,
-      company: theater.name,
-      description: payload.description ?? null,
-      playwright,
-      director,
-      publish_at: payload.publish_at ?? null,
-      start_date: startDate,
-      end_date: endDate ?? null,
-      reservation_start_at: payload.reservation_start_at ?? null,
-      reservation_label: payload.reservation_label ?? null,
-      reservation_links: reservationLinks,
-      schedule_times: scheduleTimes,
-      venue_id: payload.venue_id ?? null,
-      venue: payload.venue ?? null,
-      venue_address: payload.venue_address ?? null,
-      venue_lat: payload.venue_lat ?? null,
-      venue_lng: payload.venue_lng ?? null,
-      price_general: payload.price_general ?? null,
-      price_student: payload.price_student ?? null,
-      ticket_types: payload.ticket_types ?? [],
-      tags: normalizeTags(payload.tags),
-      image_url: payload.image_url ?? null,
-      flyer_url: payload.flyer_url ?? null,
-      ticket_url: payload.ticket_url ?? null,
-      "cast": payload.cast ?? [],
-      ai_confidence:
-        payload.ai_confidence !== undefined ? payload.ai_confidence : null,
-      status: payload.status ?? "draft",
-      categories,
-    })
+    .insert(insertPayload)
     .select("id, category, slug, status")
     .single();
 
@@ -313,38 +321,21 @@ export async function POST(req: Request) {
       createdError.message.includes("does not exist"));
 
   if (missingColumns) {
-    const retryPayload = {
-      theater_id: theater.id,
-      category,
-      slug,
-      title,
-      company: theater.name,
-      description: payload.description ?? null,
-      start_date: startDate,
-      end_date: endDate ?? null,
-      venue_id: payload.venue_id ?? null,
-      venue: payload.venue ?? null,
-      venue_address: payload.venue_address ?? null,
-      venue_lat: payload.venue_lat ?? null,
-      venue_lng: payload.venue_lng ?? null,
-      price_general: payload.price_general ?? null,
-      price_student: payload.price_student ?? null,
-      tags: normalizeTags(payload.tags),
-      image_url: payload.image_url ?? null,
-      flyer_url: payload.flyer_url ?? null,
-      ticket_url: payload.ticket_url ?? null,
-      "cast": payload.cast ?? [],
-      ai_confidence:
-        payload.ai_confidence !== undefined ? payload.ai_confidence : null,
-      status: payload.status ?? "draft",
-    };
-    const retry = await service
-      .from("events")
-      .insert(retryPayload)
-      .select("id, category, slug, status")
-      .single();
-    createdEvent = retry.data;
-    createdError = retry.error;
+    const retryPayload: Record<string, unknown> = { ...insertPayload };
+    let retries = 0;
+    while (createdError && retries < 12) {
+      const missingColumn = parseMissingColumn(createdError.message);
+      if (!missingColumn || !(missingColumn in retryPayload)) break;
+      delete retryPayload[missingColumn];
+      const retry = await service
+        .from("events")
+        .insert(retryPayload)
+        .select("id, category, slug, status")
+        .single();
+      createdEvent = retry.data;
+      createdError = retry.error;
+      retries += 1;
+    }
   }
 
   if (createdError) {

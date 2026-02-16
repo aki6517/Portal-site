@@ -120,6 +120,55 @@ const formatScheduleDisplay = (item: {
   return { main, note };
 };
 
+const normalizeScheduleRows = (
+  raw: EventRecord["schedule_times"],
+  fallbackStartDate: string
+) => {
+  const fromArray = Array.isArray(raw)
+    ? raw
+        .map((item) => {
+          const candidate = item as unknown;
+          if (!candidate) return null;
+          if (typeof candidate === "string") {
+            const start = candidate.trim();
+            return start
+              ? { start_date: start, end_date: null, label: "" }
+              : null;
+          }
+          if (typeof candidate !== "object") return null;
+          const record = candidate as {
+            start_date?: string;
+            end_date?: string | null;
+            label?: string;
+          };
+          return {
+            start_date: (record.start_date ?? "").trim(),
+            end_date: record.end_date ? record.end_date.trim() : null,
+            label: (record.label ?? "").trim(),
+          };
+        })
+        .filter(
+          (
+            item
+          ): item is { start_date: string; end_date: string | null; label: string } =>
+            Boolean(item?.start_date)
+        )
+    : [];
+
+  const merged =
+    fromArray.length > 0
+      ? fromArray
+      : [{ start_date: fallbackStartDate, end_date: null, label: "" }];
+
+  const unique = Array.from(
+    new Map(
+      merged.map((item) => [`${item.start_date}::${item.label}`, item] as const)
+    ).values()
+  );
+
+  return unique.sort((a, b) => a.start_date.localeCompare(b.start_date));
+};
+
 const decodeRouteParam = (value: string) => {
   try {
     return decodeURIComponent(value);
@@ -348,16 +397,13 @@ export default async function EventDetailPage({
     icon: "🎟️",
   };
   const siteUrl = getSiteUrl();
-  const start = formatDate(event.start_date);
-  const end = formatDate(event.end_date);
-  const dateLabel = end ? `${start} 〜 ${end}` : start;
   const image = pickEventImage(event);
-  const scheduleTimesRaw = Array.isArray(event.schedule_times)
-    ? event.schedule_times
-    : [];
-  const scheduleTimes = scheduleTimesRaw.filter((item) =>
-    Boolean(item?.start_date)
-  );
+  const scheduleTimes = normalizeScheduleRows(event.schedule_times, event.start_date);
+  const firstSchedule = scheduleTimes[0];
+  const lastSchedule = scheduleTimes[scheduleTimes.length - 1];
+  const start = formatDate(firstSchedule?.start_date ?? event.start_date);
+  const end = formatDate(lastSchedule?.end_date ?? event.end_date);
+  const dateLabel = end ? `${start} 〜 ${end}` : start;
   const hasMultipleSchedules = scheduleTimes.length > 1;
   const ticketTypes = Array.isArray(event.ticket_types)
     ? event.ticket_types
@@ -595,6 +641,9 @@ export default async function EventDetailPage({
                 )}
                 {reservationLinks.length > 0 && (
                   <div className="mt-2 grid gap-1 text-sm text-zinc-700">
+                    <div>
+                      <span className="font-semibold">予約受付:</span>
+                    </div>
                     {reservationLinks.map((item, index) => (
                       <div key={`reservation-link-${index}`} className="flex flex-wrap gap-2">
                         {item.url && reservationOpen ? (
