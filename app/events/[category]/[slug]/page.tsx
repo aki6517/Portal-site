@@ -219,15 +219,6 @@ const pickMatchedEvent = (rows: EventRecord[] | null | undefined, category: stri
   );
 };
 
-const DETAIL_SELECT_ATTEMPTS: string[] = [
-  "id, title, company, description, playwright, director, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, reservation_links, schedule_times, venue, venue_address, price_general, price_student, ticket_types, tags, image_url, flyer_url, ticket_url, cast",
-  "id, title, company, description, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, reservation_links, schedule_times, ticket_types, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
-  "id, title, company, description, category, categories, slug, publish_at, start_date, end_date, reservation_start_at, reservation_label, reservation_links, schedule_times, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
-  "id, title, company, description, category, slug, publish_at, start_date, end_date, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
-  "id, title, company, description, category, slug, start_date, end_date, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url, cast",
-  "id, title, company, description, category, slug, start_date, end_date, venue, venue_address, price_general, price_student, tags, image_url, flyer_url, ticket_url",
-];
-
 const getEvent = async (category: string, slug: string) => {
   const queryBySlug = async (
     client:
@@ -235,40 +226,30 @@ const getEvent = async (category: string, slug: string) => {
       | ReturnType<typeof createSupabaseServiceClient>,
     source: "anon" | "service"
   ) => {
-    const errors: string[] = [];
-    for (const fields of DETAIL_SELECT_ATTEMPTS) {
-      const result = await client
-        .from("events")
-        .select(fields)
-        .eq("slug", slug)
-        .eq("status", "published")
-        .returns<EventRecord[]>();
-      const matched = pickMatchedEvent(result.data, category);
-      if (matched) return matched;
+    const result = await client
+      .from("events")
+      .select("*")
+      .eq("slug", slug)
+      .eq("status", "published")
+      .returns<EventRecord[]>();
 
-      if (result.error) {
-        errors.push(result.error.message);
-        const missingColumns =
-          result.error.message.includes("column") ||
-          result.error.message.includes("does not exist");
-        if (!missingColumns) break;
-        continue;
-      }
-
-      if ((result.data?.length ?? 0) > 0) {
-        console.warn("[event-detail] rows found but filtered by release window", {
-          category,
-          slug,
-          source,
-        });
-      }
-    }
-    if (errors.length > 0) {
-      console.warn("[event-detail] query attempts failed", {
+    if (result.error) {
+      console.warn("[event-detail] query failed", {
         category,
         slug,
         source,
-        errors,
+        error: result.error.message,
+      });
+      return null;
+    }
+
+    const matched = pickMatchedEvent(result.data, category);
+    if (matched) return matched;
+    if ((result.data?.length ?? 0) > 0) {
+      console.warn("[event-detail] rows found but filtered by release window", {
+        category,
+        slug,
+        source,
       });
     }
     return null;
