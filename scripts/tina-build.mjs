@@ -39,6 +39,5 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-run("npx", ["tinacms", "build"]);
+run("npx", ["tinacms", "build", "--skip-cloud-checks"]);
 run("npx", ["next", "build"]);
-
