@@ -73,7 +73,6 @@ export default defineConfig({
             label: "日付",
             type: "datetime",
             required: true,
-            dateFormat: "YYYY-MM-DD",
           },
           { name: "author", label: "著者", type: "string" },
           { name: "category", label: "カテゴリ", type: "string" },
