@@ -94,7 +94,14 @@ markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
 
 const renderMarkdown = (value: string) => markdown.render(value);
 
-const normalizeText = (value: string) => value.replace(/\s+/g, " ").trim();
+const normalizeText = (value: string) =>
+  value
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+    .replace(/\*\*/g, "")
+    .replace(/__/g, "")
+    .replace(/`+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const INLINE_TEXT_CONTAINER_TYPES = new Set([
   "paragraph_open",
