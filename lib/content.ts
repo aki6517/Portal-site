@@ -7,8 +7,22 @@ type FrontMatter = {
   description?: string;
   date?: string;
   author?: string;
+  author_role?: string;
+  author_bio?: string;
+  author_achievements?: string;
+  author_qualifications?: string;
+  author_url?: string;
+  author_image?: string;
+  organization_name?: string;
+  organization_url?: string;
+  organization_logo?: string;
   category?: string;
   cover?: string;
+};
+
+export type FaqItem = {
+  question: string;
+  answer: string;
 };
 
 type ContentEntry = {
@@ -16,6 +30,7 @@ type ContentEntry = {
   frontMatter: FrontMatter;
   content: string;
   html: string;
+  faqItems: FaqItem[];
 };
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
@@ -79,6 +94,79 @@ markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
 
 const renderMarkdown = (value: string) => markdown.render(value);
 
+const normalizeText = (value: string) => value.replace(/\s+/g, " ").trim();
+
+const INLINE_TEXT_CONTAINER_TYPES = new Set([
+  "paragraph_open",
+  "list_item_open",
+  "blockquote_open",
+  "td_open",
+  "th_open",
+]);
+
+const extractFaqItems = (value: string): FaqItem[] => {
+  const tokens = markdown.parse(value, {});
+  const items: FaqItem[] = [];
+  let inFaqSection = false;
+  let question = "";
+  let answerParts: string[] = [];
+
+  const flush = () => {
+    const normalizedQuestion = normalizeText(question);
+    const normalizedAnswer = normalizeText(answerParts.join(" "));
+    if (normalizedQuestion && normalizedAnswer) {
+      items.push({ question: normalizedQuestion, answer: normalizedAnswer });
+    }
+    question = "";
+    answerParts = [];
+  };
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+
+    if (token.type === "heading_open") {
+      const level = Number(token.tag.replace("h", ""));
+      const next = tokens[i + 1];
+      const headingText =
+        next?.type === "inline" ? normalizeText(next.content) : "";
+
+      if (level <= 2) {
+        if (inFaqSection) {
+          flush();
+        }
+        inFaqSection = level === 2 && headingText.includes("よくある質問");
+        continue;
+      }
+
+      if (inFaqSection && level === 3) {
+        flush();
+        question = headingText;
+        continue;
+      }
+    }
+
+    if (!inFaqSection || !question || token.type !== "inline") {
+      continue;
+    }
+
+    const prevType = tokens[i - 1]?.type ?? "";
+    if (!INLINE_TEXT_CONTAINER_TYPES.has(prevType)) {
+      continue;
+    }
+
+    const text = normalizeText(token.content);
+    if (text) {
+      answerParts.push(text);
+    }
+  }
+
+  if (inFaqSection) {
+    flush();
+  }
+
+  return items;
+};
+
 const parseFrontMatter = (value: string) => {
   if (!value.startsWith("---")) {
     return { frontMatter: {}, content: value };
@@ -107,6 +195,7 @@ const readFile = (filepath: string) => {
     frontMatter: parsed.frontMatter as FrontMatter,
     content: parsed.content,
     html: renderMarkdown(parsed.content),
+    faqItems: extractFaqItems(parsed.content),
   };
 };
 
@@ -123,6 +212,7 @@ export const getAllBlogPosts = () => {
       frontMatter: data.frontMatter,
       content: data.content,
       html: data.html,
+      faqItems: data.faqItems,
     };
   });
 
@@ -142,6 +232,7 @@ export const getBlogPostBySlug = (slug: string) => {
     frontMatter: data.frontMatter,
     content: data.content,
     html: data.html,
+    faqItems: data.faqItems,
   };
 };
 
@@ -154,5 +245,6 @@ export const getPageContent = (slug: string) => {
     frontMatter: data.frontMatter,
     content: data.content,
     html: data.html,
+    faqItems: data.faqItems,
   };
 };
