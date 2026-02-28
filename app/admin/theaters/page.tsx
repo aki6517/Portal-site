@@ -21,18 +21,25 @@ const STATUS_LABELS: Record<string, string> = {
 
 const getStatusLabel = (status: string) => STATUS_LABELS[status] ?? status;
 
-const formatDate = (value: string) => {
+const formatDateSafe = (value?: string | null) => {
+  if (!value || value.trim().length === 0) return "未設定";
   const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "未設定";
   return new Intl.DateTimeFormat("ja-JP", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 };
 
+type SearchParamsInput =
+  | Promise<{ status?: string }>
+  | { status?: string }
+  | undefined;
+
 export default async function AdminTheatersPage({
   searchParams,
 }: {
-  searchParams?: { status?: string };
+  searchParams?: SearchParamsInput;
 }) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -61,7 +68,8 @@ export default async function AdminTheatersPage({
     );
   }
 
-  const filterStatus = searchParams?.status?.trim();
+  const resolvedSearchParams = await Promise.resolve(searchParams);
+  const filterStatus = resolvedSearchParams?.status?.trim();
   let query = supabase
     .from("theaters")
     .select("id, name, status, contact_email, website_url, updated_at, created_at")
@@ -72,7 +80,18 @@ export default async function AdminTheatersPage({
     query = query.eq("status", filterStatus);
   }
 
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) {
+    console.error("[admin/theaters] Failed to fetch theaters", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      filterStatus: filterStatus ?? null,
+      userId: user.id,
+    });
+  }
+
   const theaters = (data ?? []) as TheaterRow[];
 
   return (
@@ -121,6 +140,12 @@ export default async function AdminTheatersPage({
       </div>
 
       <div className="mt-4 space-y-4">
+        {error && (
+          <div className="rounded-xl border border-red-300 bg-red-50 p-6 text-sm text-red-800">
+            劇団データの読み込みに失敗しました。時間を置いて再度お試しください。
+          </div>
+        )}
+
         {theaters.length === 0 && (
           <div className="rounded-xl border border-zinc-200 p-6 text-sm text-zinc-600">
             対象の劇団はありません。
@@ -152,8 +177,8 @@ export default async function AdminTheatersPage({
               <TheaterStatusActions id={theater.id} status={theater.status} />
             </div>
             <div className="mt-3 text-[11px] text-zinc-500">
-              status: {getStatusLabel(theater.status)} / created: {formatDate(theater.created_at)} /
-              updated: {formatDate(theater.updated_at)} / id: {theater.id}
+              status: {getStatusLabel(theater.status)} / created: {formatDateSafe(theater.created_at)} /
+              updated: {formatDateSafe(theater.updated_at)} / id: {theater.id}
             </div>
           </div>
         ))}

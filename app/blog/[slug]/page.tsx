@@ -66,7 +66,7 @@ export default async function BlogDetailPage({
       </div>
 
       <article
-        className="prose prose-zinc mt-6 max-w-none rounded-2xl border-2 border-ink bg-surface p-6 shadow-hard md:p-8"
+        className="content-prose content-prose--blog mt-6 rounded-2xl border-2 border-ink bg-surface p-6 shadow-hard md:p-8"
         dangerouslySetInnerHTML={{ __html: post.html }}
       />
     </div>

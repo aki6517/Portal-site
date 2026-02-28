@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import MarkdownIt from "markdown-it";
 
 type FrontMatter = {
   title?: string;
@@ -21,95 +22,39 @@ const CONTENT_DIR = path.join(process.cwd(), "content");
 const BLOG_DIR = path.join(CONTENT_DIR, "blog");
 const PAGES_DIR = path.join(CONTENT_DIR, "pages");
 
-const escapeHtml = (value: string) =>
-  value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+const markdown = new MarkdownIt({
+  html: false,
+  linkify: true,
+  typographer: false,
+  breaks: false,
+});
 
-const sanitizeUrl = (value: string) => {
-  const trimmed = value.trim();
-  if (trimmed.startsWith("javascript:")) return "#";
-  return trimmed;
+const defaultValidateLink = markdown.validateLink.bind(markdown);
+markdown.validateLink = (url) => {
+  const normalized = url.trim().toLowerCase();
+  if (normalized.startsWith("javascript:")) return false;
+  if (normalized.startsWith("vbscript:")) return false;
+  if (normalized.startsWith("data:") && !normalized.startsWith("data:image/")) {
+    return false;
+  }
+  return defaultValidateLink(url);
 };
 
-const formatInline = (value: string) => {
-  const escaped = escapeHtml(value);
-  return escaped
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/\[(.+?)\]\((.+?)\)/g, (_, text, url) => {
-      const href = sanitizeUrl(url);
-      const isExternal = /^https?:\/\//.test(href);
-      const extra = isExternal
-        ? ' target="_blank" rel="noopener noreferrer"'
-        : "";
-      return `<a href="${href}"${extra}>${text}</a>`;
-    });
-};
-
-const renderMarkdown = (value: string) => {
-  const lines = value.split(/\r?\n/);
-  let html = "";
-  let inList = false;
-  let paragraph: string[] = [];
-
-  const flushParagraph = () => {
-    if (paragraph.length === 0) return;
-    html += `<p>${formatInline(paragraph.join(" "))}</p>`;
-    paragraph = [];
-  };
-
-  const closeList = () => {
-    if (inList) {
-      html += "</ul>";
-      inList = false;
-    }
-  };
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      flushParagraph();
-      closeList();
-      continue;
-    }
-
-    if (line.startsWith("- ")) {
-      flushParagraph();
-      if (!inList) {
-        html += "<ul>";
-        inList = true;
-      }
-      html += `<li>${formatInline(line.slice(2))}</li>`;
-      continue;
-    }
-
-    closeList();
-
-    if (line.startsWith("### ")) {
-      flushParagraph();
-      html += `<h3>${formatInline(line.slice(4))}</h3>`;
-      continue;
-    }
-    if (line.startsWith("## ")) {
-      flushParagraph();
-      html += `<h2>${formatInline(line.slice(3))}</h2>`;
-      continue;
-    }
-    if (line.startsWith("# ")) {
-      flushParagraph();
-      html += `<h1>${formatInline(line.slice(2))}</h1>`;
-      continue;
-    }
-
-    paragraph.push(line);
+const defaultLinkOpenRenderer = markdown.renderer.rules.link_open;
+markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+  const href = tokens[idx].attrGet("href") ?? "";
+  if (/^https?:\/\//i.test(href)) {
+    tokens[idx].attrSet("target", "_blank");
+    tokens[idx].attrSet("rel", "noopener noreferrer");
   }
 
-  flushParagraph();
-  closeList();
-  return html;
+  if (defaultLinkOpenRenderer) {
+    return defaultLinkOpenRenderer(tokens, idx, options, env, self);
+  }
+  return self.renderToken(tokens, idx, options);
 };
+
+const renderMarkdown = (value: string) => markdown.render(value);
 
 const parseFrontMatter = (value: string) => {
   if (!value.startsWith("---")) {
@@ -144,9 +89,7 @@ const readFile = (filepath: string) => {
 
 export const getAllBlogPosts = () => {
   if (!fs.existsSync(BLOG_DIR)) return [] as ContentEntry[];
-  const files = fs
-    .readdirSync(BLOG_DIR)
-    .filter((file) => file.endsWith(".md"));
+  const files = fs.readdirSync(BLOG_DIR).filter((file) => file.endsWith(".md"));
 
   const posts = files.map((file) => {
     const slug = file.replace(/\.md$/, "");
