@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getAllBlogPosts, getBlogPostBySlug } from "@/lib/content";
+import {
+  formatPublishedDate,
+  getAllBlogPosts,
+  getBlogPostBySlug,
+} from "@/lib/content";
 
 const SITE_NAME = "福岡アクトポータル";
 
@@ -53,7 +57,7 @@ export default async function BlogDetailPage({
 
       <div className="card-retro mt-4 p-6 md:p-8">
         <div className="badge-retro bg-pop-blue text-white shadow-hard-sm text-[11px]">
-          {post.frontMatter.date ?? "公開日未設定"}
+          {formatPublishedDate(post.frontMatter.date)}
         </div>
         <h1 className="mt-3 font-display text-3xl leading-tight tracking-tight md:text-4xl">
           {post.frontMatter.title ?? post.slug}

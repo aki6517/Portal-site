@@ -136,22 +136,23 @@
   }
 
   .content-prose :where(ul > li)::before {
-    content: "✓";
+    content: "✔";
     position: absolute;
     left: 0;
     top: 0.28rem;
     width: 1.35rem;
     height: 1.35rem;
-    border: 2px solid var(--pop-blue);
+    border: 2px solid var(--pop-pink);
     border-radius: 9999px;
-    color: var(--pop-blue);
-    font-size: 0.82rem;
+    color: var(--pop-pink);
+    font-size: 0.9rem;
     font-weight: 900;
     line-height: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     background: #fff;
+    -webkit-text-stroke: 0.3px currentColor;
   }
 
   .content-prose :where(ol > li)::marker {

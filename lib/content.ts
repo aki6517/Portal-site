@@ -22,6 +22,29 @@ const CONTENT_DIR = path.join(process.cwd(), "content");
 const BLOG_DIR = path.join(CONTENT_DIR, "blog");
 const PAGES_DIR = path.join(CONTENT_DIR, "pages");
 
+const toReadableDate = (year: string, month: string, day: string) =>
+  `${year}/${month}.${day}`;
+
+export const formatPublishedDate = (value?: string | null) => {
+  if (!value) return "公開日未設定";
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return "公開日未設定";
+
+  const ymdMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymdMatch) {
+    return toReadableDate(ymdMatch[1], ymdMatch[2], ymdMatch[3]);
+  }
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return trimmed;
+
+  return toReadableDate(
+    String(parsed.getFullYear()),
+    String(parsed.getMonth() + 1).padStart(2, "0"),
+    String(parsed.getDate()).padStart(2, "0")
+  );
+};
+
 const markdown = new MarkdownIt({
   html: false,
   linkify: true,

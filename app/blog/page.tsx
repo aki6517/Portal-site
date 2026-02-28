@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getAllBlogPosts } from "@/lib/content";
+import { formatPublishedDate, getAllBlogPosts } from "@/lib/content";
 
 const SITE_NAME = "福岡アクトポータル";
 
@@ -39,7 +39,7 @@ export default function BlogPage() {
             className="card-retro block p-5 transition-transform hover:-translate-y-0.5"
           >
             <div className="badge-retro bg-surface shadow-hard-sm text-[11px]">
-              {post.frontMatter.date ?? "公開日未設定"}
+              {formatPublishedDate(post.frontMatter.date)}
             </div>
             <h2 className="mt-3 font-display text-xl leading-tight">
               {post.frontMatter.title ?? post.slug}
