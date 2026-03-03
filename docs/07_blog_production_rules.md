@@ -22,7 +22,8 @@
 
 - `date` は ISO 8601 形式で入力する（例: `2026-02-28T05:01:59.341Z`）
 - 画面表示の日付フォーマットは固定で `YYYY/MM.DD`（例: `2026/02.28`）
-- `author` / `author_role` / `author_profile` / `author_image` / `organization_name` / `organization_url` は可能な限り入力する
+- `author` / `author_role` / `author_profile` / `author_image` / `category` は必須入力とする
+- `organization_name` / `organization_url` は入力を推奨する
 - `author_profile` は `|` 区切りで複数入力する
 
 ---

@@ -39,6 +39,7 @@ const DEFAULT_AUTHOR_PROFILE = [
   "福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）制作広報",
   "自分の劇団作品が大好きでもっと知ってほしいと思い日々奮闘中",
 ];
+const DEFAULT_AUTHOR_IMAGE_PATH = "/authors/nishiyama-akihiro.jpg";
 
 const formatBlogDate = (value?: string) => {
   if (!value) return "公開日未設定";
@@ -120,7 +121,7 @@ export default async function BlogDetailPage({
   );
   const authorUrl = post.frontMatter.author_url?.trim() || undefined;
   const authorImage = toPublicFileAbsoluteUrl(
-    post.frontMatter.author_image,
+    post.frontMatter.author_image?.trim() || DEFAULT_AUTHOR_IMAGE_PATH,
     siteUrl,
   );
 

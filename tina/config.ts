@@ -55,7 +55,12 @@ export default defineConfig({
         format: "md",
         defaultItem: () => ({
           date: new Date().toISOString(),
-          author: "編集部",
+          author: "西山明宏",
+          author_role: "福岡アクトポータル編集運営",
+          author_profile:
+            "福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）制作広報|自分の劇団作品が大好きでもっと知ってほしいと思い日々奮闘中",
+          author_image: "/authors/nishiyama-akihiro.jpg",
+          category: "舞台",
         }),
         ui: {
           filename: {
@@ -74,12 +79,13 @@ export default defineConfig({
             type: "datetime",
             required: true,
           },
-          { name: "author", label: "著者", type: "string" },
+          { name: "author", label: "著者", type: "string", required: true },
           {
             name: "author_role",
             label: "著者肩書き",
             type: "string",
             description: "例: 福岡アクトポータル 編集担当",
+            required: true,
           },
           {
             name: "author_bio",
@@ -87,16 +93,23 @@ export default defineConfig({
             type: "string",
           },
           {
-            name: "author_achievements",
-            label: "著者実績",
+            name: "author_profile",
+            label: "プロフィール項目",
             type: "string",
-            description: "複数ある場合は | で区切る（例: 実績A | 実績B）",
+            description: "必須。2〜3項目を | 区切りで入力（例: 項目A | 項目B）",
+            required: true,
+          },
+          {
+            name: "author_achievements",
+            label: "著者実績（旧互換）",
+            type: "string",
+            description: "旧記事互換用。新規記事では author_profile を使用してください。",
           },
           {
             name: "author_qualifications",
-            label: "著者資格",
+            label: "著者資格（旧互換）",
             type: "string",
-            description: "複数ある場合は | で区切る（例: 資格A | 資格B）",
+            description: "旧記事互換用。新規記事では author_profile を使用してください。",
           },
           {
             name: "author_url",
@@ -107,6 +120,8 @@ export default defineConfig({
             name: "author_image",
             label: "著者画像URL",
             type: "string",
+            description: "必須。例: /authors/nishiyama-akihiro.jpg",
+            required: true,
           },
           {
             name: "organization_name",
@@ -123,7 +138,7 @@ export default defineConfig({
             label: "運営組織ロゴURL",
             type: "string",
           },
-          { name: "category", label: "カテゴリ", type: "string" },
+          { name: "category", label: "カテゴリ", type: "string", required: true },
           { name: "body", label: "本文", type: "rich-text", isBody: true },
         ],
       },

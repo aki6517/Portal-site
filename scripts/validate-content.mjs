@@ -3,10 +3,19 @@ import path from "node:path";
 import MarkdownIt from "markdown-it";
 
 const BLOG_DIR = path.join(process.cwd(), "content", "blog");
+const PUBLIC_DIR = path.join(process.cwd(), "public");
 const GALAPA_PHRASE =
   "福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）";
 const GALAPA_URL = "https://www.galapagos-dynamos.com/";
-const REQUIRED_FRONTMATTER_KEYS = ["title", "date"];
+const REQUIRED_FRONTMATTER_KEYS = [
+  "title",
+  "date",
+  "author",
+  "author_role",
+  "author_profile",
+  "author_image",
+  "category",
+];
 
 const markdown = new MarkdownIt({
   html: false,
@@ -276,6 +285,65 @@ const collectGalapaLinkErrors = (body, bodyLines, bodyStartLine) => {
   ];
 };
 
+const collectAuthorProfileErrors = (frontMatter, frontMatterLineMap) => {
+  const value = frontMatter.author_profile;
+  if (typeof value !== "string") return [];
+
+  const items = value
+    .split("|")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (items.length >= 2) return [];
+
+  return [
+    {
+      line: frontMatterLineMap.get("author_profile") ?? 1,
+      message:
+        "frontmatter 'author_profile' は2項目以上を | 区切りで入力してください。",
+    },
+  ];
+};
+
+const collectAuthorImageErrors = (frontMatter, frontMatterLineMap) => {
+  const value = frontMatter.author_image;
+  if (typeof value !== "string" || value.trim().length === 0) return [];
+
+  const trimmed = value.trim();
+
+  if (/^https?:\/\//i.test(trimmed)) return [];
+
+  if (!trimmed.startsWith("/")) {
+    return [
+      {
+        line: frontMatterLineMap.get("author_image") ?? 1,
+        message:
+          "frontmatter 'author_image' は '/authors/...' 形式の絶対パスで指定してください。",
+      },
+    ];
+  }
+
+  if (!trimmed.startsWith("/authors/")) {
+    return [
+      {
+        line: frontMatterLineMap.get("author_image") ?? 1,
+        message:
+          "frontmatter 'author_image' は '/authors/' 配下の画像を指定してください。",
+      },
+    ];
+  }
+
+  const filepath = path.join(PUBLIC_DIR, trimmed.slice(1));
+  if (fs.existsSync(filepath)) return [];
+
+  return [
+    {
+      line: frontMatterLineMap.get("author_image") ?? 1,
+      message: `frontmatter 'author_image' の画像が存在しません: ${trimmed}`,
+    },
+  ];
+};
+
 const collectFileErrors = (filepath) => {
   const raw = fs.readFileSync(filepath, "utf-8");
   const { frontMatter, frontMatterLineMap, bodyLines, bodyStartLine } = splitFrontMatter(raw);
@@ -295,6 +363,8 @@ const collectFileErrors = (filepath) => {
   errors.push(...collectTableErrors(bodyLines, bodyStartLine));
   errors.push(...collectNakedUrlErrors(bodyLines, bodyStartLine));
   errors.push(...collectGalapaLinkErrors(body, bodyLines, bodyStartLine));
+  errors.push(...collectAuthorProfileErrors(frontMatter, frontMatterLineMap));
+  errors.push(...collectAuthorImageErrors(frontMatter, frontMatterLineMap));
 
   return errors;
 };

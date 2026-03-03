@@ -2,6 +2,9 @@
 title: 舞台を初めて見に行く人へ｜準備・服装・マナーをわかりやすく解説
 date: 2026-03-03T14:04:54.165Z
 author: 西山明宏
+author_role: 福岡アクトポータル編集運営
+author_profile: 福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）制作広報|自分の劇団作品が大好きでもっと知ってほしいと思い日々奮闘中
+author_image: /authors/nishiyama-akihiro.jpg
 category: 舞台
 ---
 
