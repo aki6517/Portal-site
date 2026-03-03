@@ -138,7 +138,7 @@
 
 - Production配信ブランチは **`main` 固定**
 - 作業フォルダは **`fukuoka-stage---night's-coffee` のみ使用**
-- `portal-main-clean` は編集用途で使わない（参照専用）
+- `portal-main-clean` は廃止済み（再作成しない）
 - デプロイ前に必ず `npm run deploy:check` を実行する
 
 `deploy:check` は次を自動検証する:
