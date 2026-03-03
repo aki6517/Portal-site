@@ -251,6 +251,16 @@ const extractFaqItems = (value: string) => {
   return items;
 };
 
+export const formatPublishedDate = (value?: string) => {
+  if (!value) return "公開日未設定";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}/${month}.${day}`;
+};
+
 const parseFrontMatter = (value: string) => {
   const matched = /^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n?([\s\S]*)$/.exec(
     value,
