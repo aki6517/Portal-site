@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "tinacms dev -c \"next dev\"",
+    "deploy:check": "node scripts/predeploy-check.mjs && npm run content:check",
+    "content:check": "node scripts/validate-content.mjs",
+    "publish:verify": "node scripts/verify-publish.mjs",
     "build": "node scripts/tina-build.mjs",
     "start": "next start",
     "lint": "eslint",

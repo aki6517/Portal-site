@@ -80,13 +80,12 @@
     line-height: 1.95;
   }
 
-  .content-prose :where(strong) {
-    font-weight: 800;
-    color: var(--ink);
-  }
-
   .content-prose :where(h2) {
-    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-family:
+      var(--font-sans),
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
     font-size: clamp(1.4rem, 2.3vw, 2rem);
     font-weight: 700;
     line-height: 1.25;
@@ -104,6 +103,11 @@
   }
 
   .content-prose :where(h3) {
+    font-family:
+      var(--font-sans),
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
     font-size: clamp(1.1rem, 1.55vw, 1.35rem);
     font-weight: 700;
     line-height: 1.45;
@@ -114,18 +118,10 @@
     border-radius: 0;
   }
 
-  .content-prose :where(ul) {
+  .content-prose :where(ul, ol) {
     margin-top: 1.15rem;
     margin-bottom: 1.15rem;
-    padding-left: 0;
-    line-height: 1.9;
-    list-style: none;
-  }
-
-  .content-prose :where(ol) {
-    margin-top: 1.15rem;
-    margin-bottom: 1.15rem;
-    padding-left: 1.5rem;
+    padding-left: 1.3rem;
     line-height: 1.9;
   }
 
@@ -134,30 +130,25 @@
     margin-bottom: 0.4rem;
   }
 
-  .content-prose :where(ul > li) {
+  .content-prose :where(ul) {
     list-style: none;
+    padding-left: 0;
+  }
+
+  .content-prose :where(ul > li) {
     position: relative;
-    padding-left: 2rem;
+    padding-left: 1.8rem;
   }
 
   .content-prose :where(ul > li)::before {
-    content: "✔";
+    content: "✓";
     position: absolute;
     left: 0;
-    top: 0.28rem;
-    width: 1.35rem;
-    height: 1.35rem;
-    border: 2px solid var(--pop-pink);
-    border-radius: 9999px;
+    top: 0.06em;
     color: var(--pop-pink);
-    font-size: 0.9rem;
+    font-size: 1.12em;
     font-weight: 900;
     line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: #fff;
-    -webkit-text-stroke: 0.3px currentColor;
   }
 
   .content-prose :where(ol > li)::marker {
@@ -211,16 +202,21 @@
     opacity: 0.9;
   }
 
-  .content-prose :where(table) {
-    display: block;
-    width: 100%;
+  .content-prose :where(.content-table-wrap) {
     margin-top: 1.5rem;
     margin-bottom: 1.5rem;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     border: 2px solid var(--ink);
     border-radius: 0.75rem;
     background: var(--surface);
     box-shadow: var(--shadow-hard-sm);
+  }
+
+  .content-prose :where(.content-table-wrap > table) {
+    width: 100%;
+    min-width: 680px;
+    margin: 0;
     border-collapse: separate;
     border-spacing: 0;
   }
@@ -234,7 +230,8 @@
     padding: 0.65rem 0.8rem;
     font-size: 0.95rem;
     line-height: 1.7;
-    white-space: nowrap;
+    vertical-align: top;
+    white-space: normal;
   }
 
   .content-prose :where(th) {

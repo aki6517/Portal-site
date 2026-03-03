@@ -1,81 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import {
-  formatPublishedDate,
-  getAllBlogPosts,
-  getBlogPostBySlug,
-} from "@/lib/content";
+import fs from "node:fs";
+import path from "node:path";
+import { getAllBlogPosts, getBlogPostBySlug } from "@/lib/content";
 import { buildMetadata, getSiteUrl } from "@/lib/seo";
-
-const DEFAULT_ORGANIZATION = {
-  name: "万能グローブガラパゴスダイナモス",
-  url: "https://www.galapagos-dynamos.com/",
-  logo: "/icon.png?v=20260210a",
-};
-
-const DEFAULT_AUTHOR = {
-  role: "福岡アクトポータル 編集担当",
-  bio: "福岡の演劇文化を広げるため、劇団・観客の双方に役立つ舞台情報を編集・発信しています。",
-  achievements: [
-    "福岡の劇団「万能グローブガラパゴスダイナモス」運営メディアの編集を担当",
-    "演劇初心者にも伝わる解説記事を中心に継続発信",
-  ],
-  qualifications: [
-    "演劇公演情報サイトの運営実務",
-    "舞台・演劇領域の編集/コンテンツ制作",
-  ],
-};
-
-const splitProfileList = (value?: string) =>
-  value
-    ?.split(/\r?\n|[|｜]/)
-    .map((item) => item.trim())
-    .filter(Boolean) ?? [];
-
-const toAbsoluteUrl = (value: string | undefined, siteUrl: string) => {
-  if (!value) return undefined;
-  if (/^https?:\/\//i.test(value)) return value;
-  return `${siteUrl}${value.startsWith("/") ? value : `/${value}`}`;
-};
-
-const buildAuthorProfile = (
-  frontMatter: NonNullable<ReturnType<typeof getBlogPostBySlug>>["frontMatter"],
-  siteUrl: string
-) => {
-  const achievements =
-    splitProfileList(frontMatter.author_achievements) ||
-    DEFAULT_AUTHOR.achievements;
-  const qualifications =
-    splitProfileList(frontMatter.author_qualifications) ||
-    DEFAULT_AUTHOR.qualifications;
-
-  return {
-    name: frontMatter.author?.trim() || "福岡アクトポータル編集部",
-    role: frontMatter.author_role?.trim() || DEFAULT_AUTHOR.role,
-    bio: frontMatter.author_bio?.trim() || DEFAULT_AUTHOR.bio,
-    url: frontMatter.author_url?.trim() || undefined,
-    image: toAbsoluteUrl(frontMatter.author_image?.trim(), siteUrl),
-    achievements:
-      achievements.length > 0 ? achievements : DEFAULT_AUTHOR.achievements,
-    qualifications:
-      qualifications.length > 0 ? qualifications : DEFAULT_AUTHOR.qualifications,
-    organization: {
-      name:
-        frontMatter.organization_name?.trim() || DEFAULT_ORGANIZATION.name,
-      url: frontMatter.organization_url?.trim() || DEFAULT_ORGANIZATION.url,
-      logo: toAbsoluteUrl(
-        frontMatter.organization_logo?.trim() || DEFAULT_ORGANIZATION.logo,
-        siteUrl
-      ),
-    },
-  };
-};
-
-const toIsoDate = (value?: string) => {
-  if (!value) return undefined;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
-};
 
 const decodeRouteParam = (value: string) => {
   try {
@@ -83,6 +11,43 @@ const decodeRouteParam = (value: string) => {
   } catch {
     return value;
   }
+};
+
+const toAbsoluteUrl = (value: string | undefined, siteUrl: string) => {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${siteUrl}${value.startsWith("/") ? value : `/${value}`}`;
+};
+
+const toPublicFileAbsoluteUrl = (value: string | undefined, siteUrl: string) => {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+
+  const normalized = value.startsWith("/") ? value : `/${value}`;
+  const publicPath = path.join(process.cwd(), "public", normalized.slice(1));
+  if (!fs.existsSync(publicPath)) return null;
+  return `${siteUrl}${normalized}`;
+};
+
+const parsePipeList = (value: string | undefined) =>
+  (value ?? "")
+    .split("|")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const DEFAULT_AUTHOR_PROFILE = [
+  "福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）制作広報",
+  "自分の劇団作品が大好きでもっと知ってほしいと思い日々奮闘中",
+];
+
+const formatBlogDate = (value?: string) => {
+  if (!value) return "公開日未設定";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}/${month}.${day}`;
 };
 
 export function generateStaticParams() {
@@ -97,13 +62,21 @@ export async function generateMetadata({
   const resolvedParams = await Promise.resolve(params);
   const post = getBlogPostBySlug(decodeRouteParam(resolvedParams.slug));
   if (!post) {
-    return buildMetadata({ title: "ブログ", path: "/blog" });
+    return buildMetadata({
+      title: "ブログ",
+      path: "/blog",
+    });
   }
-  return buildMetadata({
-    title: post.frontMatter.title ?? "ブログ",
-    description: post.frontMatter.description ?? undefined,
-    path: `/blog/${encodeURIComponent(post.slug)}`,
-  });
+
+  const path = `/blog/${encodeURIComponent(post.slug)}`;
+  return {
+    ...buildMetadata({
+      title: post.frontMatter.title ?? "ブログ",
+      description: post.frontMatter.description ?? undefined,
+      path,
+      image: post.frontMatter.cover ?? null,
+    }),
+  };
 }
 
 export default async function BlogDetailPage({
@@ -116,10 +89,52 @@ export default async function BlogDetailPage({
   if (!post) {
     notFound();
   }
+
   const siteUrl = getSiteUrl();
-  const pageUrl = `${siteUrl}/blog/${encodeURIComponent(post.slug)}`;
-  const publishedDate = toIsoDate(post.frontMatter.date);
-  const author = buildAuthorProfile(post.frontMatter, siteUrl);
+  const canonicalUrl = `${siteUrl}/blog/${encodeURIComponent(post.slug)}`;
+  const publishedDate = post.frontMatter.date ?? undefined;
+  const formattedDate = formatBlogDate(post.frontMatter.date);
+
+  const authorName = post.frontMatter.author?.trim() || "福岡アクトポータル編集部";
+  const authorRole =
+    post.frontMatter.author_role?.trim() || "演劇・舞台コンテンツ編集";
+  const authorBio = post.frontMatter.author_bio?.trim();
+  const authorProfile = parsePipeList(post.frontMatter.author_profile);
+  const legacyProfileItems = [
+    ...parsePipeList(post.frontMatter.author_achievements),
+    ...parsePipeList(post.frontMatter.author_qualifications),
+  ];
+  const authorProfileItems =
+    authorProfile.length > 0
+      ? authorProfile
+      : legacyProfileItems.length > 0
+        ? legacyProfileItems
+        : DEFAULT_AUTHOR_PROFILE;
+  const authorSummary =
+    authorBio ||
+    authorProfileItems.join(" / ") ||
+    "福岡の演劇・舞台情報を中心に、初めて観劇する方にも伝わる記事制作と監修を行っています。";
+  const authorInitial = authorName.trim().charAt(0) || "編";
+  const authorKnowsAbout = Array.from(
+    new Set(authorProfileItems.filter((item) => item.length > 0)),
+  );
+  const authorUrl = post.frontMatter.author_url?.trim() || undefined;
+  const authorImage = toPublicFileAbsoluteUrl(
+    post.frontMatter.author_image,
+    siteUrl,
+  );
+
+  const organizationName =
+    post.frontMatter.organization_name?.trim() || "万能グローブガラパゴスダイナモス";
+  const organizationUrl =
+    post.frontMatter.organization_url?.trim() ||
+    "https://www.galapagos-dynamos.com/";
+  const organizationLogo = toAbsoluteUrl(
+    post.frontMatter.organization_logo || "/icon.png?v=20260210a",
+    siteUrl,
+  );
+
+  const coverImage = toAbsoluteUrl(post.frontMatter.cover, siteUrl);
 
   const blogPostingJsonLd = {
     "@context": "https://schema.org",
@@ -130,27 +145,46 @@ export default async function BlogDetailPage({
     dateModified: publishedDate,
     mainEntityOfPage: {
       "@type": "WebPage",
-      "@id": pageUrl,
+      "@id": canonicalUrl,
     },
-    articleSection: post.frontMatter.category ?? undefined,
     author: {
       "@type": "Person",
-      name: author.name,
-      url: author.url,
-      image: author.image,
-      description: `${author.role}。${author.bio}`,
+      name: authorName,
+      ...(authorRole ? { jobTitle: authorRole } : {}),
+      ...(authorSummary ? { description: authorSummary } : {}),
+      ...(authorUrl ? { url: authorUrl } : {}),
+      ...(authorImage ? { image: authorImage } : {}),
+      ...(authorKnowsAbout.length > 0 ? { knowsAbout: authorKnowsAbout } : {}),
     },
     publisher: {
       "@type": "Organization",
-      name: author.organization.name,
-      url: author.organization.url,
-      logo: author.organization.logo
+      name: organizationName,
+      url: organizationUrl,
+      ...(organizationLogo
         ? {
-            "@type": "ImageObject",
-            url: author.organization.logo,
+            logo: {
+              "@type": "ImageObject",
+              url: organizationLogo,
+            },
           }
-        : undefined,
+        : {}),
     },
+    ...(coverImage ? { image: [coverImage] } : {}),
+  };
+
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: organizationName,
+    url: organizationUrl,
+    ...(organizationLogo
+      ? {
+          logo: {
+            "@type": "ImageObject",
+            url: organizationLogo,
+          },
+        }
+      : {}),
   };
 
   const faqJsonLd =
@@ -168,13 +202,6 @@ export default async function BlogDetailPage({
           })),
         }
       : null;
-  const organizationJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: author.organization.name,
-    url: author.organization.url,
-    logo: author.organization.logo,
-  };
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -182,16 +209,18 @@ export default async function BlogDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostingJsonLd) }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(organizationJsonLd),
+        }}
+      />
       {faqJsonLd && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
         />
       )}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
-      />
 
       <Link href="/blog" className="badge-retro bg-surface shadow-hard-sm">
         ← ブログ一覧に戻る
@@ -199,7 +228,7 @@ export default async function BlogDetailPage({
 
       <div className="card-retro mt-4 p-6 md:p-8">
         <div className="badge-retro bg-pop-blue text-white shadow-hard-sm text-[11px]">
-          {formatPublishedDate(post.frontMatter.date)}
+          {formattedDate}
         </div>
         <h1 className="mt-3 font-display text-3xl leading-tight tracking-tight md:text-4xl">
           {post.frontMatter.title ?? post.slug}
@@ -211,40 +240,76 @@ export default async function BlogDetailPage({
         )}
       </div>
 
-      <section className="card-retro mt-4 p-6 md:p-7">
-        <div className="badge-retro bg-pop-yellow text-[11px]">執筆者情報</div>
-        <h2 className="mt-3 text-xl font-black text-ink">{author.name}</h2>
-        <p className="mt-1 text-sm font-semibold text-zinc-700">{author.role}</p>
-        <p className="mt-3 text-sm leading-relaxed text-zinc-800">{author.bio}</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border-2 border-ink bg-white p-4">
-            <p className="text-xs font-black text-zinc-600">実績</p>
-            <ul className="mt-2 list-disc pl-5 text-sm leading-relaxed text-zinc-800">
-              {author.achievements.map((item) => (
-                <li key={`achievement-${item}`}>{item}</li>
-              ))}
-            </ul>
+      <section className="card-retro mt-6 p-6 md:p-8">
+        <div className="rounded-2xl border-2 border-pop-blue bg-surface p-5 shadow-hard-sm md:p-6">
+          <div className="flex items-center gap-2 text-pop-blue">
+            <span className="text-lg leading-none">✎</span>
+            <p className="text-sm font-black tracking-[0.06em]">この記事の著者</p>
+            <span className="h-[2px] flex-1 bg-pop-blue/40" />
           </div>
-          <div className="rounded-xl border-2 border-ink bg-white p-4">
-            <p className="text-xs font-black text-zinc-600">資格</p>
-            <ul className="mt-2 list-disc pl-5 text-sm leading-relaxed text-zinc-800">
-              {author.qualifications.map((item) => (
-                <li key={`qualification-${item}`}>{item}</li>
-              ))}
-            </ul>
+
+          <div className="mt-4">
+            <div className="flex items-center gap-4">
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-pop-blue bg-pop-blue/10 sm:h-24 sm:w-24">
+                {authorImage ? (
+                  <img
+                    src={authorImage}
+                    alt={`${authorName}のプロフィール画像`}
+                    className="h-full w-full object-cover object-[center_14%]"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center font-display text-3xl text-pop-blue">
+                    {authorInitial}
+                  </div>
+                )}
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-xs text-zinc-500">{authorRole}</p>
+                <h2 className="mt-1 text-2xl font-bold tracking-tight text-ink">
+                  {authorName}
+                </h2>
+                {authorUrl && (
+                  <a
+                    href={authorUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center rounded-md bg-pop-blue px-3 py-1.5 text-xs font-black text-white shadow-hard-sm transition-opacity hover:opacity-90"
+                  >
+                    詳しいプロフィール
+                  </a>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <h3 className="border-b border-zinc-300 pb-1 text-lg font-black text-ink">
+                プロフィール
+              </h3>
+              <ul className="mt-3 space-y-2 text-sm leading-7 text-zinc-700">
+                {authorProfileItems.map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="mt-[2px] text-pop-pink">✓</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
+
+          <p className="mt-4 text-xs text-zinc-600">
+            運営組織:
+            {" "}
+            <a
+              href={organizationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold text-pop-blue underline underline-offset-2"
+            >
+              {organizationName}
+            </a>
+          </p>
         </div>
-        <p className="mt-4 text-xs text-zinc-600">
-          運営:{" "}
-          <a
-            href={author.organization.url}
-            className="font-semibold text-pop-blue underline decoration-2 underline-offset-2"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {author.organization.name}
-          </a>
-        </p>
       </section>
 
       <article
