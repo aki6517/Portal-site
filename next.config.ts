@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   async headers() {
-    const securityHeaders = [
+    const baseSecurityHeaders = [
       {
         key: "X-Content-Type-Options",
         value: "nosniff",
@@ -16,10 +16,6 @@ const nextConfig: NextConfig = {
         value: "SAMEORIGIN",
       },
       {
-        key: "Cross-Origin-Opener-Policy",
-        value: "same-origin",
-      },
-      {
         key: "Cross-Origin-Resource-Policy",
         value: "same-site",
       },
@@ -29,15 +25,39 @@ const nextConfig: NextConfig = {
       },
     ];
 
+    const pageSecurityHeaders = [
+      ...baseSecurityHeaders,
+      {
+        key: "Cross-Origin-Opener-Policy",
+        value: "same-origin",
+      },
+    ];
+
+    const adminSecurityHeaders = [
+      ...baseSecurityHeaders,
+      {
+        key: "Cross-Origin-Opener-Policy",
+        value: "same-origin-allow-popups",
+      },
+    ];
+
     return [
       {
-        source: "/((?!api).*)",
-        headers: securityHeaders,
+        source: "/admin",
+        headers: adminSecurityHeaders,
+      },
+      {
+        source: "/admin/:path*",
+        headers: adminSecurityHeaders,
+      },
+      {
+        source: "/((?!api|admin).*)",
+        headers: pageSecurityHeaders,
       },
       {
         source: "/api/:path*",
         headers: [
-          ...securityHeaders,
+          ...pageSecurityHeaders,
           {
             key: "X-Robots-Tag",
             value: "noindex, nofollow, noarchive",
