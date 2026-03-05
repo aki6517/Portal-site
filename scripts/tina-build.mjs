@@ -20,6 +20,24 @@ const run = (cmd, args) => {
   if (result.status !== 0) process.exit(result.status ?? 1);
 };
 
+const syncTinaLock = () => {
+  const generatedDir = "tina/__generated__";
+  const schemaPath = `${generatedDir}/_schema.json`;
+  const lookupPath = `${generatedDir}/_lookup.json`;
+  const graphqlPath = `${generatedDir}/_graphql.json`;
+  const lockPath = "tina/tina-lock.json";
+
+  if (![schemaPath, lookupPath, graphqlPath].every((p) => fs.existsSync(p))) {
+    return;
+  }
+
+  const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+  const lookup = JSON.parse(fs.readFileSync(lookupPath, "utf8"));
+  const graphql = JSON.parse(fs.readFileSync(graphqlPath, "utf8"));
+
+  fs.writeFileSync(lockPath, JSON.stringify({ schema, lookup, graphql }));
+};
+
 await tryLoadDotenv();
 
 const missing = [];
@@ -41,4 +59,5 @@ if (missing.length > 0) {
 
 run("node", ["scripts/validate-content-markdown.mjs"]);
 run("npx", ["tinacms", "build", "--skip-cloud-checks"]);
+syncTinaLock();
 run("npx", ["next", "build"]);
