@@ -50,6 +50,10 @@ type ParsedScript = {
   content: string;
 };
 
+type ParsedMeta = {
+  attrs: Record<string, string>;
+};
+
 const EMPTY_SITE_TAGS: SiteTags = {
   head_tag: null,
   body_start_tag: null,
@@ -92,6 +96,27 @@ const parseHeadScripts = (snippet?: string | null) => {
     });
   }
   return scripts;
+};
+
+const parseHeadMeta = (snippet?: string | null) => {
+  if (!snippet) return [] as ParsedMeta[];
+  const metas: ParsedMeta[] = [];
+  const metaRegex = /<meta\b([^>]*)\/?>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = metaRegex.exec(snippet)) !== null) {
+    const attrs: Record<string, string> = {};
+    const attrRegex = /([\w-]+)\s*=\s*"([^"]*)"/g;
+    let attrMatch: RegExpExecArray | null;
+    while ((attrMatch = attrRegex.exec(match[1] ?? "")) !== null) {
+      if (attrMatch[1] && attrMatch[2] !== undefined) {
+        attrs[attrMatch[1]] = attrMatch[2];
+      }
+    }
+    if (Object.keys(attrs).length > 0) {
+      metas.push({ attrs });
+    }
+  }
+  return metas;
 };
 
 const buildScriptProps = (attrs: Record<string, string | true>) => {
@@ -155,6 +180,7 @@ export default async function RootLayout({
 }>) {
   const siteTags = await getSiteTags();
   const headScripts = parseHeadScripts(siteTags.head_tag);
+  const headMetas = parseHeadMeta(siteTags.head_tag);
 
   return (
     <html
@@ -162,6 +188,9 @@ export default async function RootLayout({
       className={`${zenSans.variable} ${delaDisplay.variable} ${geistMono.variable} ${rounded.variable}`}
     >
       <head>
+        {headMetas.map((meta, index) => (
+          <meta key={`site-head-meta-${index}`} {...meta.attrs} />
+        ))}
         {headScripts.map((script, index) => {
           const props = buildScriptProps(script.attrs);
           const key = `${props.id ?? "site-head-script"}-${index}`;

@@ -285,6 +285,29 @@ const collectGalapaLinkErrors = (body, bodyLines, bodyStartLine) => {
   ];
 };
 
+const collectBoldQuoteErrors = (bodyLines, bodyStartLine) => {
+  const errors = [];
+  let inCodeFence = false;
+
+  bodyLines.forEach((line, index) => {
+    if (isCodeFenceBoundary(line)) {
+      inCodeFence = !inCodeFence;
+      return;
+    }
+    if (inCodeFence) return;
+
+    if (/\*\*「/.test(line) || /」\*\*/.test(line)) {
+      errors.push({
+        line: bodyStartLine + index,
+        message:
+          "「」と太字（**）の併用を検出しました。「」だけで十分な強調になるので**を外してください。",
+      });
+    }
+  });
+
+  return errors;
+};
+
 const collectAuthorProfileErrors = (frontMatter, frontMatterLineMap) => {
   const value = frontMatter.author_profile;
   if (typeof value !== "string") return [];
@@ -359,6 +382,7 @@ const collectFileErrors = (filepath) => {
     });
   }
 
+  errors.push(...collectBoldQuoteErrors(bodyLines, bodyStartLine));
   errors.push(...collectBrokenLinkErrors(bodyLines, bodyStartLine));
   errors.push(...collectTableErrors(bodyLines, bodyStartLine));
   errors.push(...collectNakedUrlErrors(bodyLines, bodyStartLine));
