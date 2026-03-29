@@ -185,11 +185,9 @@ organization_logo: /icon.png?v=20260210a
 演劇って難しそう・ハードル高そうという先入観を崩す最高の入口になります。
 ぜひ選択肢に入れてみてくださいね！
 
-「甘い手」を生で見たい人は6月に上演する特設ページをチェックしてみてください。
-[甘い手 -peace- 特設ページ](https://www.galapagos-dynamos.com/amaite-peace)
+「甘い手」を生で見たい人は6月に上演する[特設ページ](https://www.galapagos-dynamos.com/amaite-peace)をチェックしてみてください。
 
-映像で見てみたい人は「観劇三昧」から見れます。
-[観劇三昧で「甘い手」を見る](https://kan-geki.com/search?keyword=%E7%94%98%E3%81%84%E6%89%8B)
+映像で見てみたい人は[観劇三昧](https://kan-geki.com/search?keyword=%E7%94%98%E3%81%84%E6%89%8B)から見れます。
 
 ## 初めての観劇ガイド｜準備・服装・マナーの基本
 
