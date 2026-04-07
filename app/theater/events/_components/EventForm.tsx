@@ -403,19 +403,29 @@ const loadImage = (file: File) =>
   });
 
 const sanitizeImage = async (file: File) => {
-  const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
-  const ext = outputType === "image/png" ? "png" : "jpg";
+  const MAX_DIMENSION = 2000;
+  const outputType = "image/jpeg";
+  const ext = "jpg";
   const img = await loadImage(file);
   const canvas = document.createElement("canvas");
-  canvas.width = img.naturalWidth || img.width;
-  canvas.height = img.naturalHeight || img.height;
+  let w = img.naturalWidth || img.width;
+  let h = img.naturalHeight || img.height;
+  if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
+    const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
+    w = Math.round(w * ratio);
+    h = Math.round(h * ratio);
+  }
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     return { blob: file, ext };
   }
-  ctx.drawImage(img, 0, 0);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
   const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, outputType, outputType === "image/jpeg" ? 0.92 : 1)
+    canvas.toBlob(resolve, outputType, 0.85)
   );
   if (!blob) {
     return { blob: file, ext };
