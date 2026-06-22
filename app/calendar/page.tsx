@@ -24,14 +24,6 @@ type CalendarEventRecord = {
   end_date?: string | null;
   venue?: string | null;
   company?: string | null;
-  publish_at?: string | null;
-};
-
-const isReleased = (publishAt?: string | null) => {
-  if (!publishAt) return true;
-  const date = new Date(publishAt);
-  if (Number.isNaN(date.getTime())) return true;
-  return date.getTime() <= Date.now();
 };
 
 const formatDate = (value?: string | null) => {
@@ -54,15 +46,12 @@ const getUpcomingEvents = async (): Promise<CalendarEventRecord[]> => {
     const { data } = await supabase
       .from("events")
       .select(
-        "id, title, category, slug, start_date, end_date, venue, company, publish_at"
+        "id, title, category, slug, start_date, end_date, venue, company"
       )
       .eq("status", "published")
       .order("start_date", { ascending: true });
-    const rows = ((data ?? []) as CalendarEventRecord[]).filter((event) =>
-      isReleased(event.publish_at)
-    );
     const threshold = Date.now() - 24 * 60 * 60 * 1000;
-    const upcoming = rows.filter((event) => {
+    const upcoming = ((data ?? []) as CalendarEventRecord[]).filter((event) => {
       const end = new Date(event.end_date ?? event.start_date);
       return !Number.isNaN(end.getTime()) && end.getTime() >= threshold;
     });
