@@ -3,6 +3,9 @@ import CalendarClient from "./CalendarClient";
 import { buildMetadata, getSiteUrl } from "@/lib/seo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+// 公開中の公演（DB）を常に最新で反映するため動的レンダリング
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata() {
   return buildMetadata({
     title: "福岡の演劇公演スケジュール｜カレンダーで上演日を確認",
