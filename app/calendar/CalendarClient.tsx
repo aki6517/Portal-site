@@ -17,6 +17,23 @@ type CalendarEvent = {
   url?: string;
 };
 
+// 日本時間の YYYY-MM-DD を返す
+const jstYmd = (s: string) =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(s));
+
+// 終日イベントの end は排他的なので最終日＋1日にする
+const addOneDay = (ymd: string) => {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10);
+};
+
 export default function CalendarClient() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -71,10 +88,18 @@ export default function CalendarClient() {
           return;
         }
         const eventInputs: EventInput[] = (json?.data?.events ?? []).map(
-          (item) => ({
-            ...item,
-            end: item.end ?? undefined,
-          })
+          (item) => {
+            const startYmd = jstYmd(item.start);
+            const endYmd = item.end ? jstYmd(item.end) : startYmd;
+            return {
+              id: item.id,
+              title: item.title,
+              url: item.url,
+              allDay: true,
+              start: startYmd,
+              end: addOneDay(endYmd),
+            };
+          }
         );
         success(eventInputs);
       } catch (err) {
