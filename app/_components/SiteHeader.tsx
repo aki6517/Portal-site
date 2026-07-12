@@ -6,8 +6,9 @@ import { useEffect, useState } from "react";
 
 const navItems = [
   { label: "公演を探す", href: "/events" },
+  { label: "公演カレンダー", href: "/calendar" },
   { label: "劇団の方へ", href: "/register" },
-  { label: "特集記事", href: "/blog" },
+  { label: "演劇ブログ", href: "/blog" },
 ];
 
 export default function SiteHeader() {
@@ -64,6 +65,7 @@ export default function SiteHeader() {
           className="shrink-0 rounded-lg border-2 border-ink bg-white p-2 text-ink shadow-hard-sm active:translate-y-1 active:shadow-none md:hidden"
           onClick={() => setMobileMenuOpen((prev) => !prev)}
           aria-label="Menu"
+          aria-expanded={mobileMenuOpen}
         >
           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>

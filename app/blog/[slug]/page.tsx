@@ -245,10 +245,10 @@ export default async function BlogDetailPage({
       </Link>
 
       <div className="card-retro mt-4 p-6 md:p-8">
-        <div className="badge-retro bg-pop-blue text-white shadow-hard-sm text-[11px]">
+        <div className="badge-retro bg-pop-blue text-white shadow-hard-sm text-sm">
           {formattedDate}
         </div>
-        <h1 className="mt-3 font-display text-3xl leading-tight tracking-tight md:text-4xl">
+        <h1 className="heading-ja mt-3 text-3xl leading-tight md:text-4xl">
           {post.frontMatter.title ?? post.slug}
         </h1>
         {post.frontMatter.description && (
@@ -278,14 +278,14 @@ export default async function BlogDetailPage({
                     className="h-full w-full object-cover object-[center_14%]"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center font-display text-3xl text-pop-blue">
+                  <div className="heading-ja flex h-full w-full items-center justify-center text-3xl text-pop-blue">
                     {authorInitial}
                   </div>
                 )}
               </div>
 
               <div className="min-w-0">
-                <p className="text-xs text-zinc-500">{authorRole}</p>
+                <p className="text-xs text-ink-muted">{authorRole}</p>
                 <h2 className="mt-1 text-2xl font-bold tracking-tight text-ink">
                   {authorName}
                 </h2>

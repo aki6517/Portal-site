@@ -72,7 +72,7 @@ export default async function EventsPage({
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="font-display text-3xl tracking-tight">公演一覧</h1>
+          <h1 className="heading-ja text-3xl">公演一覧</h1>
           <p className="mt-2 text-sm text-zinc-700">
             開催日順／人気順（直近30日PV）で並べ替えできます。
           </p>
@@ -82,6 +82,7 @@ export default async function EventsPage({
             name="q"
             defaultValue={q}
             placeholder="キーワード（公演名・会場）"
+            aria-label="公演を検索"
             className="input-retro"
           />
           <input type="hidden" name="sort" value={sort} />

@@ -113,7 +113,7 @@ export default async function Home() {
           <div className="absolute right-0 top-0 h-40 w-40 -translate-y-1/2 translate-x-1/2 rounded-full bg-pop-yellow blur-3xl opacity-20 md:h-64 md:w-64" />
           <div className="relative z-10 grid gap-8 md:gap-12 lg:grid-cols-2 lg:items-center">
             <div>
-              <div className="mb-3 inline-block rounded-full border-2 border-ink bg-pop-pink px-3 py-1 text-[10px] font-black text-white shadow-hard-sm md:text-xs">
+              <div className="mb-3 inline-block rounded-full border-2 border-ink bg-pop-pink px-3 py-1 text-xs font-black text-ink shadow-hard-sm">
                 NEW RELEASE
               </div>
               <h1 className="font-display text-4xl leading-none text-ink md:text-5xl lg:text-6xl">
@@ -125,7 +125,7 @@ export default async function Home() {
                 <br />
                 PORTAL.
               </h1>
-              <p className="mt-4 text-sm font-bold leading-relaxed text-ink/70 md:text-base">
+              <p className="mt-4 text-sm font-bold leading-relaxed text-ink-muted md:text-base">
                 福岡の演劇シーンを、もっとポップに。
                 <br className="hidden md:inline" />
                 今週末、あなたの心揺さぶる1ステージを見つけよう。
@@ -140,7 +140,8 @@ export default async function Home() {
                   type="text"
                   name="q"
                   placeholder="キーワード検索..."
-                  className="w-full bg-transparent px-3 py-2 text-sm font-bold text-ink outline-none placeholder:text-ink/30 sm:w-56"
+                  aria-label="公演を検索"
+                  className="w-full bg-transparent px-3 py-2 text-sm font-bold text-ink outline-none placeholder:text-ink/55 sm:w-56"
                 />
                 <button
                   type="submit"
@@ -181,10 +182,10 @@ export default async function Home() {
                   }
                 />
                 <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4 pt-12 text-white">
-                  <span className="inline-block rounded border-2 border-ink bg-pop-yellow px-2 py-0.5 text-[10px] font-black text-ink shadow-hard-sm">
+                  <span className="inline-block rounded border-2 border-ink bg-pop-yellow px-2 py-0.5 text-xs font-black text-ink shadow-hard-sm">
                     PICK UP
                   </span>
-                  <h3 className="mt-2 font-display text-xl md:text-2xl">
+                  <h3 className="heading-ja mt-2 text-xl md:text-2xl">
                     {featured?.title ?? "最新の公演を準備中"}
                   </h3>
                   <p className="text-xs font-bold opacity-80 md:text-sm">
@@ -203,7 +204,7 @@ export default async function Home() {
         <div className="card-retro p-6 md:p-8">
           <div className="flex items-center justify-center gap-2 text-center">
             <Sparkles size={20} className="text-pop-yellow" />
-            <h2 className="font-display text-xl md:text-2xl">
+            <h2 className="heading-ja text-xl md:text-2xl">
               今、どんな気分？
             </h2>
           </div>
@@ -221,8 +222,8 @@ export default async function Home() {
                   >
                     <Icon size={22} className={card.iconTone} />
                   </div>
-                  <h3 className="mt-4 font-display text-lg">{card.title}</h3>
-                  <p className="mt-1 text-xs font-bold text-ink/60">
+                  <h3 className="heading-ja mt-4 text-lg">{card.title}</h3>
+                  <p className="mt-1 text-xs font-bold text-ink-muted">
                     {card.tags}
                   </p>
                 </Link>
@@ -314,18 +315,18 @@ export default async function Home() {
                         </div>
                       }
                     />
-                    <div className="absolute right-2 top-2 rounded border border-ink bg-pop-yellow px-2 py-1 text-[10px] font-bold text-ink shadow-hard-sm">
+                    <div className="absolute right-2 top-2 rounded border border-ink bg-pop-yellow px-2 py-1 text-xs font-bold text-ink shadow-hard-sm">
                       {categoryLabel}
                     </div>
                   </div>
-                  <h3 className="font-display text-xl leading-tight transition-colors group-hover:text-pop-pink">
+                  <h3 className="heading-ja text-xl leading-tight transition-colors group-hover:text-pop-pink">
                     {event.title}
                   </h3>
-                  <p className="mb-3 text-xs font-bold text-ink/60">
+                  <p className="mb-3 text-xs font-bold text-ink-muted">
                     {categoryLabel}
                   </p>
                   <div className="flex items-center justify-between border-t-2 border-dashed border-zinc-200 pt-3">
-                    <div className="flex items-center gap-1 text-xs font-bold text-ink/70">
+                    <div className="flex items-center gap-1 text-xs font-bold text-ink-muted">
                       <Calendar size={12} /> {formatDate(event.start_date)}
                     </div>
                     {reservationBadge && (
@@ -335,7 +336,7 @@ export default async function Home() {
                     )}
                   </div>
                   {event.reservation_label && (
-                    <div className="mt-2 text-[11px] font-semibold text-ink/60">
+                    <div className="mt-2 text-xs font-semibold text-ink-muted">
                       予約: {event.reservation_label}
                     </div>
                   )}
@@ -349,8 +350,8 @@ export default async function Home() {
       <section className="mt-12 rounded-2xl border-2 border-ink bg-white p-8 shadow-hard-lg">
         <div className="grid gap-6 md:grid-cols-[1.2fr_1fr] md:items-center">
           <div>
-            <h2 className="font-display text-2xl">劇団の方へ</h2>
-            <p className="mt-2 text-sm text-ink/70">
+            <h2 className="heading-ja text-2xl">劇団の方へ</h2>
+            <p className="mt-2 text-sm text-ink-muted">
               ログイン後、劇団情報を登録すると公演の作成・編集ができます。
             </p>
             <div className="mt-4 flex flex-wrap gap-3 text-sm">

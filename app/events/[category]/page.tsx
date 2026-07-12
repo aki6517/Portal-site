@@ -109,7 +109,7 @@ export default async function EventsByCategoryPage({
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="font-display text-3xl tracking-tight">
+          <h1 className="heading-ja text-3xl">
             {categoryIcon} {categoryName} の公演
           </h1>
           <p className="mt-2 text-sm text-zinc-700">
@@ -161,7 +161,7 @@ export default async function EventsByCategoryPage({
             key={item.id}
             href={`/events/${encodeURIComponent(item.id)}`}
             className={`badge-retro shadow-hard-sm ${
-              item.id === categoryId ? "bg-primary" : "bg-surface"
+              item.id === categoryId ? "bg-primary text-white" : "bg-surface"
             }`}
           >
             <span aria-hidden>{item.icon ?? "🎭"}</span>

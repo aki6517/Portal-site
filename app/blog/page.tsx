@@ -18,7 +18,7 @@ export default function BlogPage() {
         <span className="badge-retro bg-pop-yellow shadow-hard-sm">
           BLOG
         </span>
-        <h1 className="mt-3 font-display text-3xl tracking-tight md:text-4xl">
+        <h1 className="heading-ja mt-3 text-3xl md:text-4xl">
           演劇ブログ
         </h1>
         <p className="mt-2 text-sm text-zinc-700">
@@ -38,10 +38,10 @@ export default function BlogPage() {
             href={`/blog/${post.slug}`}
             className="card-retro block p-5 transition-transform hover:-translate-y-0.5"
           >
-            <div className="badge-retro bg-surface shadow-hard-sm text-[11px]">
+            <div className="badge-retro bg-surface shadow-hard-sm text-xs">
               {formatPublishedDate(post.frontMatter.date)}
             </div>
-            <h2 className="mt-3 font-display text-xl leading-tight">
+            <h2 className="heading-ja mt-3 text-xl leading-tight">
               {post.frontMatter.title ?? post.slug}
             </h2>
             <p className="mt-2 text-sm text-zinc-700">

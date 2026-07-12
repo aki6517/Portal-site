@@ -149,7 +149,7 @@ export default async function CalendarPage({
         <span className="badge-retro bg-pop-green shadow-hard-sm text-xs">
           CALENDAR
         </span>
-        <h1 className="mt-3 font-display text-3xl tracking-tight md:text-4xl">
+        <h1 className="heading-ja mt-3 text-3xl md:text-4xl">
           福岡の演劇公演スケジュール
         </h1>
         <p className="mt-2 text-sm text-zinc-700">
@@ -229,7 +229,7 @@ export default async function CalendarPage({
 
       {visibleUpcomingEvents.length > 0 && (
         <section className="mt-10">
-          <h2 className="font-display text-2xl tracking-tight">
+          <h2 className="heading-ja text-2xl">
             近日開催の福岡の演劇公演スケジュール
           </h2>
           <p className="mt-2 text-sm text-zinc-700">

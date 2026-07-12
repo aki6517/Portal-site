@@ -5,6 +5,7 @@
   /* Brand (from stitch/prototype) */
   --paper: #f6f6f8;
   --ink: #111318;
+  --ink-muted: #464b57;
   --primary: #206cee;
   --accent: #ff4785;
   --secondary: #ffd600;
@@ -30,6 +31,7 @@
   --color-background: var(--paper);
   --color-foreground: var(--ink);
   --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
   --color-paper: var(--paper);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
@@ -274,6 +276,11 @@
       system-ui,
       sans-serif;
   }
+  .heading-ja {
+    font-family: var(--font-sans);
+    font-weight: 900;
+    letter-spacing: 0;
+  }
 
   .text-anywhere {
     overflow-wrap: anywhere;
@@ -474,7 +481,7 @@
     border-color: var(--ink);
     border-radius: 9999px;
     padding: 0.2rem 0.6rem;
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-weight: 800;
     font-family:
       var(--font-rounded),

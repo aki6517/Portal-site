@@ -347,7 +347,7 @@ export default async function EventDetailPage({
             </Link>
           </li>
           <li>
-            <span className="px-1 text-zinc-500">→</span>
+            <span className="px-1 text-ink-muted">→</span>
           </li>
           <li>
             <Link href="/events" className="badge-retro bg-surface">
@@ -355,7 +355,7 @@ export default async function EventDetailPage({
             </Link>
           </li>
           <li>
-            <span className="px-1 text-zinc-500">→</span>
+            <span className="px-1 text-ink-muted">→</span>
           </li>
           <li>
             <Link
@@ -367,9 +367,9 @@ export default async function EventDetailPage({
             </Link>
           </li>
           <li>
-            <span className="px-1 text-zinc-500">→</span>
+            <span className="px-1 text-ink-muted">→</span>
           </li>
-          <li className="max-w-full rounded-full border-2 border-ink bg-primary px-3 py-1 text-[11px] font-black leading-tight break-words">
+          <li className="max-w-full rounded-full border-2 border-ink bg-primary px-3 py-1 text-xs font-black leading-tight text-white break-words">
             {event.title}
           </li>
         </ol>
@@ -390,12 +390,12 @@ export default async function EventDetailPage({
                     {CATEGORY_COPY[item]?.label ?? item}
                   </span>
                 ))}
-            <span className="badge-retro bg-surface-muted max-w-full whitespace-normal break-all text-[11px]">
+            <span className="badge-retro bg-surface-muted max-w-full whitespace-normal break-all text-xs">
               <span className="font-mono">/{event.category}/{event.slug}</span>
             </span>
           </div>
 
-          <h1 className="mt-4 font-display text-2xl font-normal leading-tight tracking-tight text-ink sm:text-3xl md:text-4xl">
+          <h1 className="heading-ja mt-4 text-2xl leading-tight text-ink sm:text-3xl md:text-4xl">
             {event.title}
           </h1>
           <p className="mt-2 text-base font-semibold text-zinc-800">
@@ -419,7 +419,7 @@ export default async function EventDetailPage({
                           {hasMultipleSchedules ? exactStart : main}
                         </span>
                         {note && (
-                          <span className="text-[11px] text-zinc-600">{note}</span>
+                          <span className="text-xs text-zinc-600">{note}</span>
                         )}
                       </div>
                     );
@@ -545,7 +545,7 @@ export default async function EventDetailPage({
 
       {event.description && (
         <div className="card-retro mt-10 p-6">
-          <h2 className="font-display text-xl font-black">あらすじ</h2>
+          <h2 className="heading-ja text-xl">あらすじ</h2>
           <p className="mt-3 whitespace-pre-wrap break-words text-base leading-relaxed text-zinc-800">
             {event.description}
           </p>
@@ -553,7 +553,7 @@ export default async function EventDetailPage({
       )}
 
       <div className="card-retro mt-8 p-6">
-        <h2 className="font-display text-xl font-black">脚本・演出</h2>
+        <h2 className="heading-ja text-xl">脚本・演出</h2>
         <div className="mt-3 grid gap-2 text-base leading-relaxed">
           {!playwright && !director && (
             <div className="text-zinc-600">脚本・演出情報は準備中です。</div>
@@ -581,7 +581,7 @@ export default async function EventDetailPage({
 
       {event.cast && event.cast.length > 0 && (
         <div className="card-retro mt-8 p-6">
-          <h2 className="font-display text-xl font-black">キャスト</h2>
+          <h2 className="heading-ja text-xl">キャスト</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {event.cast.map((member, index) => (
               <div
@@ -600,7 +600,7 @@ export default async function EventDetailPage({
 
       {related.length > 0 && (
         <div className="mt-10">
-          <h2 className="font-display text-xl font-black">関連の公演</h2>
+          <h2 className="heading-ja text-xl">関連の公演</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             {related.map((item) => {
               const thumbCandidates = getEventImageCandidates(item);
@@ -637,7 +637,7 @@ export default async function EventDetailPage({
       )}
 
       <div className="card-retro mt-10 bg-secondary p-6">
-        <h2 className="font-display text-xl font-black">
+        <h2 className="heading-ja text-xl">
           公演を掲載したい劇団の方へ
         </h2>
         <p className="mt-2 text-base text-zinc-800">
