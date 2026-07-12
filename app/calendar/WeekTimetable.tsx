@@ -150,7 +150,7 @@ export default function WeekTimetable({
 
         {areas.map((area) => (
           <div key={`mobile-area-${area.label}`}>
-            <div className="border-b-2 border-ink bg-surface-muted px-3 py-1.5 text-xs font-black tracking-wide text-ink">
+            <div className="border-b-2 border-ink bg-ink px-3 py-1.5 text-xs font-black tracking-wide text-white">
               {area.label}
             </div>
             {area.venues.map((venue) => (
@@ -223,7 +223,7 @@ export default function WeekTimetable({
               return (
                 <div
                   key={`area-${item.row}`}
-                  className="border-b-2 border-ink bg-surface-muted px-3 py-1.5 text-xs font-black tracking-wide text-ink"
+                  className="border-b-2 border-ink bg-ink px-3 py-1.5 text-xs font-black tracking-wide text-white"
                   style={{ gridColumn: "1 / -1", gridRow: item.row }}
                 >
                   {item.label}
