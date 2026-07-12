@@ -1,4 +1,12 @@
 import ContactForm from "./ContactForm";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "お問い合わせ",
+  description:
+    "福岡アクトポータルへのお問い合わせはこちらから。通常2-3営業日以内に返信します。",
+  path: "/contact",
+});
 
 export default function ContactPage() {
   const siteKey = process.env.RECAPTCHA_SITE_KEY ?? "";

@@ -73,6 +73,7 @@ type FormState = {
   analyze_page_url: string;
   ai_confidence: string;
   status: "draft" | "published" | "archived";
+  superseded_by: string;
 };
 
 type TextFieldKey = {
@@ -106,6 +107,7 @@ type EventData = {
   image_url?: string | null;
   ai_confidence?: number | null;
   status?: "draft" | "published" | "archived" | null;
+  superseded_by?: string | null;
 };
 
 const emptyCastMember = (): CastMember => ({
@@ -385,6 +387,7 @@ const buildInitialState = (data?: EventData | null): FormState => ({
       ? String(data.ai_confidence)
       : "",
   status: data?.status ?? "draft",
+  superseded_by: data?.superseded_by ?? "",
 });
 
 const loadImage = (file: File) =>
@@ -490,6 +493,9 @@ export default function EventForm({
     { platform: string; text: string; hashtags: string[] }[]
   >([]);
   const [createStep, setCreateStep] = useState(0);
+  const [supersedeCandidates, setSupersedeCandidates] = useState<
+    { id: string; title: string; start_date?: string | null }[]
+  >([]);
 
   useEffect(() => {
     setForm(buildInitialState(initialData));
@@ -498,6 +504,26 @@ export default function EventForm({
 
   useEffect(() => {
     if (mode === "create") setCreateStep(0);
+  }, [mode]);
+
+  // 「後継公演（再演時のみ）」selectの選択肢。編集モードでのみ、自劇団の
+  // 公演一覧を軽くfetchする（/api/theater/events は既存の一覧取得APIを再利用）。
+  useEffect(() => {
+    if (mode !== "edit") return;
+    let active = true;
+    fetch("/api/theater/events")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!active) return;
+        const events = json?.data?.events;
+        if (Array.isArray(events)) setSupersedeCandidates(events);
+      })
+      .catch(() => {
+        // 候補取得の失敗はフォーム全体をブロックしない（「設定しない」のみ選べる状態にする）
+      });
+    return () => {
+      active = false;
+    };
   }, [mode]);
 
   const flyerPreview = useMemo(() => form.flyer_url, [form.flyer_url]);
@@ -941,6 +967,7 @@ export default function EventForm({
       image_url: form.image_url || null,
       ai_confidence: form.ai_confidence ? Number(form.ai_confidence) : null,
       cast,
+      superseded_by: form.superseded_by || null,
     };
 
     const res = await fetch(
@@ -1634,6 +1661,34 @@ export default function EventForm({
                 </option>
               ))}
             </select>
+
+            {mode === "edit" && (
+              <>
+                <label className="text-xs font-black tracking-wide text-zinc-700">
+                  後継公演（再演時のみ）
+                </label>
+                <select
+                  className="input-retro"
+                  value={form.superseded_by}
+                  onChange={(e) => updateField("superseded_by", e.target.value)}
+                >
+                  <option value="">設定しない</option>
+                  {supersedeCandidates
+                    .filter((candidate) => candidate.id !== eventId)
+                    .map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.title}
+                        {candidate.start_date
+                          ? `（${candidate.start_date.slice(0, 10)}〜）`
+                          : ""}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-zinc-600">
+                  再演でこの公演を後継公演に置き換える場合に選択してください。公開ページのcanonicalとお知らせバナーが後継公演を案内するようになります。
+                </p>
+              </>
+            )}
           </>
         )}
       </div>

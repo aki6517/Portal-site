@@ -47,7 +47,7 @@ export default function BlogPage() {
             <p className="mt-2 text-sm text-zinc-700">
               {post.frontMatter.description ?? "続きを読む"}
             </p>
-            <div className="mt-4 text-xs font-black text-pop-pink">
+            <div className="mt-4 text-xs font-black text-ink underline decoration-2 decoration-pop-pink underline-offset-4">
               記事を読む →
             </div>
           </Link>

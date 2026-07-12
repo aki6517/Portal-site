@@ -122,6 +122,13 @@ export default async function EventsPage({
             <span>{category.name}</span>
           </Link>
         ))}
+        <Link
+          href="/events/archive"
+          className="badge-retro bg-surface-muted shadow-hard-sm"
+        >
+          <span aria-hidden>🗂️</span>
+          <span>過去公演アーカイブ</span>
+        </Link>
       </div>
 
       <div className="mt-8 grid gap-4">

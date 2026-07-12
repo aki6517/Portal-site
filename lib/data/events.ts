@@ -2,7 +2,7 @@ import { unstable_cache } from "next/cache";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { buildIlikeFilter } from "@/lib/search";
-import { isEnded } from "@/lib/events/lifecycle";
+import { getEffectiveEnd, isEnded, shouldNoindex } from "@/lib/events/lifecycle";
 
 // トップ・一覧・詳細ページのデータ取得を集約するレイヤー。
 // 公開ページからは cookie依存のクライアント（createSupabaseServerClient）を使わず、
@@ -46,6 +46,7 @@ export type EventDetail = EventSummary & {
   ticket_types?: { label?: string | null; price?: number | null; note?: string | null }[] | null;
   tags: string[] | null;
   cast?: { name?: string; role?: string; image_url?: string }[] | null;
+  superseded_by?: string | null;
 };
 
 export type RelatedEventSummary = {
@@ -373,3 +374,70 @@ export const getRelatedEvents = (category: string, excludeId: string) =>
     ["related-events", category, excludeId],
     { tags: ["events"], revalidate: 600 }
   )();
+
+// ---------------------------------------------------------------------------
+// sitemap.xml向け（Phase 4）
+// 公開＋公開日到来＋shouldNoindexでない公演の一覧。終演+7日以内（noindexの
+// 猶予期間中）の公演もsitemapには含めたいため、getUpcomingEventsのようなDB側
+// end_dateカットオフは使わずpublished全件を取得し、JS側でshouldNoindexだけを
+// 判定する（このサイトの公演数規模では全件取得で十分安全）。
+// ---------------------------------------------------------------------------
+
+const SITEMAP_SELECT_FIELDS =
+  "id, category, slug, start_date, end_date, schedule_times, publish_at, updated_at";
+
+export type SitemapEventRow = {
+  id: string;
+  category: string;
+  slug: string;
+  start_date: string;
+  end_date?: string | null;
+  schedule_times?: ScheduleTimeRow[] | null;
+  publish_at?: string | null;
+  updated_at?: string | null;
+};
+
+const fetchSitemapEvents = async (): Promise<SitemapEventRow[]> => {
+  const client = createSupabasePublicClient();
+  const { data } = await client
+    .from("events")
+    .select(SITEMAP_SELECT_FIELDS)
+    .eq("status", "published")
+    .limit(1000)
+    .returns<SitemapEventRow[]>();
+  const rows = data ?? [];
+  return rows.filter((event) => isReleased(event.publish_at) && !shouldNoindex(event));
+};
+
+export const getSitemapEvents = () =>
+  unstable_cache(fetchSitemapEvents, ["sitemap-events"], {
+    tags: ["events"],
+    revalidate: 3600,
+  })();
+
+// ---------------------------------------------------------------------------
+// 過去公演アーカイブ（/events/archive、Phase 4）
+// 終演済み（isEnded）の公開公演を終演日時の新しい順で返す。ページネーションは
+// 呼び出し側（app/events/archive/page.tsx）でsliceする。
+// ---------------------------------------------------------------------------
+
+const fetchArchivedEvents = async (): Promise<EventSummary[]> => {
+  const client = createSupabasePublicClient();
+  const { data } = await client
+    .from("events")
+    .select(UPCOMING_SELECT_FIELDS)
+    .eq("status", "published")
+    .order("start_date", { ascending: false })
+    .limit(1000);
+  const rows = (data ?? []) as EventSummary[];
+  const now = new Date();
+  return rows
+    .filter((event) => isReleased(event.publish_at) && isEnded(event, now))
+    .sort((a, b) => (getEffectiveEnd(b) ?? 0) - (getEffectiveEnd(a) ?? 0));
+};
+
+export const getArchivedEvents = () =>
+  unstable_cache(fetchArchivedEvents, ["archived-events"], {
+    tags: ["events"],
+    revalidate: 600,
+  })();

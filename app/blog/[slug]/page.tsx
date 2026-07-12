@@ -90,6 +90,7 @@ export async function generateMetadata({
       description: post.frontMatter.description ?? undefined,
       path,
       image: post.frontMatter.cover ?? null,
+      ogType: "article",
     }),
   };
 }

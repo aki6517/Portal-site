@@ -8,6 +8,7 @@ import Link from "next/link";
 import "./globals.css";
 import SiteHeader from "./_components/SiteHeader";
 import { getSiteTags } from "@/lib/data/siteTags";
+import { SITE_NAME, getSiteUrl } from "@/lib/seo";
 
 const zenSans = Zen_Kaku_Gothic_New({
   variable: "--font-zen-sans",
@@ -31,6 +32,33 @@ const rounded = M_PLUS_Rounded_1c({
 });
 
 const ICON_PATH = "/icon.png?v=20260210a";
+const siteUrl = getSiteUrl();
+
+// JSON-LD の </script> 突破を防ぐため < をエスケープ（app/calendar/page.tsxと同じパターン）
+const toJsonLd = (data: unknown) => JSON.stringify(data).replace(/</g, "\\u003c");
+
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: SITE_NAME,
+  url: siteUrl,
+  potentialAction: {
+    "@type": "SearchAction",
+    target: {
+      "@type": "EntryPoint",
+      urlTemplate: `${siteUrl}/events?q={search_term_string}`,
+    },
+    "query-input": "required name=search_term_string",
+  },
+};
+
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: SITE_NAME,
+  url: siteUrl,
+  logo: `${siteUrl}/icon.png`,
+};
 
 type ParsedScript = {
   attrs: Record<string, string | true>;
@@ -118,6 +146,7 @@ const buildScriptProps = (attrs: Record<string, string | true>) => {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "福岡アクトポータル - 福岡演劇公演ポータル",
   description:
     "福岡の演劇公演情報を一元管理。今の気分で公演を探せるポータルサイト。",
@@ -162,6 +191,14 @@ export default async function RootLayout({
         })}
       </head>
       <body className={`${zenSans.className} antialiased`}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: toJsonLd(websiteJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: toJsonLd(organizationJsonLd) }}
+        />
         {siteTags.body_start_tag && (
           <div
             data-site-tag-slot="body-start"

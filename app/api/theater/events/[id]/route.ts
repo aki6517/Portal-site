@@ -35,7 +35,11 @@ type EventUpdatePayload = {
   cast?: unknown[] | null;
   ai_confidence?: number | null;
   status?: "draft" | "published" | "archived";
+  superseded_by?: string | null;
 };
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const normalizeTags = (tags?: string[] | string | null) => {
   if (!tags) return undefined;
@@ -260,6 +264,56 @@ export async function PATCH(
     );
   }
 
+  // superseded_by（再演時の後継公演指定）: UUID形式・自分自身でないこと・
+  // 同じ劇団（theater_id）の公演であることをserviceクライアントで検証する。
+  // undefinedのまま＝ペイロードに無ければ更新しない（他フィールドと同じ規約）。
+  let supersededByUpdate: string | null | undefined;
+  if ("superseded_by" in payload) {
+    const raw = payload.superseded_by;
+    if (raw === null || raw === "") {
+      supersededByUpdate = null;
+    } else if (typeof raw !== "string" || !UUID_PATTERN.test(raw)) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "superseded_by must be a valid UUID",
+          },
+        },
+        { status: 400 }
+      );
+    } else if (raw === id) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "superseded_by cannot reference itself",
+          },
+        },
+        { status: 400 }
+      );
+    } else {
+      const { data: supersededTarget } = await service
+        .from("events")
+        .select("id")
+        .eq("id", raw)
+        .eq("theater_id", resolved.activeTheaterId)
+        .maybeSingle();
+      if (!supersededTarget) {
+        return NextResponse.json(
+          {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "superseded_by must reference an event owned by the same theater",
+            },
+          },
+          { status: 400 }
+        );
+      }
+      supersededByUpdate = raw;
+    }
+  }
+
   const update: Record<string, unknown> = {};
   const incomingCategory = payload.category?.trim();
   const hasCategories = "categories" in payload;
@@ -333,6 +387,7 @@ export async function PATCH(
   if ("cast" in payload) update["cast"] = payload.cast ?? [];
   if ("ai_confidence" in payload)
     update.ai_confidence = payload.ai_confidence ?? null;
+  if (supersededByUpdate !== undefined) update.superseded_by = supersededByUpdate;
   if (payload.status) update.status = payload.status;
 
   let { data: updated, error: updateError } = await service

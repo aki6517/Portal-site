@@ -4,11 +4,13 @@ import ImageWithFallback from "@/app/_components/ImageWithFallback";
 import { buildEventImageCandidates } from "@/lib/events/image";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import {
+  getEventById,
   getEventBySlug,
   getRelatedEvents,
   isReleased,
   type EventDetail,
 } from "@/lib/data/events";
+import { isEnded, shouldNoindex } from "@/lib/events/lifecycle";
 import ViewCounter from "./ViewCounter";
 import { buildMetadata, getSiteUrl } from "@/lib/seo";
 
@@ -156,6 +158,76 @@ const getEventImageCandidates = (event: {
   flyer_url?: string | null;
 }) => buildEventImageCandidates(event.image_url, event.flyer_url);
 
+// superseded_by（再演時に手動指定される後継公演）が公開中ならその詳細を返す。
+// 未設定・後継が非公開/削除済みの場合はnull（= 元のページをそのまま案内する）。
+const resolveSupersededTarget = async (event: EventRecord) => {
+  const supersededId = event.superseded_by;
+  if (!supersededId) return null;
+  return getEventById(supersededId);
+};
+
+// JSON-LDのoffers。ticket_types（券種ごとの価格）があれば各券種をOfferに、
+// 無ければprice_general/price_studentから生成する。価格情報が一切無い場合と
+// 終演後（ended）はoffers自体を省略する。
+const buildOffers = (event: EventRecord, ended: boolean) => {
+  if (ended) return undefined;
+
+  const buildOffer = (name: string, price: number) => ({
+    "@type": "Offer",
+    name,
+    price,
+    priceCurrency: "JPY",
+    url: event.ticket_url || undefined,
+    availability: "https://schema.org/InStock",
+  });
+
+  const pricedTicketTypes = (Array.isArray(event.ticket_types) ? event.ticket_types : []).filter(
+    (item): item is { label?: string | null; price: number; note?: string | null } =>
+      Boolean(item) && typeof item?.price === "number"
+  );
+  if (pricedTicketTypes.length > 0) {
+    return pricedTicketTypes.map((item) =>
+      buildOffer(item.label?.trim() || "チケット", item.price)
+    );
+  }
+
+  const generated: ReturnType<typeof buildOffer>[] = [];
+  if (typeof event.price_general === "number") {
+    generated.push(buildOffer("一般", event.price_general));
+  }
+  if (typeof event.price_student === "number") {
+    generated.push(buildOffer("学生", event.price_student));
+  }
+  return generated.length > 0 ? generated : undefined;
+};
+
+// castの1要素から名前を取り出す。実データはEventFormが保存する
+// {name, role, image_url} 形式だけでなく、文字列そのもの（例: "坂東玉三郎"）の
+// 配列で入っているケースが本番DBに実在するため、両方に対応する。
+const getCastMemberName = (member: unknown): string => {
+  if (typeof member === "string") return member.trim();
+  if (member && typeof member === "object" && "name" in member) {
+    return String((member as { name?: unknown }).name ?? "").trim();
+  }
+  return "";
+};
+
+// JSON-LDのperformer。cast（キャスト）にnameがあればPerson[]、
+// 無ければcompany（劇団名）をPerformingGroupとして1件返す。
+const buildPerformer = (event: EventRecord) => {
+  const castNames = (Array.isArray(event.cast) ? event.cast : [])
+    .map(getCastMemberName)
+    .filter((name) => name.length > 0);
+  if (castNames.length > 0) {
+    return castNames.map((name) => ({ "@type": "Person", name }));
+  }
+  const companyName = (event.company ?? "").trim();
+  if (companyName) {
+    return { "@type": "PerformingGroup", name: companyName };
+  }
+  return undefined;
+};
+
 const tryRedirect = async (category: string, slug: string) => {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
   const service = createSupabaseServiceClient();
@@ -197,12 +269,19 @@ export async function generateMetadata({
   if (!event) {
     return buildMetadata({ title: "公演詳細", path });
   }
+  const supersededTarget = await resolveSupersededTarget(event);
+  const canonicalPath = supersededTarget
+    ? `/events/${encodeURIComponent(supersededTarget.category)}/${encodeURIComponent(
+        supersededTarget.slug
+      )}`
+    : path;
   const image = getEventImageCandidates(event)[0] ?? undefined;
   return buildMetadata({
     title: event.title,
     description: event.description ?? undefined,
-    path,
+    path: canonicalPath,
     image,
+    noindex: shouldNoindex(event),
   });
 }
 
@@ -267,7 +346,11 @@ export default async function EventDetailPage({
   const director = (event.director ?? "").trim();
   const isSameStaff = Boolean(playwright && director && playwright === director);
   const reservationOpen = isReservationOpen(event.reservation_start_at);
-  const related = await getRelatedEvents(event.category, event.id);
+  const ended = isEnded(event);
+  const [related, supersededTarget] = await Promise.all([
+    getRelatedEvents(event.category, event.id),
+    resolveSupersededTarget(event),
+  ]);
 
   const startIso = event.start_date;
   const endIso = event.end_date ?? event.start_date;
@@ -319,6 +402,8 @@ export default async function EventDetailPage({
       "@type": "Organization",
       name: event.company,
     },
+    performer: buildPerformer(event),
+    offers: buildOffers(event, ended),
   };
 
   const breadcrumbJsonLd = {
@@ -374,6 +459,32 @@ export default async function EventDetailPage({
           </li>
         </ol>
       </nav>
+
+      {supersededTarget && (
+        <div className="card-retro mt-4 flex flex-wrap items-center justify-between gap-3 bg-primary p-4 text-white">
+          <p className="text-sm font-black">この公演の最新情報はこちら</p>
+          <Link
+            href={`/events/${encodeURIComponent(
+              supersededTarget.category
+            )}/${encodeURIComponent(supersededTarget.slug)}`}
+            className="btn-retro btn-ink"
+          >
+            最新の公演情報を見る
+          </Link>
+        </div>
+      )}
+
+      {ended && (
+        <div className="card-retro mt-4 flex flex-wrap items-center justify-between gap-3 bg-surface-muted p-4">
+          <p className="flex flex-wrap items-center gap-2 text-sm font-black text-ink">
+            <span className="badge-retro bg-ink text-white">終了しました</span>
+            この公演は終了しました。
+          </p>
+          <Link href="/events/archive" className="btn-retro btn-surface">
+            過去公演アーカイブを見る
+          </Link>
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="card-retro p-6">
@@ -468,7 +579,7 @@ export default async function EventDetailPage({
                 {event.price_student ? `学生 ${event.price_student}円` : ""}
               </div>
             )}
-            {(reservationLinks.length > 0 || event.reservation_start_at) && (
+            {!ended && (reservationLinks.length > 0 || event.reservation_start_at) && (
               <div>
                 {event.reservation_start_at && (
                   <div>
@@ -583,17 +694,24 @@ export default async function EventDetailPage({
         <div className="card-retro mt-8 p-6">
           <h2 className="heading-ja text-xl">キャスト</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            {event.cast.map((member, index) => (
-              <div
-                key={`${member.name ?? "cast"}-${index}`}
-                className="rounded-xl border-2 border-ink bg-surface p-4 shadow-hard-sm"
-              >
-                <div className="font-bold">{member.name ?? "名称未設定"}</div>
-                {member.role && (
-                  <div className="mt-1 text-sm text-zinc-700">{member.role}</div>
-                )}
-              </div>
-            ))}
+            {event.cast.map((member, index) => {
+              const name = getCastMemberName(member);
+              const role =
+                member && typeof member === "object" && "role" in member
+                  ? String((member as { role?: unknown }).role ?? "").trim()
+                  : "";
+              return (
+                <div
+                  key={`${name || "cast"}-${index}`}
+                  className="rounded-xl border-2 border-ink bg-surface p-4 shadow-hard-sm"
+                >
+                  <div className="font-bold">{name || "名称未設定"}</div>
+                  {role && (
+                    <div className="mt-1 text-sm text-zinc-700">{role}</div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
