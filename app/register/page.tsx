@@ -347,6 +347,9 @@ export default function RegisterPage() {
         <p className="mt-2 text-sm text-zinc-700">
           初めての方は「Googleでログイン」または「メールリンクでログイン」からアカウントを登録してください。その後は登録したアドレスからログインできます。
         </p>
+        <p className="mt-2 text-sm text-zinc-700">
+          大学演劇部・高校演劇部・学生プロデュース公演も大歓迎です。学生の劇団・サークルもぜひ登録してください。
+        </p>
       </div>
 
       <div className="card-retro p-6 text-sm">
