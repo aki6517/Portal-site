@@ -2,53 +2,19 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import ImageWithFallback from "@/app/_components/ImageWithFallback";
 import { buildEventImageCandidates } from "@/lib/events/image";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import {
+  getEventBySlug,
+  getRelatedEvents,
+  isReleased,
+  type EventDetail,
+} from "@/lib/data/events";
 import ViewCounter from "./ViewCounter";
 import { buildMetadata, getSiteUrl } from "@/lib/seo";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 600;
 
-type EventRecord = {
-  id: string;
-  title: string;
-  company: string;
-  description: string | null;
-  playwright?: string | null;
-  director?: string | null;
-  category: string;
-  categories?: string[] | null;
-  slug: string;
-  publish_at?: string | null;
-  start_date: string;
-  end_date: string | null;
-  reservation_start_at?: string | null;
-  reservation_label?: string | null;
-  reservation_links?: { label?: string | null; url?: string | null }[] | null;
-  schedule_times?: { start_date?: string; end_date?: string | null; label?: string }[] | null;
-  venue: string | null;
-  venue_address: string | null;
-  price_general: number | null;
-  price_student: number | null;
-  ticket_types?: { label?: string | null; price?: number | null; note?: string | null }[] | null;
-  tags: string[] | null;
-  image_url: string | null;
-  flyer_url: string | null;
-  ticket_url: string | null;
-  cast?: { name?: string; role?: string; image_url?: string }[] | null;
-};
-
-type RelatedEvent = {
-  id: string;
-  category: string;
-  slug: string;
-  title: string;
-  publish_at?: string | null;
-  start_date: string;
-  venue: string | null;
-  flyer_url: string | null;
-  image_url: string | null;
-};
+type EventRecord = EventDetail;
 
 const CATEGORY_COPY: Record<string, { label: string; icon: string }> = {
   comedy: { label: "コメディ", icon: "😂" },
@@ -178,13 +144,6 @@ const decodeRouteParam = (value: string) => {
   }
 };
 
-const isReleased = (publishAt?: string | null) => {
-  if (!publishAt) return true;
-  const date = new Date(publishAt);
-  if (Number.isNaN(date.getTime())) return true;
-  return date.getTime() <= Date.now();
-};
-
 const isReservationOpen = (reservationStartAt?: string | null) => {
   if (!reservationStartAt) return true;
   const date = new Date(reservationStartAt);
@@ -196,99 +155,6 @@ const getEventImageCandidates = (event: {
   image_url?: string | null;
   flyer_url?: string | null;
 }) => buildEventImageCandidates(event.image_url, event.flyer_url);
-
-const pickMatchedEvent = (rows: EventRecord[] | null | undefined, category: string) => {
-  const released = (rows ?? []).filter((item) => isReleased(item.publish_at));
-  return (
-    released.find(
-      (item) =>
-        item.category === category ||
-        (Array.isArray(item.categories) && item.categories.includes(category))
-    ) ?? released[0] ?? null
-  );
-};
-
-const getEvent = async (category: string, slug: string) => {
-  const queryBySlug = async (
-    client:
-      | Awaited<ReturnType<typeof createSupabaseServerClient>>
-      | ReturnType<typeof createSupabaseServiceClient>,
-    source: "anon" | "service"
-  ) => {
-    const result = await client
-      .from("events")
-      .select("*")
-      .eq("slug", slug)
-      .eq("status", "published")
-      .returns<EventRecord[]>();
-
-    if (result.error) {
-      console.warn("[event-detail] query failed", {
-        category,
-        slug,
-        source,
-        error: result.error.message,
-      });
-      return null;
-    }
-
-    const matched = pickMatchedEvent(result.data, category);
-    if (matched) return matched;
-    if ((result.data?.length ?? 0) > 0) {
-      console.warn("[event-detail] rows found but filtered by release window", {
-        category,
-        slug,
-        source,
-      });
-    }
-    return null;
-  };
-
-  const supabase = await createSupabaseServerClient();
-  const anonMatched = await queryBySlug(supabase, "anon");
-  if (anonMatched) return anonMatched;
-
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const service = createSupabaseServiceClient();
-    const serviceMatched = await queryBySlug(service, "service");
-    if (serviceMatched) return serviceMatched;
-  }
-
-  console.warn("[event-detail] not found", { category, slug });
-  return null;
-};
-
-const getRelatedEvents = async (category: string, excludeId: string) => {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("events")
-    .select("id, category, slug, title, publish_at, start_date, venue, flyer_url, image_url")
-    .eq("category", category)
-    .eq("status", "published")
-    .neq("id", excludeId)
-    .order("start_date", { ascending: true })
-    .limit(3)
-    .returns<RelatedEvent[]>();
-
-  let rows = data ?? [];
-  const missingColumns =
-    !!error &&
-    (error.message.includes("column") || error.message.includes("does not exist"));
-  if (missingColumns) {
-    const fallback = await supabase
-      .from("events")
-      .select("id, category, slug, title, start_date, venue, flyer_url, image_url")
-      .eq("category", category)
-      .eq("status", "published")
-      .neq("id", excludeId)
-      .order("start_date", { ascending: true })
-      .limit(10)
-      .returns<RelatedEvent[]>();
-    rows = fallback.data ?? [];
-  }
-
-  return rows.filter((item) => isReleased(item.publish_at)).slice(0, 3);
-};
 
 const tryRedirect = async (category: string, slug: string) => {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
@@ -326,7 +192,7 @@ export async function generateMetadata({
   const resolvedParams = await Promise.resolve(params);
   const category = decodeRouteParam(resolvedParams.category);
   const slug = decodeRouteParam(resolvedParams.slug);
-  const event = await getEvent(category, slug);
+  const event = await getEventBySlug(category, slug);
   const path = `/events/${resolvedParams.category}/${resolvedParams.slug}`;
   if (!event) {
     return buildMetadata({ title: "公演詳細", path });
@@ -348,7 +214,7 @@ export default async function EventDetailPage({
   const resolvedParams = await Promise.resolve(params);
   const category = decodeRouteParam(resolvedParams.category);
   const slug = decodeRouteParam(resolvedParams.slug);
-  const event = await getEvent(category, slug);
+  const event = await getEventBySlug(category, slug);
 
   if (!event) {
     await tryRedirect(category, slug);
@@ -667,7 +533,6 @@ export default async function EventDetailPage({
             width={800}
             height={1000}
             sizes="(min-width: 1024px) 40vw, 100vw"
-            unoptimized
             className="h-full w-full bg-surface object-cover"
             fallback={
               <div className="flex h-80 items-center justify-center bg-surface text-sm text-zinc-600">
@@ -754,7 +619,6 @@ export default async function EventDetailPage({
                       width={800}
                       height={600}
                       sizes="(min-width: 1024px) 20vw, (min-width: 768px) 33vw, 100vw"
-                      unoptimized
                       className="h-full w-full object-cover"
                     />
                   </div>

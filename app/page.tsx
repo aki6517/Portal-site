@@ -9,33 +9,20 @@ import {
   Sparkles,
   Drama,
 } from "lucide-react";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import {
+  getTrendingEvents,
+  getCategories,
+  type EventSummary,
+  type CategorySummary,
+} from "@/lib/data/events";
 import ImageWithFallback from "@/app/_components/ImageWithFallback";
 import { buildEventImageCandidates } from "@/lib/events/image";
 
-type TrendingEvent = {
-  id: string;
-  title: string;
-  category: string;
-  slug: string;
-  start_date: string;
-  publish_at?: string | null;
-  reservation_start_at?: string | null;
-  reservation_label?: string | null;
-  ticket_url?: string | null;
-  image_url?: string | null;
-  flyer_url?: string | null;
-};
+type TrendingEvent = EventSummary;
 
-type CategoryRow = {
-  id: string;
-  name: string;
-  icon: string | null;
-  sort_order?: number | null;
-};
+export const revalidate = 600;
 
-const fallbackCategories: CategoryRow[] = [
+const fallbackCategories: CategorySummary[] = [
   { id: "comedy", name: "コメディ", icon: "😂", sort_order: 1 },
   { id: "conversation", name: "会話劇", icon: "💬", sort_order: 2 },
   { id: "musical", name: "ミュージカル", icon: "🎵", sort_order: 3 },
@@ -54,13 +41,6 @@ const formatDate = (value?: string | null) => {
   }).format(date);
 };
 
-const isReleased = (publishAt?: string | null) => {
-  if (!publishAt) return true;
-  const date = new Date(publishAt);
-  if (Number.isNaN(date.getTime())) return true;
-  return date.getTime() <= Date.now();
-};
-
 const getEventImageCandidates = (event?: {
   image_url?: string | null;
   flyer_url?: string | null;
@@ -75,98 +55,12 @@ const getReservationBadge = (event: TrendingEvent) => {
   return date.getTime() <= Date.now() ? "予約可" : "予約開始前";
 };
 
-const getTrendingEvents = async () => {
-  const selectFields =
-    "id, title, category, slug, start_date, publish_at, reservation_start_at, reservation_label, ticket_url, image_url, flyer_url";
-  const fallbackSelect =
-    "id, title, category, slug, start_date, image_url, flyer_url";
-
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const service = createSupabaseServiceClient();
-    const since = new Date();
-    since.setDate(since.getDate() - 30);
-    const sinceDate = since.toISOString().slice(0, 10);
-    const { data: views } = await service
-      .from("event_views_daily")
-      .select("event_id, views")
-      .gte("view_date", sinceDate);
-    const map = new Map<string, number>();
-    (views ?? []).forEach((row) => {
-      const total = map.get(row.event_id) ?? 0;
-      map.set(row.event_id, total + (row.views ?? 0));
-    });
-    const ranked = [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20);
-    const ids = ranked.map(([id]) => id);
-    if (ids.length === 0) return [];
-    const { data: events, error } = await service
-      .from("events")
-      .select(selectFields)
-      .eq("status", "published")
-      .in("id", ids);
-    let rows = (events ?? []) as TrendingEvent[];
-    const missingColumns =
-      !!error &&
-      (error.message.includes("column") || error.message.includes("does not exist"));
-    if (missingColumns) {
-      const fallback = await service
-        .from("events")
-        .select(fallbackSelect)
-        .eq("status", "published")
-        .in("id", ids);
-      rows = (fallback.data ?? []) as TrendingEvent[];
-    }
-
-    const byId = new Map(
-      rows
-        .filter((event) => isReleased(event.publish_at))
-        .map((event) => [event.id, event])
-    );
-    return ranked
-      .map(([id]) => byId.get(id))
-      .filter(Boolean)
-      .slice(0, 3) as TrendingEvent[];
-  }
-
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("events")
-    .select(selectFields)
-    .eq("status", "published")
-    .order("start_date", { ascending: true })
-    .limit(30);
-
-  let rows = (data ?? []) as TrendingEvent[];
-  const missingColumns =
-    !!error &&
-    (error.message.includes("column") || error.message.includes("does not exist"));
-  if (missingColumns) {
-    const fallback = await supabase
-      .from("events")
-      .select(fallbackSelect)
-      .eq("status", "published")
-      .order("start_date", { ascending: true })
-      .limit(30);
-    rows = (fallback.data ?? []) as TrendingEvent[];
-  }
-
-  return rows.filter((event) => isReleased(event.publish_at)).slice(0, 3);
-};
-
-const getCategories = async () => {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("categories")
-    .select("id, name, icon, sort_order")
-    .order("sort_order", { ascending: true })
-    .limit(8);
-  return (data ?? []) as CategoryRow[];
-};
-
 export default async function Home() {
-  const [trending, categories] = await Promise.all([
+  const [trending, allCategories] = await Promise.all([
     getTrendingEvents(),
     getCategories(),
   ]);
+  const categories = allCategories.slice(0, 8);
   const categoriesList =
     categories.length > 0 ? categories : fallbackCategories;
   const categoryMap = new Map(
@@ -279,7 +173,6 @@ export default async function Home() {
                   fill
                   priority
                   sizes="(min-width: 1024px) 50vw, 100vw"
-                  unoptimized
                   className="object-cover transition-all duration-500"
                   fallback={
                     <div className="flex h-full w-full items-center justify-center bg-surface-muted text-xs font-bold text-zinc-600">
@@ -414,7 +307,6 @@ export default async function Home() {
                       alt={event.title}
                       fill
                       sizes="(min-width: 1024px) 30vw, (min-width: 768px) 33vw, 100vw"
-                      unoptimized
                       className="object-cover transition-all duration-500"
                       fallback={
                         <div className="flex h-full w-full items-center justify-center text-xs font-bold text-zinc-600">

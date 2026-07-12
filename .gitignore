@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase CLI (link状態などの一時ファイル。migrations/はコミット対象)
+/supabase/.temp/
+
 # tina (auto-generated, may include secrets)
 /tina/__generated__
 

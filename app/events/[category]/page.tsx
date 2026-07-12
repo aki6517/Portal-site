@@ -1,31 +1,12 @@
 import Link from "next/link";
 import ImageWithFallback from "@/app/_components/ImageWithFallback";
 import { buildEventImageCandidates } from "@/lib/events/image";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import {
+  getCategories,
+  getUpcomingEvents,
+  getViews30Map,
+} from "@/lib/data/events";
 import { buildMetadata } from "@/lib/seo";
-
-type CategoryRecord = {
-  id: string;
-  name: string;
-  icon?: string | null;
-  color?: string | null;
-};
-
-type EventRecord = {
-  id: string;
-  title: string;
-  category: string;
-  categories?: string[] | null;
-  slug: string;
-  start_date: string;
-  end_date?: string | null;
-  venue?: string | null;
-  image_url?: string | null;
-  flyer_url?: string | null;
-  company?: string | null;
-  publish_at?: string | null;
-};
 
 const formatDate = (value?: string | null) => {
   if (!value) return "";
@@ -58,89 +39,10 @@ const decodeRouteParam = (value: string) => {
   }
 };
 
-const isReleased = (publishAt?: string | null) => {
-  if (!publishAt) return true;
-  const date = new Date(publishAt);
-  if (Number.isNaN(date.getTime())) return true;
-  return date.getTime() <= Date.now();
-};
-
 const getEventImageCandidates = (event: {
   image_url?: string | null;
   flyer_url?: string | null;
 }) => buildEventImageCandidates(event.image_url, event.flyer_url);
-
-const getCategories = async () => {
-  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? createSupabaseServiceClient()
-    : await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("categories")
-    .select("id, name, icon, color")
-    .order("sort_order", { ascending: true });
-  return (data ?? []) as CategoryRecord[];
-};
-
-const getEvents = async (category: string, query?: string) => {
-  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? createSupabaseServiceClient()
-    : await createSupabaseServerClient();
-  const selectFields =
-    "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company, publish_at";
-  const { data, error } = await supabase
-    .from("events")
-    .select(selectFields)
-    .eq("status", "published")
-    .order("start_date", { ascending: true });
-
-  let rows = (data ?? []) as EventRecord[];
-  const missingCategoriesColumn =
-    !!error &&
-    (error.message.includes("column") || error.message.includes("does not exist"));
-
-  if (missingCategoriesColumn) {
-    const fallback = await supabase
-      .from("events")
-      .select(
-        "id, title, category, slug, start_date, end_date, venue, image_url, flyer_url, company"
-      )
-      .eq("status", "published")
-      .order("start_date", { ascending: true });
-    rows = (fallback.data ?? []) as EventRecord[];
-  }
-
-  const filtered = rows.filter(
-    (event) =>
-      event.category === category ||
-      (Array.isArray(event.categories) && event.categories.includes(category))
-  );
-  const released = filtered.filter((event) => isReleased(event.publish_at));
-  if (!query) return released;
-  const lowered = query.toLowerCase();
-  return released.filter((event) =>
-    [event.title, event.venue, event.company]
-      .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(lowered))
-  );
-};
-
-const getViews30Map = async () => {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return new Map<string, number>();
-  const service = createSupabaseServiceClient();
-  const since = new Date();
-  since.setDate(since.getDate() - 30);
-  const sinceDate = since.toISOString().slice(0, 10);
-  const { data } = await service
-    .from("event_views_daily")
-    .select("event_id, views")
-    .gte("view_date", sinceDate);
-  const map = new Map<string, number>();
-  (data ?? []).forEach((row) => {
-    const total = map.get(row.event_id) ?? 0;
-    map.set(row.event_id, total + (row.views ?? 0));
-  });
-  return map;
-};
 
 export async function generateMetadata({
   params,
@@ -181,7 +83,7 @@ export default async function EventsByCategoryPage({
   const q = normalizeQuery(resolvedSearchParams?.q);
   const [categories, events, viewsMap] = await Promise.all([
     getCategories(),
-    getEvents(categoryId, q),
+    getUpcomingEvents({ category: categoryId, query: q, limit: 60 }),
     sort === "popular" ? getViews30Map() : Promise.resolve(new Map()),
   ]);
 
@@ -314,7 +216,6 @@ export default async function EventsByCategoryPage({
                   width={128}
                   height={80}
                   sizes="128px"
-                  unoptimized
                   className="h-20 w-32 rounded-xl border-2 border-ink object-cover shadow-hard-sm"
                 />
               </div>

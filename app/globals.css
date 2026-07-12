@@ -40,7 +40,7 @@
   --color-pop-purple: var(--pop-purple);
   --font-sans: var(--font-zen-sans);
   --font-display: var(--font-dela-display);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
 }
 
 @layer base {

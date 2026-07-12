@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import fs from "node:fs";
 import path from "node:path";
 import { getAllBlogPosts, getBlogPostBySlug } from "@/lib/content";
@@ -27,6 +28,19 @@ const toPublicFileAbsoluteUrl = (value: string | undefined, siteUrl: string) => 
   const publicPath = path.join(process.cwd(), "public", normalized.slice(1));
   if (!fs.existsSync(publicPath)) return null;
   return `${siteUrl}${normalized}`;
+};
+
+// next/imageに渡す用。/public配下のローカルファイルなら相対パスのまま返す
+// （next/imageは自サイトのpublicパスをremotePatterns無しで最適化できるため）。
+// 外部URL・存在しないファイルはnullにしてフォールバック表示に回す。
+const toPublicFileLocalPath = (value: string | undefined) => {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return null;
+
+  const normalized = value.startsWith("/") ? value : `/${value}`;
+  const publicPath = path.join(process.cwd(), "public", normalized.slice(1));
+  if (!fs.existsSync(publicPath)) return null;
+  return normalized;
 };
 
 const parsePipeList = (value: string | undefined) =>
@@ -123,6 +137,9 @@ export default async function BlogDetailPage({
   const authorImage = toPublicFileAbsoluteUrl(
     post.frontMatter.author_image?.trim() || DEFAULT_AUTHOR_IMAGE_PATH,
     siteUrl,
+  );
+  const authorImagePath = toPublicFileLocalPath(
+    post.frontMatter.author_image?.trim() || DEFAULT_AUTHOR_IMAGE_PATH,
   );
 
   const organizationName =
@@ -252,10 +269,12 @@ export default async function BlogDetailPage({
           <div className="mt-4">
             <div className="flex items-center gap-4">
               <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-pop-blue bg-pop-blue/10 sm:h-24 sm:w-24">
-                {authorImage ? (
-                  <img
-                    src={authorImage}
+                {authorImagePath ? (
+                  <Image
+                    src={authorImagePath}
                     alt={`${authorName}のプロフィール画像`}
+                    width={96}
+                    height={96}
                     className="h-full w-full object-cover object-[center_14%]"
                   />
                 ) : (

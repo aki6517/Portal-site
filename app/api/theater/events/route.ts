@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { resolveActiveTheater } from "@/lib/theater/activeTheater";
@@ -357,6 +358,13 @@ export async function POST(req: Request) {
       },
       { status }
     );
+  }
+
+  if (createdEvent?.id) {
+    // 第2引数はNext.js 16で必須化されたcacheLifeプロファイル。
+    // { expire: 0 } を渡すと無条件・即時のフル再検証になる（保存→即反映を維持するため）。
+    revalidateTag("events", { expire: 0 });
+    revalidateTag(`event:${createdEvent.id}`, { expire: 0 });
   }
 
   return NextResponse.json({ data: { event: createdEvent } }, { status: 201 });

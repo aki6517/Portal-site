@@ -1,25 +1,12 @@
 import Link from "next/link";
 import ImageWithFallback from "@/app/_components/ImageWithFallback";
 import { buildEventImageCandidates } from "@/lib/events/image";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
-import { buildIlikeFilter } from "@/lib/search";
+import {
+  getCategories,
+  getUpcomingEvents,
+  getViews30Map,
+} from "@/lib/data/events";
 import { buildMetadata } from "@/lib/seo";
-
-type EventRecord = {
-  id: string;
-  title: string;
-  category: string;
-  categories?: string[] | null;
-  slug: string;
-  start_date: string;
-  end_date?: string | null;
-  venue?: string | null;
-  image_url?: string | null;
-  flyer_url?: string | null;
-  company?: string | null;
-  publish_at?: string | null;
-};
 
 const formatDate = (value?: string | null) => {
   if (!value) return "";
@@ -44,85 +31,10 @@ const normalizeQuery = (value?: string) => {
   return trimmed.slice(0, 80);
 };
 
-const isReleased = (publishAt?: string | null) => {
-  if (!publishAt) return true;
-  const date = new Date(publishAt);
-  if (Number.isNaN(date.getTime())) return true;
-  return date.getTime() <= Date.now();
-};
-
 const getEventImageCandidates = (event: {
   image_url?: string | null;
   flyer_url?: string | null;
 }) => buildEventImageCandidates(event.image_url, event.flyer_url);
-
-const getCategories = async () => {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("categories")
-    .select("id, name, icon, color")
-    .order("sort_order", { ascending: true });
-  return data ?? [];
-};
-
-const getEvents = async (query?: string) => {
-  const supabase = await createSupabaseServerClient();
-  let request = supabase
-    .from("events")
-    .select(
-      "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company, publish_at"
-    )
-    .eq("status", "published");
-
-  if (query) {
-    const filter = buildIlikeFilter(query, ["title", "venue", "company"]);
-    if (filter) {
-      request = request.or(filter);
-    }
-  }
-
-  const { data, error } = await request.order("start_date", { ascending: true });
-  let rows = (data ?? []) as EventRecord[];
-  const missingColumns =
-    !!error &&
-    (error.message.includes("column") || error.message.includes("does not exist"));
-  if (missingColumns) {
-    let fallback = supabase
-      .from("events")
-      .select(
-        "id, title, category, categories, slug, start_date, end_date, venue, image_url, flyer_url, company"
-      )
-      .eq("status", "published");
-    if (query) {
-      const filter = buildIlikeFilter(query, ["title", "venue", "company"]);
-      if (filter) {
-        fallback = fallback.or(filter);
-      }
-    }
-    const fallbackRes = await fallback.order("start_date", { ascending: true });
-    rows = (fallbackRes.data ?? []) as EventRecord[];
-  }
-
-  return rows.filter((event) => isReleased(event.publish_at));
-};
-
-const getViews30Map = async () => {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return new Map<string, number>();
-  const service = createSupabaseServiceClient();
-  const since = new Date();
-  since.setDate(since.getDate() - 30);
-  const sinceDate = since.toISOString().slice(0, 10);
-  const { data } = await service
-    .from("event_views_daily")
-    .select("event_id, views")
-    .gte("view_date", sinceDate);
-  const map = new Map<string, number>();
-  (data ?? []).forEach((row) => {
-    const total = map.get(row.event_id) ?? 0;
-    map.set(row.event_id, total + (row.views ?? 0));
-  });
-  return map;
-};
 
 export async function generateMetadata() {
   return buildMetadata({
@@ -142,7 +54,7 @@ export default async function EventsPage({
   const q = normalizeQuery(resolvedSearchParams?.q);
   const [categories, events, viewsMap] = await Promise.all([
     getCategories(),
-    getEvents(q),
+    getUpcomingEvents({ query: q, limit: 60 }),
     sort === "popular" ? getViews30Map() : Promise.resolve(new Map()),
   ]);
 
@@ -255,7 +167,6 @@ export default async function EventsPage({
                   width={128}
                   height={80}
                   sizes="128px"
-                  unoptimized
                   className="h-20 w-32 rounded-xl border-2 border-ink object-cover shadow-hard-sm"
                 />
               </div>

@@ -1,18 +1,17 @@
 import type { Metadata } from "next";
 import {
   Dela_Gothic_One,
-  Geist_Mono,
   M_PLUS_Rounded_1c,
   Zen_Kaku_Gothic_New,
 } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 import SiteHeader from "./_components/SiteHeader";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { getSiteTags } from "@/lib/data/siteTags";
 
 const zenSans = Zen_Kaku_Gothic_New({
   variable: "--font-zen-sans",
-  weight: ["400", "500", "700", "900"],
+  weight: ["400", "700", "900"],
   subsets: ["latin"],
   display: "swap",
 });
@@ -24,26 +23,14 @@ const delaDisplay = Dela_Gothic_One({
   display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  display: "swap",
-});
-
 const rounded = M_PLUS_Rounded_1c({
   variable: "--font-rounded",
-  weight: ["400", "500", "700", "800"],
+  weight: ["700", "800"],
   subsets: ["latin"],
   display: "swap",
 });
 
 const ICON_PATH = "/icon.png?v=20260210a";
-
-type SiteTags = {
-  head_tag: string | null;
-  body_start_tag: string | null;
-  body_end_tag: string | null;
-};
 
 type ParsedScript = {
   attrs: Record<string, string | true>;
@@ -52,18 +39,6 @@ type ParsedScript = {
 
 type ParsedMeta = {
   attrs: Record<string, string>;
-};
-
-const EMPTY_SITE_TAGS: SiteTags = {
-  head_tag: null,
-  body_start_tag: null,
-  body_end_tag: null,
-};
-
-const normalizeSnippet = (value?: string | null) => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
 };
 
 const parseScriptAttrs = (attrsText: string) => {
@@ -142,26 +117,6 @@ const buildScriptProps = (attrs: Record<string, string | true>) => {
   return props;
 };
 
-const getSiteTags = async () => {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return EMPTY_SITE_TAGS;
-  try {
-    const service = createSupabaseServiceClient();
-    const { data, error } = await service
-      .from("site_settings")
-      .select("head_tag, body_start_tag, body_end_tag")
-      .eq("id", 1)
-      .maybeSingle();
-    if (error || !data) return EMPTY_SITE_TAGS;
-    return {
-      head_tag: normalizeSnippet(data.head_tag),
-      body_start_tag: normalizeSnippet(data.body_start_tag),
-      body_end_tag: normalizeSnippet(data.body_end_tag),
-    } satisfies SiteTags;
-  } catch {
-    return EMPTY_SITE_TAGS;
-  }
-};
-
 export const metadata: Metadata = {
   title: "福岡アクトポータル - 福岡演劇公演ポータル",
   description:
@@ -185,7 +140,7 @@ export default async function RootLayout({
   return (
     <html
       lang="ja"
-      className={`${zenSans.variable} ${delaDisplay.variable} ${geistMono.variable} ${rounded.variable}`}
+      className={`${zenSans.variable} ${delaDisplay.variable} ${rounded.variable}`}
     >
       <head>
         {headMetas.map((meta, index) => (
