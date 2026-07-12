@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { resolveActiveTheater } from "@/lib/theater/activeTheater";
+import { resolveVenue, type VenueRow } from "@/lib/venues/normalize";
 
 type EventUpdatePayload = {
   category?: string;
@@ -118,6 +119,25 @@ const deriveDateRange = (
     start: starts[0],
     end: ends.length > 0 ? ends[ends.length - 1] : fallbackEnd ?? null,
   };
+};
+
+// venue文字列からvenuesテーブルを引いてvenue_idを解決する（ベストエフォート）。
+// venuesの取得に失敗しても公演の保存自体は止めない（venue_id: nullのまま更新）。
+// select("*")にしているのはdocs/sql/009_venues_area.sql未適用のDBでも
+// aliases列エラーにならないようにするため（lib/venues/normalizeのresolveVenueは
+// aliasesが無くても動く）。
+const resolveVenueId = async (
+  venueText: string | null | undefined,
+  service: ReturnType<typeof createSupabaseServiceClient>
+): Promise<string | null> => {
+  const text = (venueText ?? "").trim();
+  if (!text) return null;
+  try {
+    const { data } = await service.from("venues").select("*");
+    return resolveVenue(text, (data ?? []) as VenueRow[]).venueId;
+  } catch {
+    return null;
+  }
 };
 
 export async function GET(
@@ -289,7 +309,12 @@ export async function PATCH(
   if ("reservation_links" in payload) {
     update.reservation_links = normalizeReservationLinks(payload.reservation_links) ?? [];
   }
-  if ("venue_id" in payload) update.venue_id = payload.venue_id ?? null;
+  if ("venue_id" in payload) {
+    update.venue_id = payload.venue_id ?? null;
+  } else if ("venue" in payload) {
+    // venue_idが明示されない保存（EventFormの通常フロー）はvenue文字列から自動解決する
+    update.venue_id = await resolveVenueId(payload.venue, service);
+  }
   if ("venue" in payload) update.venue = payload.venue ?? null;
   if ("venue_address" in payload)
     update.venue_address = payload.venue_address ?? null;

@@ -1,10 +1,18 @@
 import Link from "next/link";
-import CalendarClient from "./CalendarClient";
+import WeekTimetable from "./WeekTimetable";
 import { buildMetadata, getSiteUrl } from "@/lib/seo";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getUpcomingEvents } from "@/lib/data/events";
+import {
+  buildCalendarHref,
+  getWeekTimetable,
+  normalizeWeekParam,
+  shiftWeekIso,
+} from "@/lib/data/calendar";
+import { getReadableTextColor } from "@/lib/color";
 
-// 公開中の公演（DB）を常に最新で反映するため動的レンダリング
-export const dynamic = "force-dynamic";
+// searchParams（?week=, ?cat=）に依存する動的ページ。ただしDBフェッチ自体は
+// lib/data/calendar.ts / lib/data/events.ts 側でunstable_cache+tagsされて
+// いるため、force-dynamicは指定しない（Phase 1と同じ考え方）。
 
 export async function generateMetadata() {
   return buildMetadata({
@@ -15,16 +23,11 @@ export async function generateMetadata() {
   });
 }
 
-type CalendarEventRecord = {
-  id: string;
-  title: string;
-  category: string;
-  slug: string;
-  start_date: string;
-  end_date?: string | null;
-  venue?: string | null;
-  company?: string | null;
-};
+const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
+
+// days[]（UTC深夜として表現したJST暦日の疑似Date）を「7月13日(月)」形式にする
+const formatFullDate = (pseudoDate: Date) =>
+  `${pseudoDate.getUTCMonth() + 1}月${pseudoDate.getUTCDate()}日(${WEEKDAY_LABELS[pseudoDate.getUTCDay()]})`;
 
 const formatDate = (value?: string | null) => {
   if (!value) return "";
@@ -39,41 +42,41 @@ const formatDate = (value?: string | null) => {
   }).format(date);
 };
 
-// 公開済み・今後開催（前日以降に終わる）の公演を開催日順に取得。失敗時は空配列でフォールバック。
-const getUpcomingEvents = async (): Promise<CalendarEventRecord[]> => {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data } = await supabase
-      .from("events")
-      .select(
-        "id, title, category, slug, start_date, end_date, venue, company"
-      )
-      .eq("status", "published")
-      .order("start_date", { ascending: true });
-    const threshold = Date.now() - 24 * 60 * 60 * 1000;
-    const upcoming = ((data ?? []) as CalendarEventRecord[]).filter((event) => {
-      const end = new Date(event.end_date ?? event.start_date);
-      return !Number.isNaN(end.getTime()) && end.getTime() >= threshold;
-    });
-    return upcoming.slice(0, 50);
-  } catch {
-    return [];
-  }
-};
-
 const buildEventUrl = (siteUrl: string, category: string, slug: string) =>
   `${siteUrl}/events/${encodeURIComponent(category)}/${encodeURIComponent(slug)}`;
 
 // JSON-LD の </script> 突破を防ぐため < をエスケープ
-const toJsonLd = (data: unknown) =>
-  JSON.stringify(data).replace(/</g, "\\u003c");
+const toJsonLd = (data: unknown) => JSON.stringify(data).replace(/</g, "\\u003c");
 
-export default async function CalendarPage() {
-  const events = await getUpcomingEvents();
+type CalendarSearchParams = { week?: string; cat?: string };
+
+export default async function CalendarPage({
+  searchParams,
+}: {
+  searchParams?: CalendarSearchParams | Promise<CalendarSearchParams>;
+}) {
+  const resolvedSearchParams = await Promise.resolve(searchParams);
+  const weekStartIso = normalizeWeekParam(resolvedSearchParams?.week);
+  const rawCat = (resolvedSearchParams?.cat ?? "").trim();
+
+  const [timetable, upcomingEvents] = await Promise.all([
+    getWeekTimetable(weekStartIso, rawCat || undefined),
+    getUpcomingEvents({ limit: 50 }),
+  ]);
+
+  // 不正なcatは無視する（timetable.categoriesに実在するIDだけ有効として扱う）
+  const activeCat = timetable.categories.some((category) => category.id === rawCat) ? rawCat : "";
+  const days = timetable.weeks.days;
+  const prevWeekIso = shiftWeekIso(weekStartIso, -1);
+  const nextWeekIso = shiftWeekIso(weekStartIso, 1);
+  const thisWeekIso = normalizeWeekParam();
+  const isThisWeek = weekStartIso === thisWeekIso;
+  const weekRangeLabel = `${formatFullDate(days[0])} 〜 ${formatFullDate(days[6])}`;
+
   const siteUrl = getSiteUrl();
   const pageUrl = `${siteUrl}/calendar`;
 
-  const eventItems = events.map((event, index) => {
+  const eventItems = upcomingEvents.map((event, index) => {
     const theaterEvent: Record<string, unknown> = {
       "@type": "TheaterEvent",
       name: event.title,
@@ -129,7 +132,7 @@ export default async function CalendarPage() {
     ],
   };
 
-  const visibleEvents = events.slice(0, 12);
+  const visibleUpcomingEvents = upcomingEvents.slice(0, 12);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -143,22 +146,88 @@ export default async function CalendarPage() {
       />
 
       <div className="card-retro p-6 md:p-8">
-        <span className="badge-retro bg-pop-green shadow-hard-sm text-[11px]">
+        <span className="badge-retro bg-pop-green shadow-hard-sm text-xs">
           CALENDAR
         </span>
         <h1 className="mt-3 font-display text-3xl tracking-tight md:text-4xl">
           福岡の演劇公演スケジュール
         </h1>
         <p className="mt-2 text-sm text-zinc-700">
-          福岡で開催される演劇・舞台公演の日程を、カレンダーで確認できます。気になる公演は、そのまま詳細やチケット情報もチェックできますよ。
+          福岡で開催される演劇・舞台公演の日程を、会場×週の番組表で確認できます。気になる公演は、そのまま詳細やチケット情報もチェックできますよ。
         </p>
       </div>
 
-      <div className="mt-6">
-        <CalendarClient />
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={buildCalendarHref(prevWeekIso, activeCat)} className="btn-retro btn-surface">
+            ← 前週
+          </Link>
+          <Link
+            href={buildCalendarHref(thisWeekIso, activeCat)}
+            className={`btn-retro ${isThisWeek ? "btn-ink" : "btn-surface"}`}
+          >
+            今週
+          </Link>
+          <Link href={buildCalendarHref(nextWeekIso, activeCat)} className="btn-retro btn-surface">
+            次週 →
+          </Link>
+        </div>
+        <div className="text-sm font-bold text-ink">{weekRangeLabel}</div>
       </div>
 
-      {visibleEvents.length > 0 && (
+      <div className="mt-4 flex flex-wrap gap-2 text-sm">
+        <Link
+          href={buildCalendarHref(weekStartIso, "")}
+          className={`badge-retro shadow-hard-sm ${activeCat ? "bg-surface" : "bg-ink text-white"}`}
+        >
+          すべて
+        </Link>
+        {timetable.categories.map((category) => {
+          const isActive = activeCat === category.id;
+          return (
+            <Link
+              key={category.id}
+              href={buildCalendarHref(weekStartIso, category.id)}
+              className={`badge-retro shadow-hard-sm ${isActive ? "" : "bg-surface"}`}
+              style={
+                isActive
+                  ? {
+                      backgroundColor: category.color ?? "#90A4AE",
+                      color: getReadableTextColor(category.color),
+                    }
+                  : undefined
+              }
+            >
+              <span aria-hidden>{category.icon ?? "🎭"}</span>
+              <span>{category.name}</span>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="mt-4">
+        <WeekTimetable
+          weekStartIso={weekStartIso}
+          activeCategory={activeCat}
+          days={days}
+          areas={timetable.areas}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-600">
+        {timetable.categories.map((category) => (
+          <span key={category.id} className="inline-flex items-center gap-1">
+            <span
+              aria-hidden
+              className="inline-block h-3 w-3 rounded-full border border-ink"
+              style={{ backgroundColor: category.color ?? "#90A4AE" }}
+            />
+            {category.name}
+          </span>
+        ))}
+      </div>
+
+      {visibleUpcomingEvents.length > 0 && (
         <section className="mt-10">
           <h2 className="font-display text-2xl tracking-tight">
             近日開催の福岡の演劇公演スケジュール
@@ -167,7 +236,7 @@ export default async function CalendarPage() {
             これから上演される福岡の演劇・舞台公演を、開催日順に紹介します。
           </p>
           <ul className="mt-4 grid gap-3">
-            {visibleEvents.map((event) => (
+            {visibleUpcomingEvents.map((event) => (
               <li key={event.id} className="card-retro p-4">
                 <Link
                   href={`/events/${encodeURIComponent(
