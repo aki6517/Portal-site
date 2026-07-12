@@ -347,6 +347,9 @@ export default async function EventDetailPage({
   const isSameStaff = Boolean(playwright && director && playwright === director);
   const reservationOpen = isReservationOpen(event.reservation_start_at);
   const ended = isEnded(event);
+  // source_urlsが1件以上あれば、portal-scout（AI自動収集）由来の公演とみなし、
+  // 主催者向けの「ご自身で更新できます」告知を出す
+  const isAiSourced = Array.isArray(event.source_urls) && event.source_urls.length > 0;
   const [related, supersededTarget] = await Promise.all([
     getRelatedEvents(event.category, event.id),
     resolveSupersededTarget(event),
@@ -512,6 +515,17 @@ export default async function EventDetailPage({
           <p className="mt-2 text-base font-semibold text-zinc-800">
             {event.company}
           </p>
+
+          {isAiSourced && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border-2 border-ink bg-surface-muted px-4 py-3 text-sm text-ink">
+              <p className="min-w-[200px] flex-1">
+                この公演情報は公式発表をもとに編集部が掲載しています。主催者の方はご自身で情報の更新・掲載ができます。
+              </p>
+              <Link href="/register" className="btn-retro btn-surface shrink-0 text-sm">
+                公演を登録する
+              </Link>
+            </div>
+          )}
 
           <div className="mt-5 grid gap-3 text-base leading-relaxed">
             <div>
@@ -766,7 +780,7 @@ export default async function EventDetailPage({
             href="/register"
             className="btn-retro btn-ink"
           >
-            ログイン / 登録
+            公演を登録する
           </Link>
           <Link
             href="/theater"

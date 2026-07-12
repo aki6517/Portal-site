@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 const navItems = [
   { label: "公演を探す", href: "/events" },
   { label: "公演カレンダー", href: "/calendar" },
-  { label: "劇団の方へ", href: "/register" },
+  { label: "公演を登録する", href: "/register" },
   { label: "演劇ブログ", href: "/blog" },
 ];
 

@@ -350,13 +350,13 @@ export default async function Home() {
       <section className="mt-12 rounded-2xl border-2 border-ink bg-white p-8 shadow-hard-lg">
         <div className="grid gap-6 md:grid-cols-[1.2fr_1fr] md:items-center">
           <div>
-            <h2 className="heading-ja text-2xl">劇団の方へ</h2>
+            <h2 className="heading-ja text-2xl">公演情報を掲載しませんか？</h2>
             <p className="mt-2 text-sm text-ink-muted">
-              ログイン後、劇団情報を登録すると公演の作成・編集ができます。
+              福岡アクトポータルに、あなたの劇団の公演情報を無料で掲載できます。ログイン後、劇団情報を登録すればすぐに公演の作成・編集が可能です。
             </p>
             <div className="mt-4 flex flex-wrap gap-3 text-sm">
               <Link href="/register" className="btn-retro btn-ink">
-                ログイン / 登録
+                公演を登録する（無料）
               </Link>
               <Link href="/theater" className="btn-retro btn-surface">
                 劇団ダッシュボード

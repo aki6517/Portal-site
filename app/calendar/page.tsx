@@ -8,11 +8,12 @@ import {
   normalizeWeekParam,
   shiftWeekIso,
 } from "@/lib/data/calendar";
-import { getReadableTextColor } from "@/lib/color";
 
-// searchParams（?week=, ?cat=）に依存する動的ページ。ただしDBフェッチ自体は
+// searchParams（?week=）に依存する動的ページ。ただしDBフェッチ自体は
 // lib/data/calendar.ts / lib/data/events.ts 側でunstable_cache+tagsされて
 // いるため、force-dynamicは指定しない（Phase 1と同じ考え方）。
+// カテゴリフィルタUI（チップ）はオーナー要望で廃止済み。getWeekTimetableの
+// categoryFilter引数自体は将来の再導入用に残しているが、このページからは渡さない。
 
 export async function generateMetadata() {
   return buildMetadata({
@@ -48,7 +49,7 @@ const buildEventUrl = (siteUrl: string, category: string, slug: string) =>
 // JSON-LD の </script> 突破を防ぐため < をエスケープ
 const toJsonLd = (data: unknown) => JSON.stringify(data).replace(/</g, "\\u003c");
 
-type CalendarSearchParams = { week?: string; cat?: string };
+type CalendarSearchParams = { week?: string };
 
 export default async function CalendarPage({
   searchParams,
@@ -57,15 +58,12 @@ export default async function CalendarPage({
 }) {
   const resolvedSearchParams = await Promise.resolve(searchParams);
   const weekStartIso = normalizeWeekParam(resolvedSearchParams?.week);
-  const rawCat = (resolvedSearchParams?.cat ?? "").trim();
 
   const [timetable, upcomingEvents] = await Promise.all([
-    getWeekTimetable(weekStartIso, rawCat || undefined),
+    getWeekTimetable(weekStartIso),
     getUpcomingEvents({ limit: 50 }),
   ]);
 
-  // 不正なcatは無視する（timetable.categoriesに実在するIDだけ有効として扱う）
-  const activeCat = timetable.categories.some((category) => category.id === rawCat) ? rawCat : "";
   const days = timetable.weeks.days;
   const prevWeekIso = shiftWeekIso(weekStartIso, -1);
   const nextWeekIso = shiftWeekIso(weekStartIso, 1);
@@ -159,56 +157,26 @@ export default async function CalendarPage({
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Link href={buildCalendarHref(prevWeekIso, activeCat)} className="btn-retro btn-surface">
+          <Link href={buildCalendarHref(prevWeekIso, "")} className="btn-retro btn-surface">
             ← 前週
           </Link>
           <Link
-            href={buildCalendarHref(thisWeekIso, activeCat)}
+            href={buildCalendarHref(thisWeekIso, "")}
             className={`btn-retro ${isThisWeek ? "btn-ink" : "btn-surface"}`}
           >
             今週
           </Link>
-          <Link href={buildCalendarHref(nextWeekIso, activeCat)} className="btn-retro btn-surface">
+          <Link href={buildCalendarHref(nextWeekIso, "")} className="btn-retro btn-surface">
             次週 →
           </Link>
         </div>
         <div className="text-sm font-bold text-ink">{weekRangeLabel}</div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2 text-sm">
-        <Link
-          href={buildCalendarHref(weekStartIso, "")}
-          className={`badge-retro shadow-hard-sm ${activeCat ? "bg-surface" : "bg-ink text-white"}`}
-        >
-          すべて
-        </Link>
-        {timetable.categories.map((category) => {
-          const isActive = activeCat === category.id;
-          return (
-            <Link
-              key={category.id}
-              href={buildCalendarHref(weekStartIso, category.id)}
-              className={`badge-retro shadow-hard-sm ${isActive ? "" : "bg-surface"}`}
-              style={
-                isActive
-                  ? {
-                      backgroundColor: category.color ?? "#90A4AE",
-                      color: getReadableTextColor(category.color),
-                    }
-                  : undefined
-              }
-            >
-              <span aria-hidden>{category.icon ?? "🎭"}</span>
-              <span>{category.name}</span>
-            </Link>
-          );
-        })}
-      </div>
-
       <div className="mt-4">
         <WeekTimetable
           weekStartIso={weekStartIso}
-          activeCategory={activeCat}
+          activeCategory=""
           days={days}
           areas={timetable.areas}
         />
@@ -225,6 +193,15 @@ export default async function CalendarPage({
             {category.name}
           </span>
         ))}
+      </div>
+
+      <div className="card-retro mt-6 flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+        <p className="text-sm font-bold text-ink">
+          あなたの公演もここに掲載できます
+        </p>
+        <Link href="/register" className="btn-retro btn-ink">
+          公演を登録する
+        </Link>
       </div>
 
       {visibleUpcomingEvents.length > 0 && (

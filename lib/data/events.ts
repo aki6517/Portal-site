@@ -47,6 +47,11 @@ export type EventDetail = EventSummary & {
   tags: string[] | null;
   cast?: { name?: string; role?: string; image_url?: string }[] | null;
   superseded_by?: string | null;
+  // AIスカウト（portal-scout）が参照した出典URL。1件以上あれば「AI自動収集由来」の
+  // 公演とみなし、詳細ページで「主催者の方はご自身で更新できます」告知を出す判定に使う
+  // （docs/sql/011_scout_fields.sqlでDBカラム追加。未適用DBではselect("*")でも
+  // undefinedのまま返るだけなので、常にoptionalとして扱う）。
+  source_urls?: string[] | null;
 };
 
 export type RelatedEventSummary = {
