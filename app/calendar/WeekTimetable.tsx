@@ -100,6 +100,7 @@ type WeekTimetableProps = {
   activeCategory: string;
   days: Date[];
   areas: TimetableArea[];
+  canNavigateNext: boolean;
 };
 
 export default function WeekTimetable({
@@ -107,17 +108,20 @@ export default function WeekTimetable({
   activeCategory,
   days,
   areas,
+  canNavigateNext,
 }: WeekTimetableProps) {
   if (areas.length === 0) {
     const nextWeekIso = shiftWeekIso(weekStartIso, 1);
     return (
       <div className="card-retro p-6 text-sm text-zinc-700">
         この週はまだ公演情報がありません。次の週もチェックしてみてくださいね。
-        <div className="mt-4">
-          <Link href={buildCalendarHref(nextWeekIso, activeCategory)} className="btn-retro btn-ink">
-            次の週を見る →
-          </Link>
-        </div>
+        {canNavigateNext && (
+          <div className="mt-4">
+            <Link href={buildCalendarHref(nextWeekIso, activeCategory)} className="btn-retro btn-ink">
+              次の週を見る →
+            </Link>
+          </div>
+        )}
       </div>
     );
   }

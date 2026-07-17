@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { permanentRedirect } from "next/navigation";
 import WeekTimetable from "./WeekTimetable";
 import { buildMetadata, getSiteUrl } from "@/lib/seo";
 import { getUpcomingEvents } from "@/lib/data/events";
@@ -14,6 +15,10 @@ import {
 // いるため、force-dynamicは指定しない（Phase 1と同じ考え方）。
 // カテゴリフィルタUI（チップ）はオーナー要望で廃止済み。getWeekTimetableの
 // categoryFilter引数自体は将来の再導入用に残しているが、このページからは渡さない。
+
+export const revalidate = 600;
+
+const CALENDAR_RANGE_WEEKS = 52;
 
 export async function generateMetadata() {
   return buildMetadata({
@@ -58,6 +63,13 @@ export default async function CalendarPage({
 }) {
   const resolvedSearchParams = await Promise.resolve(searchParams);
   const weekStartIso = normalizeWeekParam(resolvedSearchParams?.week);
+  const thisWeekIso = normalizeWeekParam();
+  const minWeekIso = shiftWeekIso(thisWeekIso, -CALENDAR_RANGE_WEEKS);
+  const maxWeekIso = shiftWeekIso(thisWeekIso, CALENDAR_RANGE_WEEKS);
+
+  if (weekStartIso < minWeekIso || weekStartIso > maxWeekIso) {
+    permanentRedirect("/calendar");
+  }
 
   const [timetable, upcomingEvents] = await Promise.all([
     getWeekTimetable(weekStartIso),
@@ -67,8 +79,9 @@ export default async function CalendarPage({
   const days = timetable.weeks.days;
   const prevWeekIso = shiftWeekIso(weekStartIso, -1);
   const nextWeekIso = shiftWeekIso(weekStartIso, 1);
-  const thisWeekIso = normalizeWeekParam();
   const isThisWeek = weekStartIso === thisWeekIso;
+  const canNavigatePrevious = weekStartIso > minWeekIso;
+  const canNavigateNext = weekStartIso < maxWeekIso;
   const weekRangeLabel = `${formatFullDate(days[0])} 〜 ${formatFullDate(days[6])}`;
 
   const siteUrl = getSiteUrl();
@@ -157,18 +170,22 @@ export default async function CalendarPage({
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Link href={buildCalendarHref(prevWeekIso, "")} className="btn-retro btn-surface">
-            ← 前週
-          </Link>
+          {canNavigatePrevious && (
+            <Link href={buildCalendarHref(prevWeekIso, "")} className="btn-retro btn-surface">
+              ← 前週
+            </Link>
+          )}
           <Link
             href={buildCalendarHref(thisWeekIso, "")}
             className={`btn-retro ${isThisWeek ? "btn-ink" : "btn-surface"}`}
           >
             今週
           </Link>
-          <Link href={buildCalendarHref(nextWeekIso, "")} className="btn-retro btn-surface">
-            次週 →
-          </Link>
+          {canNavigateNext && (
+            <Link href={buildCalendarHref(nextWeekIso, "")} className="btn-retro btn-surface">
+              次週 →
+            </Link>
+          )}
         </div>
         <div className="text-sm font-bold text-ink">{weekRangeLabel}</div>
       </div>
@@ -179,6 +196,7 @@ export default async function CalendarPage({
           activeCategory=""
           days={days}
           areas={timetable.areas}
+          canNavigateNext={canNavigateNext}
         />
       </div>
 
