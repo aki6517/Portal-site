@@ -228,14 +228,20 @@ const collectNakedUrlErrors = (bodyLines, bodyStartLine) => {
     if (inCodeFence) return;
 
     const markdownUrlRanges = [];
-    const markdownLinkPattern = /\[[^\]]+\]\((https?:\/\/[^)\s]+)\)/g;
-    for (const match of line.matchAll(markdownLinkPattern)) {
-      const whole = match[0] ?? "";
-      const url = match[1] ?? "";
-      const startInWhole = whole.indexOf(url);
-      if (match.index === undefined || startInWhole < 0) continue;
-      const start = match.index + startInWhole;
-      markdownUrlRanges.push([start, start + url.length]);
+    const markdownLinkPatterns = [
+      /\[[^\]]+\]\((https?:\/\/[^)\s]+)\)/g,
+      // リンク付き画像: [![alt](src)](url)
+      /\[!\[[^\]]*\]\([^)\s]+\)\]\((https?:\/\/[^)\s]+)\)/g,
+    ];
+    for (const markdownLinkPattern of markdownLinkPatterns) {
+      for (const match of line.matchAll(markdownLinkPattern)) {
+        const whole = match[0] ?? "";
+        const url = match[1] ?? "";
+        const startInWhole = whole.lastIndexOf(url);
+        if (match.index === undefined || startInWhole < 0) continue;
+        const start = match.index + startInWhole;
+        markdownUrlRanges.push([start, start + url.length]);
+      }
     }
 
     const urlPattern = /https?:\/\/[^\s<>"')]+/g;
