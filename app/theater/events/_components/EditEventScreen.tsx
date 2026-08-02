@@ -30,6 +30,7 @@ type EventData = {
   tags?: string[] | null;
   cast?: unknown[] | null;
   flyer_url?: string | null;
+  analysis_flyer_url?: string | null;
   image_url?: string | null;
 };
 

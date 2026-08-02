@@ -31,6 +31,7 @@ type EventUpdatePayload = {
   tags?: string[] | string | null;
   image_url?: string | null;
   flyer_url?: string | null;
+  analysis_flyer_url?: string | null;
   ticket_url?: string | null;
   cast?: unknown[] | null;
   ai_confidence?: number | null;
@@ -383,6 +384,9 @@ export async function PATCH(
   if ("tags" in payload) update.tags = normalizeTags(payload.tags) ?? [];
   if ("image_url" in payload) update.image_url = payload.image_url ?? null;
   if ("flyer_url" in payload) update.flyer_url = payload.flyer_url ?? null;
+  if ("analysis_flyer_url" in payload) {
+    update.analysis_flyer_url = payload.analysis_flyer_url ?? null;
+  }
   if ("ticket_url" in payload) update.ticket_url = payload.ticket_url ?? null;
   if ("cast" in payload) update["cast"] = payload.cast ?? [];
   if ("ai_confidence" in payload)

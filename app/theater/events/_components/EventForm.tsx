@@ -69,6 +69,7 @@ type FormState = {
   tags: string;
   cast: CastMember[];
   flyer_url: string;
+  analysis_flyer_url: string;
   image_url: string;
   analyze_page_url: string;
   ai_confidence: string;
@@ -104,6 +105,7 @@ type EventData = {
   tags?: string[] | null;
   cast?: unknown[] | null;
   flyer_url?: string | null;
+  analysis_flyer_url?: string | null;
   image_url?: string | null;
   ai_confidence?: number | null;
   status?: "draft" | "published" | "archived" | null;
@@ -380,6 +382,7 @@ const buildInitialState = (data?: EventData | null): FormState => ({
   tags: Array.isArray(data?.tags) ? data.tags.join(", ") : "",
   cast: normalizeCastMembers(data?.cast),
   flyer_url: data?.flyer_url ?? "",
+  analysis_flyer_url: data?.analysis_flyer_url ?? "",
   image_url: data?.image_url ?? "",
   analyze_page_url: data?.ticket_url ?? "",
   ai_confidence:
@@ -458,8 +461,33 @@ type Props = {
   onSaved?: () => void;
 };
 
-type UploadTarget = "flyer" | "display";
+type UploadTarget = "flyer" | "display" | "analysis";
 type UploadNoticeType = "error" | "success" | "info";
+
+const IMAGE_UPLOAD_TARGETS = {
+  flyer: {
+    field: "flyer_url",
+    fileName: "flyer",
+    label: "チラシ画像",
+  },
+  analysis: {
+    field: "analysis_flyer_url",
+    fileName: "analysis-flyer",
+    label: "AI解析用チラシ画像",
+  },
+  display: {
+    field: "image_url",
+    fileName: "event-image",
+    label: "表示用メイン画像",
+  },
+} as const satisfies Record<
+  UploadTarget,
+  {
+    field: "flyer_url" | "analysis_flyer_url" | "image_url";
+    fileName: string;
+    label: string;
+  }
+>;
 
 export default function EventForm({
   mode,
@@ -528,6 +556,11 @@ export default function EventForm({
 
   const flyerPreview = useMemo(() => form.flyer_url, [form.flyer_url]);
   const displayPreview = useMemo(() => form.image_url, [form.image_url]);
+  const flyerUrlForAnalysis =
+    normalizeText(form.analysis_flyer_url) || normalizeText(form.flyer_url);
+  const canAnalyze = Boolean(
+    flyerUrlForAnalysis || normalizeText(form.analyze_page_url)
+  );
   const effectiveEventId = useMemo(
     () => eventId ?? createdId,
     [eventId, createdId]
@@ -677,13 +710,10 @@ export default function EventForm({
     setUploadNotice(null);
     setMessage(null);
     try {
+      const uploadTarget = IMAGE_UPLOAD_TARGETS[target];
       const { blob, ext } = await sanitizeImage(file);
       const formData = new FormData();
-      formData.append(
-        "file",
-        blob,
-        `${target === "flyer" ? "flyer" : "event-image"}.${ext}`
-      );
+      formData.append("file", blob, `${uploadTarget.fileName}.${ext}`);
       formData.append("ext", ext);
       const res = await fetch("/api/storage/flyers", {
         method: "POST",
@@ -691,8 +721,7 @@ export default function EventForm({
       });
       if (!res.ok) {
         const errorMessage = await parseErrorResponse(res);
-        const targetLabel = target === "flyer" ? "チラシ画像" : "表示画像";
-        const detail = `${targetLabel}のアップロードに失敗しました: ${errorMessage}`;
+        const detail = `${uploadTarget.label}のアップロードに失敗しました: ${errorMessage}`;
         setUploadNotice({ type: "error", text: detail });
         setMessage(detail);
         return;
@@ -707,18 +736,9 @@ export default function EventForm({
       }
       setForm((prev) => ({
         ...prev,
-        ...(target === "flyer"
-          ? {
-              flyer_url: url,
-            }
-          : {
-              image_url: url,
-            }),
+        [uploadTarget.field]: url,
       }));
-      const successMessage =
-        target === "flyer"
-          ? `チラシ画像をアップロードしました（${FLYER_BUCKET}）`
-          : `表示画像をアップロードしました（${FLYER_BUCKET}）`;
+      const successMessage = `${uploadTarget.label}をアップロードしました（${FLYER_BUCKET}）`;
       setUploadNotice({ type: "success", text: successMessage });
       setMessage(successMessage);
     } catch (error) {
@@ -733,8 +753,10 @@ export default function EventForm({
 
   const runAnalyze = async () => {
     const pageUrl = normalizeText(form.analyze_page_url);
-    if (!form.flyer_url && !pageUrl) {
-      setMessage("チラシ画像または公演ページURLを入力してください");
+    if (!flyerUrlForAnalysis && !pageUrl) {
+      setMessage(
+        "AI解析用または公開用のチラシ画像、もしくは公演ページURLを入力してください"
+      );
       return;
     }
     setAnalyzing(true);
@@ -745,7 +767,7 @@ export default function EventForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          flyer_url: normalizeText(form.flyer_url) || undefined,
+          flyer_url: flyerUrlForAnalysis || undefined,
           page_url: pageUrl || undefined,
         }),
       });
@@ -796,6 +818,10 @@ export default function EventForm({
             : legacyTicketTypes.length > 0
               ? legacyTicketTypes
               : prev.ticket_types;
+        const aiImageUrl =
+          typeof result.image_url === "string"
+            ? normalizeText(result.image_url)
+            : "";
 
         return {
           ...prev,
@@ -805,10 +831,7 @@ export default function EventForm({
           reservation_links: nextReservationLinks,
           venue: result.venue ?? prev.venue,
           venue_address: result.venue_address ?? prev.venue_address,
-          image_url:
-            typeof result.image_url === "string" && normalizeText(result.image_url)
-              ? normalizeText(result.image_url)
-              : prev.image_url,
+          image_url: normalizeText(prev.image_url) ? prev.image_url : aiImageUrl,
           playwright:
             typeof result.playwright === "string"
               ? result.playwright
@@ -964,6 +987,7 @@ export default function EventForm({
       tags: form.tags || null,
       status: form.status,
       flyer_url: form.flyer_url || null,
+      analysis_flyer_url: form.analysis_flyer_url || null,
       image_url: form.image_url || null,
       ai_confidence: form.ai_confidence ? Number(form.ai_confidence) : null,
       cast,
@@ -1111,7 +1135,7 @@ export default function EventForm({
         {(!isWizard || createStep === 0) && (
           <>
             <label className="text-xs font-black tracking-wide text-zinc-700">
-              チラシ画像
+              チラシ画像（表面・公開ページに表示されます）
             </label>
             <input
               type="file"
@@ -1128,6 +1152,27 @@ export default function EventForm({
               value={form.flyer_url}
               readOnly
             />
+            <label className="text-xs font-black tracking-wide text-zinc-700">
+              AI解析用チラシ画像（裏面など・任意）
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              className="input-retro"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void uploadImageAsset(file, "analysis");
+              }}
+            />
+            <input
+              className="input-retro bg-surface-muted text-xs text-zinc-600"
+              placeholder="AI解析用チラシURL（アップロード後に自動入力）"
+              value={form.analysis_flyer_url}
+              readOnly
+            />
+            <p className="text-xs text-zinc-600">
+              公開はされません。文字情報の多い面をアップすると自動入力の精度が上がります
+            </p>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -1135,7 +1180,7 @@ export default function EventForm({
                 disabled={
                   analyzing ||
                   uploadingTarget !== null ||
-                  (!form.flyer_url && !normalizeText(form.analyze_page_url))
+                  !canAnalyze
                 }
                 className="btn-retro btn-surface text-xs disabled:opacity-50"
               >
@@ -1168,7 +1213,7 @@ export default function EventForm({
               </p>
             )}
             <label className="text-xs font-black tracking-wide text-zinc-700">
-              表示画像（トップ・詳細ページ用）
+              表示用メイン画像（任意・トップや詳細で優先表示）
             </label>
             <input
               type="file"
@@ -1212,14 +1257,12 @@ export default function EventForm({
             )}
             {!displayPreview && (
               <div className="max-h-64 rounded-2xl border-2 border-ink bg-surface p-4 text-xs text-zinc-600 shadow-hard-sm">
-                表示画像は未設定です。上の「表示画像（トップ・詳細ページ用）」から画像をアップロードしてください。
+                表示用メイン画像は未設定です。上の欄から画像をアップロードしてください。
               </div>
             )}
             {uploadingTarget && (
               <p className="text-xs text-zinc-600">
-                {uploadingTarget === "flyer"
-                  ? "チラシ画像をアップロード中..."
-                  : "表示画像をアップロード中..."}
+                {IMAGE_UPLOAD_TARGETS[uploadingTarget].label}をアップロード中...
               </p>
             )}
           </>

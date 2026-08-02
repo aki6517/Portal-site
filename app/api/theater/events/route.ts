@@ -31,6 +31,7 @@ type EventPayload = {
   tags?: string[] | string | null;
   image_url?: string | null;
   flyer_url?: string | null;
+  analysis_flyer_url?: string | null;
   ticket_url?: string | null;
   cast?: unknown[] | null;
   ai_confidence?: number | null;
@@ -334,6 +335,7 @@ export async function POST(req: Request) {
     tags: normalizeTags(payload.tags),
     image_url: payload.image_url ?? null,
     flyer_url: payload.flyer_url ?? null,
+    analysis_flyer_url: payload.analysis_flyer_url ?? null,
     ticket_url: payload.ticket_url ?? null,
     "cast": payload.cast ?? [],
     ai_confidence:
