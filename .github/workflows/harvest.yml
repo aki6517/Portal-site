@@ -1,0 +1,45 @@
+# 公演情報の月次自動収集（設計: docs/harvest/DESIGN.md）
+# 月末回（28日 6:00 JST）で翌月分を取り込み、月初回（2日 6:00 JST）で取りこぼしを回収する。
+name: harvest-events
+
+on:
+  schedule:
+    - cron: "0 21 27 * *" # 毎月28日 6:00 JST（月末回・翌月分）
+    - cron: "0 21 1 * *"  # 毎月2日 6:00 JST（月初回・回収）
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "書き込み・メールなしのレポートのみ"
+        type: boolean
+        default: false
+      sources:
+        description: "対象ソース（カンマ区切り: fpap,pomplaza,qgeki）"
+        default: "fpap,pomplaza,qgeki"
+      window_days:
+        description: "実行日から何日先までを対象にするか"
+        default: "70"
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run harvest
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          HARVEST_REPORT_TO: ${{ secrets.HARVEST_REPORT_TO }}
+          CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
+          HARVEST_PUBLISH: "true"
+        run: |
+          ARGS="--window-days=${{ inputs.window_days || '70' }} --source=${{ inputs.sources || 'fpap,pomplaza,qgeki' }}"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          node scripts/harvest/index.mjs $ARGS
