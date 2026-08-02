@@ -10,6 +10,7 @@
 | `fpap` | FPAP公演カレンダーの公開Google CalendarをiCalで取得 | `https://calendar.google.com/calendar/ical/ab9b5ce4d3bf0cb83265338ab8262a72e3c5c34851c0ea4b5f42b71404b7b751%40group.calendar.google.com/public/basic.ics`。劇団が自己登録→FPAPが掲載する一次情報。SUMMARY=公演名/LOCATION=会場/DESCRIPTIONに日程・詳細。1公演日=1VEVENTのことが多い |
 | `pomplaza` | `http://pomplazahall.jp/files/event_YYMM.pdf`（月別・命名規則固定）をGeminiで構造化 | 公式イベントカレンダーPDF。pdftotext -layoutでも読めるが格子レイアウトのためLLM構造化＋厳密バリデーションを採用 |
 | `qgeki` | `https://q-geki.jp/events/` 一覧→ジャンル=演劇の個別ページをHTML解析 | 北九州芸術劇場公式。FPAPには北九州の情報がほぼ無いため必須 |
+| `corich` | CoRich舞台芸術 `https://stage.corich.jp/stage?area=11`（九州・沖縄）の一覧をHTML解析 | 劇団の自己登録データ。一覧だけで題名/劇団/会場/県名/期間が取れるため個別ページには行かない（負荷配慮・robots.txt制限なし確認済み）。県名=福岡県でフィルタ。時刻なしdate-only・期間は初日と楽日のみ登録。科学館など「公式に公演一覧が無い会場」の受け皿（2026-08-02追加） |
 
 ## パイプライン（scripts/harvest/index.mjs）
 

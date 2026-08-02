@@ -17,7 +17,9 @@ import {
   parseCliArgs,
   resolveVenue,
   computeVenueKey,
+  venueKeysMatch,
   titleSimilarity,
+  bigramSet,
   normalizeForCompare,
   isLikelyNonTheater,
   guessCategory,
@@ -32,6 +34,7 @@ import {
 import { fetchFpapRecords } from "./adapters/fpap.mjs";
 import { fetchPomplazaRecords } from "./adapters/pomplaza.mjs";
 import { fetchQgekiRecords } from "./adapters/qgeki.mjs";
+import { fetchCorichRecords } from "./adapters/corich.mjs";
 
 // ---------------------------------------------------------------------------
 // 定数
@@ -42,17 +45,20 @@ const ADAPTERS = {
   pomplaza: ({ fixturesDir, windowDays, now, geminiApiKey }) =>
     fetchPomplazaRecords({ fixturesDir, windowDays, now, geminiApiKey }),
   qgeki: ({ fixturesDir, windowDays, now }) => fetchQgekiRecords({ fixturesDir, windowDays, now }),
+  corich: ({ fixturesDir, windowDays, now }) => fetchCorichRecords({ fixturesDir, windowDays, now }),
 };
 
 const SOURCE_LABELS = {
   fpap: "FPAP公演カレンダー",
   pomplaza: "ぽんプラザホール",
   qgeki: "北九州芸術劇場",
+  corich: "CoRich舞台芸術",
 };
 
 // pomplazaはPDF→LLM構造化を経由するため、公式一次情報のfpap/qgekiより
 // ai_confidenceを保守的に設定する（DESIGN.mdに数値指定は無いため実装判断）。
-const SOURCE_CONFIDENCE = { fpap: 0.85, qgeki: 0.85, pomplaza: 0.6 };
+// corichは劇団の自己登録データ＝一次情報だが時刻なしのため0.8。
+const SOURCE_CONFIDENCE = { fpap: 0.85, qgeki: 0.85, pomplaza: 0.6, corich: 0.8 };
 
 const DUPLICATE_SKIP_THRESHOLD = 0.55;
 const DUPLICATE_DRAFT_THRESHOLD = 0.4;
@@ -129,7 +135,7 @@ const findDuplicateMatch = (record, existingEvents, venuesList) => {
 
   for (const ev of existingEvents) {
     const evVenueKey = computeVenueKey(ev.venue, ev.venue_id, venuesList);
-    if (evVenueKey !== recordVenueKey) continue;
+    if (!venueKeysMatch(evVenueKey, recordVenueKey)) continue;
 
     const evMin = jstDateFromTimestamptz(ev.start_date);
     const evMax = jstDateFromTimestamptz(ev.end_date) ?? evMin;
@@ -148,6 +154,17 @@ const findDuplicateMatch = (record, existingEvents, venuesList) => {
     const longer = recNorm.length <= evNorm.length ? evNorm : recNorm;
     if (shorter.length >= 2 && longer.includes(shorter)) {
       similarity = Math.max(similarity, 0.8);
+    }
+    // overlap係数（積集合/小さい方）: 「15 Minutes Made 東京/福岡 福岡公演」vs
+    // 「Mrs.fictions presents『15 Minutes Made』福岡公演」のように双方に別々の
+    // 冠・接尾辞が付き、包含もJaccardも届かないケースの救済。
+    const setRec = bigramSet(record.title);
+    const setEv = bigramSet(ev.title ?? "");
+    const minSize = Math.min(setRec.size, setEv.size);
+    if (minSize >= 3) {
+      let intersection = 0;
+      for (const item of setRec) if (setEv.has(item)) intersection += 1;
+      if (intersection / minSize >= 0.7) similarity = Math.max(similarity, 0.8);
     }
     if (!best || similarity > best.similarity) {
       best = { similarity, event: ev };

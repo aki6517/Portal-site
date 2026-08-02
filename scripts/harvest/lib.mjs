@@ -106,11 +106,16 @@ const HALL_SUFFIX_TOKENS = new Set([
 
 const stripBrackets = (value) => value.replace(/[（(][^）)]*[）)]/g, "");
 
+// 「福岡市美術館・ミュージアムホール」のような中黒区切りをホール語分離に
+// かけられるよう、・は空白扱いにする（lib/venues/normalize.tsとの差分。
+// 比較時は両辺とも同じ正規化を通すので、名前自体に・を含む施設も一致する）
+const dotToSpace = (value) => value.replace(/・/g, " ");
+
 export const splitVenueString = (raw) => {
   const value = (raw ?? "").trim();
   if (!value) return { facilityName: "", hallNote: null };
 
-  const normalized = stripBrackets(value.normalize("NFKC")).trim();
+  const normalized = dotToSpace(stripBrackets(value.normalize("NFKC"))).trim();
   const tokens = normalized.split(/\s+/).filter(Boolean);
 
   if (tokens.length >= 2) {
@@ -126,7 +131,8 @@ export const splitVenueString = (raw) => {
   return { facilityName: normalized, hallNote: null };
 };
 
-const normalizeVenueForCompare = (value) => stripBrackets(value.normalize("NFKC")).trim();
+const normalizeVenueForCompare = (value) =>
+  dotToSpace(stripBrackets(value.normalize("NFKC"))).replace(/\s+/g, " ").trim();
 
 export const resolveVenue = (raw, venues) => {
   const { facilityName, hallNote } = splitVenueString(raw);
@@ -150,7 +156,24 @@ export const computeVenueKey = (venueText, existingVenueId, venues) => {
   if (existingVenueId) return `id:${existingVenueId}`;
   const resolved = resolveVenue(venueText, venues);
   if (resolved.venueId) return `id:${resolved.venueId}`;
-  return `text:${normalizeVenueForCompare(resolved.facilityName || venueText || "")}`;
+  // 未解決会場は記号・空白の揺れに強いタイトル用正規化でキー化する
+  return `text:${normalizeForCompare(resolved.facilityName || venueText || "")}`;
+};
+
+/**
+ * 会場キー同士の一致判定。完全一致に加え、双方が未解決（text:）の場合は
+ * 片方がもう片方を含めば同一会場とみなす（例: 「SAWARAPIA」と
+ * 「SAWARAPIA福岡県立ももち文化センター」）。短すぎるキーの包含は誤爆する
+ * ため4文字以上に限る。
+ */
+export const venueKeysMatch = (a, b) => {
+  if (a === b) return true;
+  if (!a.startsWith("text:") || !b.startsWith("text:")) return false;
+  const ta = a.slice(5);
+  const tb = b.slice(5);
+  const shorter = ta.length <= tb.length ? ta : tb;
+  const longer = ta.length <= tb.length ? tb : ta;
+  return shorter.length >= 4 && longer.includes(shorter);
 };
 
 // ---------------------------------------------------------------------------

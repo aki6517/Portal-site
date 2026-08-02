@@ -13,8 +13,8 @@ on:
         type: boolean
         default: false
       sources:
-        description: "対象ソース（カンマ区切り: fpap,pomplaza,qgeki）"
-        default: "fpap,pomplaza,qgeki"
+        description: "対象ソース（カンマ区切り: fpap,pomplaza,qgeki,corich）"
+        default: "fpap,pomplaza,qgeki,corich"
       window_days:
         description: "実行日から何日先までを対象にするか"
         default: "70"
@@ -40,6 +40,6 @@ jobs:
           CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
           HARVEST_PUBLISH: "true"
         run: |
-          ARGS="--window-days=${{ inputs.window_days || '70' }} --source=${{ inputs.sources || 'fpap,pomplaza,qgeki' }}"
+          ARGS="--window-days=${{ inputs.window_days || '70' }} --source=${{ inputs.sources || 'fpap,pomplaza,qgeki,corich' }}"
           if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
           node scripts/harvest/index.mjs $ARGS
