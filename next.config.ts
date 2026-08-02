@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
         hostname: "uqravexrkvndxlcghihn.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
+      // 劇団側が公演サイト（Wix）の画像URLを登録するケース（例: ガラパ036誘拐）
+      {
+        protocol: "https",
+        hostname: "static.wixstatic.com",
+      },
     ],
   },
   async headers() {

@@ -12,6 +12,7 @@ import {
 import {
   getTrendingEvents,
   getCategories,
+  getFeaturedEvent,
   type EventSummary,
   type CategorySummary,
 } from "@/lib/data/events";
@@ -56,9 +57,10 @@ const getReservationBadge = (event: TrendingEvent) => {
 };
 
 export default async function Home() {
-  const [trending, allCategories] = await Promise.all([
+  const [trending, allCategories, featuredPick] = await Promise.all([
     getTrendingEvents(),
     getCategories(),
+    getFeaturedEvent(),
   ]);
   const categories = allCategories.slice(0, 8);
   const categoriesList =
@@ -66,7 +68,8 @@ export default async function Home() {
   const categoryMap = new Map(
     categoriesList.map((category) => [category.id, category])
   );
-  const featured = trending[0];
+  // 編集部おすすめ（featured_at設定済み）があれば最優先、無ければトレンド1位
+  const featured = featuredPick ?? trending[0];
   const featuredImageCandidates = getEventImageCandidates(featured);
   const featuredHref = featured
     ? `/events/${encodeURIComponent(featured.category)}/${encodeURIComponent(

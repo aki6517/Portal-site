@@ -225,6 +225,38 @@ export const getTrendingEvents = () =>
   })();
 
 // ---------------------------------------------------------------------------
+// 編集部おすすめ（トップのPICK UP固定枠）
+// featured_at が設定された公開中・未終演のイベントのうち featured_at が最新の
+// 1件を返す。無ければ null（トップは従来どおりトレンド1位を表示する）。
+// migrations/20260802100012 未適用のDBではエラーになるので null にフォールバック。
+// ---------------------------------------------------------------------------
+
+const FEATURED_SELECT_FIELDS =
+  "id, title, category, slug, start_date, end_date, schedule_times, publish_at, reservation_start_at, reservation_label, ticket_url, image_url, flyer_url";
+
+const fetchFeaturedEvent = async (): Promise<EventSummary | null> => {
+  const client = createSupabasePublicClient();
+  const { data, error } = await client
+    .from("events")
+    .select(FEATURED_SELECT_FIELDS)
+    .eq("status", "published")
+    .not("featured_at", "is", null)
+    .order("featured_at", { ascending: false })
+    .limit(5);
+  if (error) return null;
+  const rows = (data ?? []) as EventSummary[];
+  return (
+    rows.find((event) => isReleased(event.publish_at) && !isEnded(event)) ?? null
+  );
+};
+
+export const getFeaturedEvent = () =>
+  unstable_cache(fetchFeaturedEvent, ["featured-event"], {
+    tags: ["events"],
+    revalidate: 600,
+  })();
+
+// ---------------------------------------------------------------------------
 // 一覧（/events, /events/[category]）
 // 過去公演の除外はDB側のcoarseフィルタ（end_date基準、±24h猶予）＋
 // JS側のlib/events/lifecycle.isEndedによる正確なフィルタの2段構え。
