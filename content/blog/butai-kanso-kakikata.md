@@ -15,7 +15,7 @@ description: 舞台を観た後、感想をうまく言葉にできない…そ�
 
 ちょっとしたコツを知っておくだけで、SNSでも友達との会話でも、自分の気持ちをしっかり伝えられるようになりますよ。
 
-[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』2026年10月2日〜4日・ぽんプラザホール・チケット一般発売中](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai)
+[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』2026年10月2日〜4日・ぽんプラザホール・チケット一般発売中](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai?utm_source=act-portal&utm_medium=banner&utm_campaign=yukai2026&utm_content=butai-kanso-kakikata__top)
 
 ## 感想がうまく書けない理由
 
@@ -72,4 +72,4 @@ description: 舞台を観た後、感想をうまく言葉にできない…そ�
 
 福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）の次回公演『誘拐されちゃったかもしれない』は、2026年10月2日（金）〜4日（日）にぽんプラザホールで上演されます。チケットは一般発売中ですよ。
 
-[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』公演バナー](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai)
+[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』公演バナー](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai?utm_source=act-portal&utm_medium=banner&utm_campaign=yukai2026&utm_content=butai-kanso-kakikata__bottom)

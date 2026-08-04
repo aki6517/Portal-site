@@ -20,7 +20,7 @@ organization_logo: /icon.png?v=20260210a
 
 この記事では、舞台とミュージカルの違いを比較表付きで整理したうえで、「初心者はどっちから見るべき？」という疑問にも答えていきますね。
 
-[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』2026年10月2日〜4日・ぽんプラザホール・チケット一般発売中](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai)
+[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』2026年10月2日〜4日・ぽんプラザホール・チケット一般発売中](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai?utm_source=act-portal&utm_medium=banner&utm_campaign=yukai2026&utm_content=butai-musical-chigai__top)
 
 ## 舞台とミュージカルの違いは「歌が物語の核になるかどうか」
 
@@ -207,4 +207,4 @@ SNSで「観劇してきた！」と書けば、ミュージカルでもスト�
 
 福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）の次回公演『誘拐されちゃったかもしれない』は、2026年10月2日（金）〜4日（日）にぽんプラザホールで上演されます。チケットは一般発売中ですよ。
 
-[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』公演バナー](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai)
+[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』公演バナー](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai?utm_source=act-portal&utm_medium=banner&utm_campaign=yukai2026&utm_content=butai-musical-chigai__bottom)

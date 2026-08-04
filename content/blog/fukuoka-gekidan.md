@@ -24,7 +24,7 @@ organization_logo: /icon.png?v=20260210a
 
 「福岡にどんな劇団があるのか知りたい」「初めて見るならどの劇団がいいのか迷う」という方は、ぜひ参考にしてみてくださいね。
 
-[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』2026年10月2日〜4日・ぽんプラザホール・チケット一般発売中](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai)
+[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』2026年10月2日〜4日・ぽんプラザホール・チケット一般発売中](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai?utm_source=act-portal&utm_medium=banner&utm_campaign=yukai2026&utm_content=fukuoka-gekidan__top)
 
 ## 福岡の劇団一覧【直近3年に公演した現役15組】
 
@@ -209,6 +209,6 @@ FOURTEEN PLUS 14+は、**社会性と娯楽性をあわせ持つ作品**を上�
 
 [福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）](https://www.galapagos-dynamos.com/)の次回公演『誘拐されちゃったかもしれない』は、2026年10月2日（金）〜4日（日）にぽんプラザホールで上演されます。チケットは一般発売中ですよ。
 
-[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』公演バナー](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai)
+[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』公演バナー](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai?utm_source=act-portal&utm_medium=banner&utm_campaign=yukai2026&utm_content=fukuoka-gekidan__bottom)
 
 公演情報は[福岡アクトポータル](https://portal.galapagos-dynamos.com/)からチェックしてみましょう。
