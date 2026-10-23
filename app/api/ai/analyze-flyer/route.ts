@@ -1,3 +1,4 @@
+import https from "node:https";
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -77,16 +78,114 @@ const normalizeUrl = (value?: string | null) => {
   }
 };
 
-const fetchImageBase64 = async (imageUrl: string) => {
-  const response = await fetch(imageUrl);
-  if (!response.ok) {
-    throw new Error(`IMAGE_FETCH_FAILED:${response.status}`);
-  }
-  const contentType =
-    response.headers.get("content-type")?.split(";")[0] || "image/jpeg";
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return { base64: buffer.toString("base64"), mimeType: contentType };
+// Node.js の Brotli 脆弱性（CVE-2026-111497）への一時対策。
+// 利用者が指定した外部サーバーからは取得しない（チラシは自分たちの Storage だけ・公演ページは停止）。
+// 公演ページを戻すときは、本番の Node.js が修正版になったことを [runtime] ログで確かめてから
+// PAGE_URL_FETCH_ENABLED を true にする（修正前の Node.js では isPatchedNodeRuntime が止める）。
+// 公演ページの取得は任意URLへの取得に戻るので、fetchFlyerImage と同じ制限（圧縮の拒否・サイズ・時間）と
+// 行き先の制限（SSRF 対策）を fetchPageContext に入れてから戻す。
+const PAGE_URL_FETCH_ENABLED = false;
+const FLYER_BUCKETS = ["flyers-public", "flyers"];
+const FLYER_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_FLYER_IMAGE_BYTES = 5 * 1024 * 1024;
+const FLYER_FETCH_TIMEOUT_MS = 10_000;
+const MIN_PATCHED_NODE_VERSIONS: Record<number, [number, number]> = {
+  22: [23, 4],
+  24: [22, 1],
+  26: [12, 1],
 };
+
+const isPatchedNodeRuntime = () => {
+  if (/[-+]/.test(process.versions.node)) return false;
+  const [major, minor, patch] = process.versions.node.split(".").map(Number);
+  if (major > 26) return true;
+  const min = MIN_PATCHED_NODE_VERSIONS[major];
+  if (!min) return false;
+  return minor > min[0] || (minor === min[0] && patch >= min[1]);
+};
+
+const isAllowedFlyerUrl = (value: string) => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return false;
+  try {
+    const url = new URL(value);
+    const base = new URL(supabaseUrl);
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      url.host === base.host &&
+      !/%2e|%2f|%5c/i.test(url.pathname) &&
+      FLYER_BUCKETS.some((bucket) =>
+        url.pathname.startsWith(`/storage/v1/object/public/${bucket}/flyers/`)
+      )
+    );
+  } catch {
+    return false;
+  }
+};
+
+type FlyerImage = { base64: string; mimeType: string };
+
+class FlyerImageError extends Error {}
+
+// fetch は Brotli などの圧縮を自動で展開するので使わない。
+// node:https は展開しないので、圧縮されて届いた応答は中身を読まずに断る。
+const fetchFlyerImage = (imageUrl: string) =>
+  new Promise<FlyerImage>((resolve, reject) => {
+    const req = https.get(
+      imageUrl,
+      { headers: { "Accept-Encoding": "identity" } },
+      (res) => {
+        res.on("error", reject);
+        const fail = (code: string) => {
+          clearTimeout(timer);
+          res.destroy();
+          reject(new FlyerImageError(code));
+        };
+
+        if (res.statusCode !== 200) {
+          fail(`IMAGE_FETCH_FAILED:${res.statusCode}`);
+          return;
+        }
+        const encoding = (res.headers["content-encoding"] ?? "")
+          .trim()
+          .toLowerCase();
+        if (encoding && encoding !== "identity") {
+          fail(`IMAGE_ENCODING_NOT_ALLOWED:${encoding}`);
+          return;
+        }
+        const mimeType = (res.headers["content-type"] ?? "")
+          .split(";")[0]
+          .trim()
+          .toLowerCase();
+        if (!FLYER_IMAGE_TYPES.has(mimeType)) {
+          fail(`IMAGE_CONTENT_TYPE_INVALID:${mimeType || "none"}`);
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        let size = 0;
+        res.on("data", (chunk: Buffer) => {
+          size += chunk.length;
+          if (size > MAX_FLYER_IMAGE_BYTES) {
+            fail("IMAGE_TOO_LARGE");
+            return;
+          }
+          chunks.push(chunk);
+        });
+        res.on("end", () => {
+          clearTimeout(timer);
+          resolve({ base64: Buffer.concat(chunks).toString("base64"), mimeType });
+        });
+      }
+    );
+    const timer = setTimeout(() => {
+      req.destroy(new FlyerImageError("IMAGE_FETCH_TIMEOUT"));
+    }, FLYER_FETCH_TIMEOUT_MS);
+    req.on("close", () => clearTimeout(timer));
+    req.on("error", reject);
+  });
 
 const decodeHtml = (value: string) =>
   value
@@ -221,12 +320,12 @@ const getModelCandidates = () => {
 const callGemini = async ({
   model,
   prompt,
-  imageUrl,
+  image,
   pageContextText,
 }: {
   model: string;
   prompt: string;
-  imageUrl?: string | null;
+  image?: FlyerImage | null;
   pageContextText?: string | null;
 }) => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -245,9 +344,8 @@ const callGemini = async ({
     });
   }
 
-  if (imageUrl) {
-    const { base64, mimeType } = await fetchImageBase64(imageUrl);
-    parts.push({ inline_data: { mime_type: mimeType, data: base64 } });
+  if (image) {
+    parts.push({ inline_data: { mime_type: image.mimeType, data: image.base64 } });
   }
 
   const response = await fetch(
@@ -582,6 +680,34 @@ export async function POST(req: Request) {
     );
   }
 
+  if (flyerUrl && !isAllowedFlyerUrl(flyerUrl)) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "FLYER_URL_NOT_ALLOWED",
+          message:
+            "チラシ画像は、この画面からアップロードした画像だけ解析できます（外部の画像URLは安全のため一時的に使えません）",
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  const pageUrlFetchEnabled = PAGE_URL_FETCH_ENABLED && isPatchedNodeRuntime();
+
+  if (pageUrl && !pageUrlFetchEnabled && !flyerUrl) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "PAGE_URL_DISABLED",
+          message:
+            "公演ページURLからの読み取りは安全のため一時停止中です。チラシ画像をアップロードして解析してください",
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   const rateKey = getClientKey(req, user.id);
   const limit = checkRateLimit(rateKey);
   if (!limit.ok) {
@@ -596,10 +722,33 @@ export async function POST(req: Request) {
     );
   }
 
+  let flyerImage: FlyerImage | null = null;
+  if (flyerUrl) {
+    try {
+      flyerImage = await fetchFlyerImage(flyerUrl);
+    } catch (error) {
+      const code =
+        error instanceof FlyerImageError ? error.message : "IMAGE_FETCH_FAILED";
+      return NextResponse.json(
+        {
+          error: {
+            code: "FLYER_FETCH_ERROR",
+            message: `チラシ画像を読み込めませんでした（${code}）。画像をアップロードし直してから解析してください`,
+          },
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   const warnings: string[] = [];
   let pageContext: PageContext | null = null;
 
-  if (pageUrl) {
+  if (pageUrl && !pageUrlFetchEnabled) {
+    warnings.push(
+      "公演ページURLの読み取りは安全のため一時停止中です（チラシ画像だけで解析しました）"
+    );
+  } else if (pageUrl) {
     try {
       pageContext = await fetchPageContext(pageUrl);
     } catch (error) {
@@ -625,7 +774,7 @@ export async function POST(req: Request) {
         const raw = (await callGemini({
           model,
           prompt,
-          imageUrl: flyerUrl,
+          image: flyerImage,
           pageContextText: pageContext
             ? `URL: ${pageContext.url}\nTitle: ${pageContext.title}\nDescription: ${pageContext.description}\nOG Image: ${pageContext.ogImageUrl ?? "N/A"}\nReservation Link Hints:\n${pageContext.reservationLinkHints
                 .map((item, index) => `${index + 1}. ${item.label} | ${item.url}`)
