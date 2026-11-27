@@ -6,6 +6,9 @@ import path from "node:path";
 import { getAllBlogPosts, getBlogPostBySlug } from "@/lib/content";
 import { buildMetadata, getSiteUrl } from "@/lib/seo";
 
+// JSON-LD の </script> 突破を防ぐため < をエスケープ（app/calendar/page.tsxと同じパターン）
+const toJsonLd = (data: unknown) => JSON.stringify(data).replace(/</g, "\\u003c");
+
 const decodeRouteParam = (value: string) => {
   try {
     return decodeURIComponent(value);
@@ -226,18 +229,18 @@ export default async function BlogDetailPage({
     <div className="mx-auto max-w-4xl px-4 py-10">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostingJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLd(blogPostingJsonLd) }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(organizationJsonLd),
+          __html: toJsonLd(organizationJsonLd),
         }}
       />
       {faqJsonLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: toJsonLd(faqJsonLd) }}
         />
       )}
 
