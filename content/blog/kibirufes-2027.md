@@ -122,6 +122,8 @@ organization_logo: /icon.png?v=20260210a
 - 日時：12月18日（金）19:00／19日（土）14:30、18:00／20日（日）13:00
 - 料金：一般3,900円、U25 2,900円、U18 1,000円（全席自由）
 - 初めて劇場で観劇する方は1,000円引き（18歳以下は無料）になる「初めてのカンゲキ割」あり（数量限定）
+- 公演の詳しい情報：[『ケモノヒト』特設ページ](https://www.michinox.com/kemonohito)
+- チケット：[予約フォーム（R7チケット）](https://r7ticket.jp/151b1a165e18c22)
 
 劇団のこれまでの作品やおもしろさは、[MICHInoX（ミチノークス）を紹介した記事](/blog/michinox)でも詳しく書いているので、気になった方はのぞいてみてくださいね。
 
@@ -142,6 +144,8 @@ organization_logo: /icon.png?v=20260210a
 - 日時：12月26日（土）14:00、19:00／27日（日）11:00、15:00
 - 27日11:00の回は、舞台手話通訳付きで上演されます
 - 料金：一般前売2,500円（当日3,000円）、U-25 1,500円（当日2,000円）、未就学児無料（全席自由）
+- 公演の詳しい情報：[劇団ヒロシ軍の公演ページ](https://peraichi.com/landing_pages/view/1iaw2)
+- チケット：[予約フォーム](https://forms.gle/X3GSWAVr8HYFev418)、[ローソンチケット（Lコード：82491）](https://l-tike.com/order/?gLcode=82491)
 
 ### INDEPENDENT『INDEPENDENT in キビるフェス』（大阪）
 
@@ -165,6 +169,8 @@ INDEPENDENTは、大阪で2001年からずっと続いている一人芝居の�
 
 - 日時：1月15日（金）19:00／16日（土）11:30
 - 料金：一般3,000円（当日も同じ）、U25 2,000円（前売のみ）、全席自由
+- 公演の詳しい情報：[『INDEPENDENT in キビるフェス』特設ページ](https://www.independent-fes.com/re/inkf.html)
+- チケット：[予約フォーム](https://www.quartet-online.net/ticket/inkf)、[ローソンチケット（Lコード：82492）](https://l-tike.com/order/?gLcode=82492)
 
 また、俳優向けにはワークショップ「俳優の名刺代わりになる一人芝居の創り方」も1月16日と17日に開かれます（2日間通しで一般10,000円、定員15名程度、応募は12月28日まで）。
 
@@ -186,6 +192,8 @@ PUYEY（プイエイ）は福岡のユニットで、今回は10周年記念公�
 - 料金：一般3,500円、U25 2,000円、小学生500円（当日は各券500円増し、全席自由）
 - 障がい者手帳をお持ちの方は各券500円引き
 - 日英字幕付きの上演もあります（対象の回は団体の公式サイトで確認してください）
+- 公演の詳しい情報：[PUYEY 7th season 特設ページ](https://www.puyey.com/7thseason)
+- チケット：[予約フォーム](https://puyey.corich.co/7thontarosfukuoka/common)、[ローソンチケット（Lコード：82493）](https://l-tike.com/order/?gLcode=82493)
 
 ### オイスターズ『ドレミの歌』（名古屋と福岡の俳優）
 
@@ -203,6 +211,8 @@ PUYEY（プイエイ）は福岡のユニットで、今回は10周年記念公�
 
 - 日時：1月22日（金）19:00／23日（土）14:00、18:00
 - 料金：一般前売2,500円（当日3,000円）、U25 1,500円（全席自由、未就学児は入場不可）
+- 公演の詳しい情報：[『ドレミの歌』紹介ページ（キビるフェス公式サイト）](https://kibirufes-fuk.localinfo.jp/posts/59159291)
+- チケット：[予約フォーム](https://www.quartet-online.net/ticket/doremifukuoka)、[ローソンチケット（Lコード：82495）](https://l-tike.com/order/?gLcode=82495)
 
 ### 三等フランソワーズ『白日』（大阪）
 
@@ -219,6 +229,8 @@ PUYEY（プイエイ）は福岡のユニットで、今回は10周年記念公�
 - 日時：1月29日（金）19:00／30日（土）14:00、18:00
 - 料金：一般前売3,500円（当日4,000円）、U25 2,500円（全席自由、未就学児は入場不可）
 - チケット発売は11月29日（日）10:00から
+- 公演の詳しい情報：[三等フランソワーズ公式X](https://x.com/san_fura2015)
+- チケット：[予約フォーム](https://www.quartet-online.net/ticket/hakujitsu)、[ローソンチケット（Lコード：82501）](https://l-tike.com/order/?gLcode=82501)
 
 ### 万能グローブ ガラパゴスダイナモス『キューピッツ』（福岡）
 
@@ -241,8 +253,10 @@ PUYEY（プイエイ）は福岡のユニットで、今回は10周年記念公�
 - 上演時間は90分程度です
 - 車椅子席、台本の事前貸し出し、衣装を音声で紹介する動画といった鑑賞サポートを用意しています
 - チケット一般発売は11月28日（土）10:00から
+- 公演の詳しい情報：[『キューピッツ』特設サイト](https://www.galapagos-dynamos.com/037-cupids)
+- チケット：[LivePocket](https://livepocket.jp/t/galapa-037-cupids-fuk)、[チケットぴあ（Pコード：545-460）](https://w.pia.jp/t/galapagos37/)、[ローソンチケット（Lコード：82826）](https://l-tike.com/order/?gLcode=82826)、スリーオクロック（電話 092-732-1688・平日10:00〜18:30）
 
-詳しい公演情報は、[ガラパの公式サイト](https://www.galapagos-dynamos.com/037-cupids)もチェックしてみてくださいね。
+あらすじやキャスト、アフターイベントの情報は、[『キューピッツ』特設サイト](https://www.galapagos-dynamos.com/037-cupids)にまとまっているので、のぞいてみてくださいね。
 
 ## 私がキビるフェスをおすすめしたい4つの理由
 
@@ -308,15 +322,15 @@ MICHInoXの東北の歴史を題材にした舞台や、大阪の一人芝居フ
 
 キビるフェスの公式サイトからまとめて買う仕組みではないので、そこだけ気をつけてくださいね。
 
-| 作品 | 主な予約先 | 発売日 |
-| --- | --- | --- |
-| MICHInoX『ケモノヒト』 | [MICHInoX公式サイト](https://www.michinox.com/kemonohito) | 発売中 |
-| 劇団ヒロシ軍 | ローソンチケット、劇団の予約フォーム | 発売中 |
-| INDEPENDENT | ローソンチケット、[INDEPENDENT公式サイト](https://www.independent-fes.com/re/inkf.html) | 発売中 |
-| PUYEY『おんたろうズ』 | ローソンチケット、[PUYEY公式サイト](https://www.puyey.com/7thseason) | 一般発売は12月1日（火）10:00 |
-| オイスターズ『ドレミの歌』 | ローソンチケット、[キビるフェス公式サイト](https://kibirufes-fuk.localinfo.jp/posts/59159291) | 発売中 |
-| 三等フランソワーズ『白日』 | ローソンチケット、劇団の予約フォーム | 11月29日（日）10:00 |
-| ガラパ『キューピッツ』 | LivePocket、チケットぴあ、ローソンチケットほか | 一般発売は11月28日（土）10:00 |
+| 作品 | 公演ページ | 主な予約先 | 発売日 |
+| --- | --- | --- | --- |
+| MICHInoX『ケモノヒト』 | [特設ページ](https://www.michinox.com/kemonohito) | [予約フォーム（R7チケット）](https://r7ticket.jp/151b1a165e18c22) | 発売中 |
+| 劇団ヒロシ軍 | [公演ページ](https://peraichi.com/landing_pages/view/1iaw2) | [予約フォーム](https://forms.gle/X3GSWAVr8HYFev418)、[ローソンチケット](https://l-tike.com/order/?gLcode=82491) | 発売中 |
+| INDEPENDENT | [特設ページ](https://www.independent-fes.com/re/inkf.html) | [予約フォーム](https://www.quartet-online.net/ticket/inkf)、[ローソンチケット](https://l-tike.com/order/?gLcode=82492) | 発売中 |
+| PUYEY『おんたろうズ』 | [特設ページ](https://www.puyey.com/7thseason) | [予約フォーム](https://puyey.corich.co/7thontarosfukuoka/common)、[ローソンチケット](https://l-tike.com/order/?gLcode=82493) | 一般発売は12月1日（火）10:00 |
+| オイスターズ『ドレミの歌』 | [紹介ページ](https://kibirufes-fuk.localinfo.jp/posts/59159291) | [予約フォーム](https://www.quartet-online.net/ticket/doremifukuoka)、[ローソンチケット](https://l-tike.com/order/?gLcode=82495) | 発売中 |
+| 三等フランソワーズ『白日』 | [公式X](https://x.com/san_fura2015) | [予約フォーム](https://www.quartet-online.net/ticket/hakujitsu)、[ローソンチケット](https://l-tike.com/order/?gLcode=82501) | 11月29日（日）10:00 |
+| ガラパ『キューピッツ』 | [特設サイト](https://www.galapagos-dynamos.com/037-cupids) | [LivePocket](https://livepocket.jp/t/galapa-037-cupids-fuk)、[チケットぴあ](https://w.pia.jp/t/galapagos37/)、[ローソンチケット](https://l-tike.com/order/?gLcode=82826)、スリーオクロック（電話） | 一般発売は11月28日（土）10:00 |
 
 発売日は2026年11月27日時点の情報です。
 
