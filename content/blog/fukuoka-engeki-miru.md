@@ -20,7 +20,7 @@ organization_logo: /icon.png?v=20260210a
 
 この記事では、福岡で演劇を見られる劇場、公演を行っている劇団、ジャンルと初心者の選び方、チケットの取り方、初めての不安の解消法まで、順を追ってわかりやすく解説します。
 
-[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』2026年10月2日〜4日・ぽんプラザホール・チケット一般発売中](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai?utm_source=act-portal&utm_medium=banner&utm_campaign=yukai2026&utm_content=fukuoka-engeki-miru__top)
+[![万能グローブ ガラパゴスダイナモス 第37回公演『キューピッツ』福岡公演2027年2月3日〜7日・パピオビールーム大練習室・チケット一般発売は11月28日10時から](/banners/cupids2027-banner.jpg)](https://www.galapagos-dynamos.com/037-cupids?utm_source=act-portal&utm_medium=banner&utm_campaign=cupids2027&utm_content=fukuoka-engeki-miru__top)
 
 ## 福岡で演劇を見られる主な劇場
 
@@ -286,6 +286,8 @@ organization_logo: /icon.png?v=20260210a
 
 公演情報は[福岡アクトポータル](https://portal.galapagos-dynamos.com/)からチェックしてみましょう。
 
-福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）の次回公演『誘拐されちゃったかもしれない』は、2026年10月2日（金）〜4日（日）にぽんプラザホールで上演されます。チケットは一般発売中ですよ。
+福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）の次回公演『キューピッツ』は、2027年2月3日（水）〜7日（日）にパピオビールーム大練習室で上演されます。チケットは2026年11月28日（土）10:00から一般発売ですよ。
 
-[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』公演バナー](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai?utm_source=act-portal&utm_medium=banner&utm_campaign=yukai2026&utm_content=fukuoka-engeki-miru__bottom)
+冬の演劇祭「キビるフェス2027」の参加作品なので、ほかの劇団の作品とあわせて観るのもおすすめです（[キビるフェス2027の記事](/blog/kibirufes-2027)）。
+
+[![万能グローブ ガラパゴスダイナモス 第37回公演『キューピッツ』公演バナー](/banners/cupids2027-banner.jpg)](https://www.galapagos-dynamos.com/037-cupids?utm_source=act-portal&utm_medium=banner&utm_campaign=cupids2027&utm_content=fukuoka-engeki-miru__bottom)

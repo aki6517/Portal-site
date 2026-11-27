@@ -24,7 +24,7 @@ organization_logo: /icon.png?v=20260210a
 
 「福岡にどんな劇団があるのか知りたい」「初めて見るならどの劇団がいいのか迷う」という方は、ぜひ参考にしてみてくださいね。
 
-[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』2026年10月2日〜4日・ぽんプラザホール・チケット一般発売中](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai?utm_source=act-portal&utm_medium=banner&utm_campaign=yukai2026&utm_content=fukuoka-gekidan__top)
+[![万能グローブ ガラパゴスダイナモス 第37回公演『キューピッツ』福岡公演2027年2月3日〜7日・パピオビールーム大練習室・チケット一般発売は11月28日10時から](/banners/cupids2027-banner.jpg)](https://www.galapagos-dynamos.com/037-cupids?utm_source=act-portal&utm_medium=banner&utm_campaign=cupids2027&utm_content=fukuoka-gekidan__top)
 
 ## 福岡の劇団一覧【直近3年に公演した現役15組】
 
@@ -69,7 +69,7 @@ organization_logo: /icon.png?v=20260210a
 
 会話のズレとテンポで笑わせる作風なので、演劇の知識がゼロでも直感的に楽しめます。キャナルシティ劇場のような大きな劇場での上演歴もあり、福岡の小劇場シーンの看板的な存在ですよ。
 
-次回公演『誘拐されちゃったかもしれない』は、2026年10月2日（金）〜4日（日）にぽんプラザホールで上演されます。
+次回公演『キューピッツ』は、2027年2月3日（水）〜7日（日）にパピオビールーム大練習室で上演されます（キビるフェス2027の参加作品）。
 
 ### 劇団ジグザグバイト
 
@@ -207,8 +207,10 @@ FOURTEEN PLUS 14+は、**社会性と娯楽性をあわせ持つ作品**を上�
 
 初めて福岡の劇団の公演を見るなら、**まずは笑える会話コメディから入るのがおすすめ**です。「おもしろかった！」と素直に感じやすいので、観劇デビューの成功率が高いですよ。
 
-[福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）](https://www.galapagos-dynamos.com/)の次回公演『誘拐されちゃったかもしれない』は、2026年10月2日（金）〜4日（日）にぽんプラザホールで上演されます。チケットは一般発売中ですよ。
+[福岡の劇団「万能グローブ ガラパゴスダイナモス」（通称ガラパ）](https://www.galapagos-dynamos.com/)の次回公演『キューピッツ』は、2027年2月3日（水）〜7日（日）にパピオビールーム大練習室で上演されます。チケットは2026年11月28日（土）10:00から一般発売ですよ。
 
-[![万能グローブ ガラパゴスダイナモス 第36回公演『誘拐されちゃったかもしれない』公演バナー](/banners/yukai2026-banner.jpg)](https://www.galapagos-dynamos.com/036-yukai?utm_source=act-portal&utm_medium=banner&utm_campaign=yukai2026&utm_content=fukuoka-gekidan__bottom)
+冬の演劇祭「キビるフェス2027」の参加作品なので、ほかの劇団の作品とあわせて観るのもおすすめです（[キビるフェス2027の記事](/blog/kibirufes-2027)）。
+
+[![万能グローブ ガラパゴスダイナモス 第37回公演『キューピッツ』公演バナー](/banners/cupids2027-banner.jpg)](https://www.galapagos-dynamos.com/037-cupids?utm_source=act-portal&utm_medium=banner&utm_campaign=cupids2027&utm_content=fukuoka-gekidan__bottom)
 
 公演情報は[福岡アクトポータル](https://portal.galapagos-dynamos.com/)からチェックしてみましょう。
