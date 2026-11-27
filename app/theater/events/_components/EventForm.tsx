@@ -445,18 +445,36 @@ const sanitizeImage = async (file: File) => {
   return { blob, ext };
 };
 
+// 応答に日本語の message が無いとき（JSON でない応答・サーバーの前段のエラーページなど）に出す文。
+// 英語の statusText やエラーページの本文は出さず、問い合わせの手がかりにステータスだけ添える。
+const fallbackErrorMessage = (status: number) =>
+  `通信に失敗しました（${status}）。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。`;
+
+const NETWORK_ERROR_MESSAGE =
+  "通信に失敗しました。インターネットへのつながりを確かめて、もう一度お試しください。";
+const IMAGE_LOAD_FAILED_MESSAGE =
+  "画像を読み込めませんでした。jpg・png・webp の画像を選び直してください。";
+
+// 画面に出す文は、理由ごとの決まった日本語にする。内部の識別子（IMAGE_LOAD_FAILED など）や、
+// 通信断のときのブラウザの例外の文（Chrome の Failed to fetch・Safari の Load failed・Firefox の
+// NetworkError … など）は画面に出さず、console.error に残す。
+const describeClientError = (error: unknown, fallback: string) => {
+  console.error("[EventForm]", error);
+  if (error instanceof Error && error.message === "IMAGE_LOAD_FAILED") {
+    return IMAGE_LOAD_FAILED_MESSAGE;
+  }
+  // fetch が通信断で失敗したときは TypeError になる
+  if (error instanceof TypeError) return NETWORK_ERROR_MESSAGE;
+  return fallback;
+};
+
 const parseErrorResponse = async (res: Response) => {
-  const cloned = res.clone();
   try {
     const json = await res.json();
-    const message =
-      json?.error?.message ||
-      json?.message ||
-      `${res.status} ${res.statusText || "Request failed"}`;
+    const message = json?.error?.message || json?.message || fallbackErrorMessage(res.status);
     return String(message);
   } catch {
-    const text = (await cloned.text()).trim();
-    return text || `${res.status} ${res.statusText || "Request failed"}`;
+    return fallbackErrorMessage(res.status);
   }
 };
 
@@ -790,8 +808,10 @@ export default function EventForm({
       setUploadNotice({ type: "success", text: successMessage });
       setMessage(successMessage);
     } catch (error) {
-      const detail =
-        error instanceof Error ? error.message : "アップロードに失敗しました";
+      const detail = `${IMAGE_UPLOAD_TARGETS[target].label}のアップロードに失敗しました。${describeClientError(
+        error,
+        "時間をおいてもう一度お試しください。"
+      )}`;
       setUploadNotice({ type: "error", text: detail });
       setMessage(detail);
     } finally {
@@ -927,6 +947,10 @@ export default function EventForm({
           ? `AI解析が完了しました（注意: ${warnings.join(" / ")}）。内容を確認してください。`
           : "AI解析が完了しました。内容を確認してください。"
       );
+    } catch (error) {
+      setMessage(
+        describeClientError(error, "AI解析に失敗しました。時間をおいてもう一度お試しください。")
+      );
     } finally {
       setAnalyzing(false);
     }
@@ -1054,17 +1078,27 @@ export default function EventForm({
       superseded_by: form.superseded_by || null,
     };
 
-    const res = await fetch(
-      mode === "create"
-        ? "/api/theater/events"
-        : `/api/theater/events/${eventId}`,
-      {
-        method: mode === "create" ? "POST" : "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }
-    );
-    const json = await res.json();
+    // 通信断（fetch の例外）や JSON でない応答でも「保存中」のまま止まらないようにし、決まった文を出す
+    let res: Response;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 応答の形は API ごとに違うので、今までどおり any で読む
+    let json: any;
+    try {
+      res = await fetch(
+        mode === "create"
+          ? "/api/theater/events"
+          : `/api/theater/events/${eventId}`,
+        {
+          method: mode === "create" ? "POST" : "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      json = await res.json();
+    } catch (error) {
+      setMessage(describeClientError(error, "保存に失敗しました。時間をおいてもう一度お試しください。"));
+      setSaving(false);
+      return;
+    }
     if (!res.ok) {
       setMessage(json?.error?.message ?? "保存に失敗しました");
       setSaving(false);
@@ -1134,7 +1168,7 @@ export default function EventForm({
       setPromotionMessage("宣伝文を生成しました。");
     } catch (error) {
       setPromotionMessage(
-        error instanceof Error ? error.message : "生成に失敗しました。"
+        describeClientError(error, "宣伝文を作れませんでした。時間をおいてもう一度お試しください。")
       );
     } finally {
       setPromotionLoading(false);
@@ -1513,6 +1547,7 @@ export default function EventForm({
             <label className="text-xs font-black tracking-wide text-zinc-700">
               料金（券種ごとに複数設定）
             </label>
+            <p className="text-xs text-zinc-600">金額は円単位の整数で入力してください（例：3000）。</p>
             <div className="space-y-3 rounded-2xl border-2 border-ink bg-surface p-3 shadow-hard-sm">
               {form.ticket_types.map((item, index) => (
                 <div
@@ -1540,6 +1575,7 @@ export default function EventForm({
                       <input
                         className="input-retro"
                         placeholder="3000"
+                        inputMode="numeric"
                         value={item.price}
                         onChange={(e) =>
                           updateTicketType(index, "price", e.target.value)

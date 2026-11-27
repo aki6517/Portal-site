@@ -2,6 +2,30 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
+// 劇団向けの画面は応答の error.message をそのまま表示するので、message は劇団の人が読んで次に何をすれば
+// いいか分かる日本語にする（error.code と HTTP ステータスは機械が読む値なので変えない）。
+// DB などのエラー文は応答に出さず、サーバーのログ（console.error）に code・message を残す。
+const LOGIN_REQUIRED_MESSAGE =
+  "ログインが必要です。ログインし直してから、もう一度お試しください。";
+const INVALID_BODY_MESSAGE =
+  "送られた内容を読み取れませんでした。画面を読み込み直してから、もう一度お試しください。";
+const RATE_LIMITED_MESSAGE =
+  "短い時間に何度も送られました。1分ほど待ってから、もう一度お試しください。";
+const SAVE_FAILED_MESSAGE =
+  "保存に失敗しました。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。";
+const PROMOTION_INPUT_REQUIRED_MESSAGE =
+  "宣伝文を作る公演と、投稿先（SNS）を選んでください。";
+const PROMOTION_EVENT_NOT_FOUND_MESSAGE =
+  "公演が見つかりませんでした。画面を読み込み直してから、もう一度お試しください。";
+const MEMBERSHIP_CHECK_FAILED_MESSAGE =
+  "所属の確認に失敗しました。時間をおいてもう一度お試しください。";
+const PROMOTION_FAILED_MESSAGE =
+  "宣伝文を作れませんでした。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。";
+
+const logError = (context: string, error: { code?: string; message?: string } | null | undefined) => {
+  console.error(`[api/ai/generate-promotion] ${context}`, { code: error?.code, message: error?.message });
+};
+
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 5;
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
@@ -31,7 +55,9 @@ const checkRateLimit = (key: string) => {
   return { ok: true, retryAfter: 0 };
 };
 
-const extractJson = (text: string) => {
+// AI の応答の文から JSON を取り出す。JSON.parse の SyntaxError の文には応答の断片が入るので、
+// 固定の識別子（GEMINI_INVALID_JSON）と HTTP ステータスだけの例外にする（ログ・例外に応答の中身を残さない）。
+const extractJson = (text: string, status: number) => {
   const trimmed = text.trim();
   const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
   const candidate = fenceMatch ? fenceMatch[1] : trimmed;
@@ -40,7 +66,32 @@ const extractJson = (text: string) => {
   if (firstBrace === -1 || lastBrace === -1) {
     throw new Error("JSON_NOT_FOUND");
   }
-  return JSON.parse(candidate.slice(firstBrace, lastBrace + 1));
+  try {
+    return JSON.parse(candidate.slice(firstBrace, lastBrace + 1));
+  } catch {
+    throw new Error(`GEMINI_INVALID_JSON:${status}`);
+  }
+};
+
+// Gemini の失敗の応答から、ログに残してよいもの（HTTP ステータスと、上流の決まった識別子
+// error.status・error.code）だけを取り出す。応答の本文そのもの（上流のエラーの文。URL に鍵が入る
+// 上流エラーなら鍵も入りうる）は、例外の文にもログにも入れない。
+const summarizeGeminiError = async (response: Response) => {
+  let id = "";
+  try {
+    const body = (await response.json()) as { error?: { status?: unknown; code?: unknown } };
+    const status = body?.error?.status;
+    const code = body?.error?.code;
+    id = [
+      typeof status === "string" && /^[A-Z_]{1,64}$/.test(status) ? status : "",
+      typeof code === "number" && Number.isInteger(code) ? String(code) : "",
+    ]
+      .filter(Boolean)
+      .join("/");
+  } catch {
+    // 本文が JSON でないときは識別子なし
+  }
+  return `GEMINI_ERROR:${response.status}${id ? `:${id}` : ""}`;
 };
 
 const callGemini = async ({
@@ -75,20 +126,32 @@ const callGemini = async ({
   );
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`GEMINI_ERROR:${response.status}:${text}`);
+    throw new Error(await summarizeGeminiError(response));
   }
 
-  const data = (await response.json()) as {
+  // 応答の本文が JSON でないとき（SyntaxError の文に本文の断片が入る）も、固定の識別子にする
+  let data: {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
   };
+  try {
+    data = (await response.json()) as typeof data;
+  } catch {
+    throw new Error(`GEMINI_INVALID_JSON:${response.status}`);
+  }
 
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
     throw new Error("GEMINI_EMPTY_RESPONSE");
   }
-  return extractJson(text);
+  return extractJson(text, response.status);
 };
+
+// 本文が普通のオブジェクト（JSON の null・配列・文字列などではない）か。違うと payload.xxx で例外（500）になる
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+// 無い（undefined・null）か文字列か。数値などだと trim() で例外（500）になる
+const isOptionalString = (value: unknown) =>
+  value === undefined || value === null || typeof value === "string";
 
 const allowedPlatforms = new Set(["twitter", "instagram", "facebook"]);
 
@@ -106,7 +169,7 @@ export async function POST(req: Request) {
 
   if (!user) {
     return NextResponse.json(
-      { error: { code: "UNAUTHORIZED", message: "Login required" } },
+      { error: { code: "UNAUTHORIZED", message: LOGIN_REQUIRED_MESSAGE } },
       { status: 401 }
     );
   }
@@ -116,7 +179,35 @@ export async function POST(req: Request) {
     payload = (await req.json()) as { event_id?: string; platforms?: string[] };
   } catch {
     return NextResponse.json(
-      { error: { code: "INVALID_JSON", message: "Request body is invalid" } },
+      { error: { code: "INVALID_JSON", message: INVALID_BODY_MESSAGE } },
+      { status: 400 }
+    );
+  }
+
+  if (!isPlainObject(payload)) {
+    return NextResponse.json(
+      { error: { code: "INVALID_JSON", message: INVALID_BODY_MESSAGE } },
+      { status: 400 }
+    );
+  }
+  if (!isOptionalString(payload.event_id)) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: PROMOTION_INPUT_REQUIRED_MESSAGE } },
+      { status: 400 }
+    );
+  }
+
+  // platforms は文字列の配列（要素が文字列でないものを黙って捨てずに、絞り込む前に 400 にする）
+  if (
+    !(
+      payload.platforms === undefined ||
+      payload.platforms === null ||
+      (Array.isArray(payload.platforms) &&
+        payload.platforms.every((platform) => typeof platform === "string"))
+    )
+  ) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: PROMOTION_INPUT_REQUIRED_MESSAGE } },
       { status: 400 }
     );
   }
@@ -131,7 +222,7 @@ export async function POST(req: Request) {
       {
         error: {
           code: "VALIDATION_ERROR",
-          message: "event_id and platforms are required",
+          message: PROMOTION_INPUT_REQUIRED_MESSAGE,
         },
       },
       { status: 400 }
@@ -145,7 +236,7 @@ export async function POST(req: Request) {
       {
         error: {
           code: "RATE_LIMITED",
-          message: "Too many requests",
+          message: RATE_LIMITED_MESSAGE,
         },
       },
       { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
@@ -162,7 +253,7 @@ export async function POST(req: Request) {
 
   if (eventError || !event) {
     return NextResponse.json(
-      { error: { code: "NOT_FOUND", message: "Event not found" } },
+      { error: { code: "NOT_FOUND", message: PROMOTION_EVENT_NOT_FOUND_MESSAGE } },
       { status: 404 }
     );
   }
@@ -182,8 +273,9 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (membershipError) {
+      logError("theater_members の読み込みに失敗", membershipError);
       return NextResponse.json(
-        { error: { code: "DB_ERROR", message: membershipError.message } },
+        { error: { code: "DB_ERROR", message: MEMBERSHIP_CHECK_FAILED_MESSAGE } },
         { status: 500 }
       );
     }
@@ -194,7 +286,7 @@ export async function POST(req: Request) {
       {
         error: {
           code: "DB_ERROR",
-          message: "所属の確認に失敗しました。時間をおいてもう一度お試しください。",
+          message: MEMBERSHIP_CHECK_FAILED_MESSAGE,
         },
       },
       { status: 500 }
@@ -281,7 +373,7 @@ JSONのみを出力し、説明文は不要です。
 
     if (promotions.length === 0) {
       return NextResponse.json(
-        { error: { code: "AI_ERROR", message: "No promotions generated" } },
+        { error: { code: "AI_ERROR", message: PROMOTION_FAILED_MESSAGE } },
         { status: 500 }
       );
     }
@@ -296,18 +388,21 @@ JSONのみを出力し、説明文は不要です。
     );
 
     if (insertError) {
+      logError("promotions の保存に失敗", insertError);
       return NextResponse.json(
-        { error: { code: "DB_ERROR", message: insertError.message } },
+        { error: { code: "DB_ERROR", message: SAVE_FAILED_MESSAGE } },
         { status: 500 }
       );
     }
 
     return NextResponse.json({ data: { promotions } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "AI_GENERATION_FAILED";
+    // AI の応答の文（英語のことがある）は応答に出さず、ログに残す
+    logError("宣伝文の生成に失敗", {
+      message: error instanceof Error ? error.message : "AI_GENERATION_FAILED",
+    });
     return NextResponse.json(
-      { error: { code: "AI_ERROR", message } },
+      { error: { code: "AI_ERROR", message: PROMOTION_FAILED_MESSAGE } },
       { status: 500 }
     );
   }

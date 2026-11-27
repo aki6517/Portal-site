@@ -2,6 +2,24 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
+// 劇団向けの画面は応答の error.message をそのまま表示するので、message は劇団の人が読んで次に何をすれば
+// いいか分かる日本語にする（error.code と HTTP ステータスは機械が読む値なので変えない）。
+// DB などのエラー文は応答に出さず、サーバーのログ（console.error）に code・message を残す。
+const LOGIN_REQUIRED_MESSAGE =
+  "ログインが必要です。ログインし直してから、もう一度お試しください。";
+const RATE_LIMITED_MESSAGE =
+  "短い時間に何度も送られました。1分ほど待ってから、もう一度お試しください。";
+const INVALID_FORM_MESSAGE =
+  "送られたファイルを読み取れませんでした。画像を選び直してから、もう一度お試しください。";
+const FILE_REQUIRED_MESSAGE =
+  "アップロードする画像を選んでください。";
+const FILE_TOO_LARGE_MESSAGE =
+  "画像は5MB以下にしてください。";
+const UNSUPPORTED_TYPE_MESSAGE =
+  "画像は jpg・png・webp のどれかにしてください。";
+const UPLOAD_FAILED_MESSAGE =
+  "画像を保存できませんでした。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。";
+
 export const runtime = "nodejs";
 
 const PRIMARY_BUCKET = "flyers-public";
@@ -116,7 +134,7 @@ export async function POST(req: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { error: { code: "UNAUTHORIZED", message: "Login required" } },
+        { error: { code: "UNAUTHORIZED", message: LOGIN_REQUIRED_MESSAGE } },
         { status: 401 }
       );
     }
@@ -128,7 +146,7 @@ export async function POST(req: Request) {
         {
           error: {
             code: "RATE_LIMITED",
-            message: "Too many requests",
+            message: RATE_LIMITED_MESSAGE,
           },
         },
         { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
@@ -140,7 +158,7 @@ export async function POST(req: Request) {
       formData = await req.formData();
     } catch {
       return NextResponse.json(
-        { error: { code: "INVALID_FORM", message: "Invalid form data" } },
+        { error: { code: "INVALID_FORM", message: INVALID_FORM_MESSAGE } },
         { status: 400 }
       );
     }
@@ -155,7 +173,7 @@ export async function POST(req: Request) {
 
     if (!isBlobLike) {
       return NextResponse.json(
-        { error: { code: "VALIDATION_ERROR", message: "file is required" } },
+        { error: { code: "VALIDATION_ERROR", message: FILE_REQUIRED_MESSAGE } },
         { status: 400 }
       );
     }
@@ -166,7 +184,7 @@ export async function POST(req: Request) {
         {
           error: {
             code: "FILE_TOO_LARGE",
-            message: "file size must be 5MB or less",
+            message: FILE_TOO_LARGE_MESSAGE,
           },
         },
         { status: 413 }
@@ -186,7 +204,7 @@ export async function POST(req: Request) {
         {
           error: {
             code: "UNSUPPORTED_TYPE",
-            message: "Only jpg, png, webp files are allowed",
+            message: UNSUPPORTED_TYPE_MESSAGE,
           },
         },
         { status: 400 }
@@ -265,28 +283,27 @@ export async function POST(req: Request) {
             ? 403
             : 500;
 
-    console.error("[storage/flyers] upload failed", {
-      path,
-      statusCode: lastError?.statusCode,
-      message: lastError?.message,
-      attempts: uploadErrors,
-    });
-
-    const missingBucketMessage =
+    // 保存先の設定の手がかり（英語）は、応答ではなくサーバーのログに残す
+    const missingBucketHint =
       status === 404
         ? serviceClient
           ? "Storage bucket not found. Confirm bucket configuration in Supabase."
           : "Storage bucket not found. Configure SUPABASE_SERVICE_ROLE_KEY or create bucket flyers-public."
         : null;
 
+    console.error("[storage/flyers] upload failed", {
+      path,
+      statusCode: lastError?.statusCode,
+      message: lastError?.message,
+      hint: missingBucketHint,
+      attempts: uploadErrors,
+    });
+
     return NextResponse.json(
       {
         error: {
           code: "STORAGE_ERROR",
-          message: missingBucketMessage
-            ? `${missingBucketMessage} (${lastError?.message ?? "no detail"})`
-            : lastError?.message ??
-              "Storage upload failed. Check bucket name/policy/env settings.",
+          message: UPLOAD_FAILED_MESSAGE,
           status_code: statusCode,
         },
       },
@@ -298,7 +315,7 @@ export async function POST(req: Request) {
       {
         error: {
           code: "STORAGE_FATAL",
-          message: error instanceof Error ? error.message : "Unexpected storage error",
+          message: UPLOAD_FAILED_MESSAGE,
         },
       },
       { status: 500 }

@@ -3,6 +3,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { resolveActiveTheater } from "@/lib/theater/activeTheater";
 
+// 劇団向けの画面は応答の error.message をそのまま表示するので、message は劇団の人が読んで次に何をすれば
+// いいか分かる日本語にする（error.code と HTTP ステータスは機械が読む値なので変えない）。
+// DB などのエラー文は応答に出さず、サーバーのログ（console.error）に code・message を残す。
+const LOGIN_REQUIRED_MESSAGE =
+  "ログインが必要です。ログインし直してから、もう一度お試しください。";
+
 // 同じメール宛ての保留中の招待を、1 回の呼び出しで何件まで見るか
 const MAX_PENDING_INVITES_TO_CHECK = 10;
 
@@ -18,7 +24,7 @@ export async function GET() {
 
   if (userError || !user) {
     return NextResponse.json(
-      { error: { code: "UNAUTHORIZED", message: "Login required" } },
+      { error: { code: "UNAUTHORIZED", message: LOGIN_REQUIRED_MESSAGE } },
       { status: 401 }
     );
   }

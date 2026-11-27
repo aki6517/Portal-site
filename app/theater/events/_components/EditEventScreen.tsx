@@ -38,10 +38,15 @@ type Props = {
   eventId: string;
 };
 
+const EVENT_LOAD_FAILED_MESSAGE =
+  "読み込みに失敗しました。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。";
+
 export default function EditEventScreen({ eventId }: Props) {
   const [event, setEvent] = useState<EventData | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // 公演の取得に失敗したとき（何も出ないままにしないため）
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [statusUpdating, setStatusUpdating] = useState<
     "published" | "draft" | "archived" | null
   >(null);
@@ -49,12 +54,21 @@ export default function EditEventScreen({ eventId }: Props) {
 
   const fetchEvent = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/theater/events/${eventId}`, {
-      cache: "no-store",
-    });
-    if (res.ok) {
-      const json = await res.json();
-      setEvent(json.data?.event);
+    setLoadError(null);
+    try {
+      const res = await fetch(`/api/theater/events/${eventId}`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setEvent(json.data?.event);
+      } else {
+        const json = await res.json().catch(() => null);
+        setLoadError(json?.error?.message ?? EVENT_LOAD_FAILED_MESSAGE);
+      }
+    } catch (err) {
+      console.error("[EditEventScreen] 公演の読み込みに失敗", err);
+      setLoadError(EVENT_LOAD_FAILED_MESSAGE);
     }
     setLoading(false);
   }, [eventId]);
@@ -102,6 +116,9 @@ export default function EditEventScreen({ eventId }: Props) {
     <div className="space-y-6">
       {loading && (
         <div className="card-retro p-6 text-sm text-zinc-700">読み込み中...</div>
+      )}
+      {!loading && loadError && (
+        <div className="card-retro p-6 text-sm text-red-700">{loadError}</div>
       )}
       {event && (
         <div className="space-y-4">

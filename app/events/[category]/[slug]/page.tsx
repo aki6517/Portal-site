@@ -163,10 +163,19 @@ const getEventImageCandidates = (event: {
 
 // superseded_by（再演時に手動指定される後継公演）が公開中ならその詳細を返す。
 // 未設定・後継が非公開/削除済みの場合はnull（= 元のページをそのまま案内する）。
+// 後継公演の読み取りが失敗したとき（getEventById は例外にする）も、今までどおり案内を出さないだけにする
+// （公演の解決ではないので、ページ全体をエラーにしない。例外は保存されないので次の表示で読み直す）。
 const resolveSupersededTarget = async (event: EventRecord) => {
   const supersededId = event.superseded_by;
   if (!supersededId) return null;
-  return getEventById(supersededId);
+  try {
+    return await getEventById(supersededId);
+  } catch (error) {
+    console.error("[events/[category]/[slug]] 後継公演の読み込みに失敗", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
 };
 
 // JSON-LDのoffers。ticket_types（券種ごとの価格）があれば各券種をOfferに、
@@ -231,23 +240,32 @@ const buildPerformer = (event: EventRecord) => {
   return undefined;
 };
 
+// 解決順の2。転送の行・転送先の公演の読み取りが失敗したときは、「行が無い」と同じに扱わずに例外にする
+// （行が無いとして次の「同じ slug の別の公演へ 308」や 404 に進むと、検索結果やブラウザに残る
+// 308・404 になってしまう）。ページは Next のエラーになる。
+const throwRedirectLookupError = (what: string, error: { code?: string; message?: string }) => {
+  throw new Error(`[events/[category]/[slug]] ${what}の読み込みに失敗しました（${error.code ?? "unknown"}: ${error.message ?? ""}）`);
+};
+
 const tryRedirect = async (category: string, slug: string) => {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
   const service = createSupabaseServiceClient();
-  const { data: redirect } = await service
+  const { data: redirect, error: redirectError } = await service
     .from("event_redirects")
     .select("to_event_id")
     .eq("from_category", category)
     .eq("from_slug", slug)
     .maybeSingle();
+  if (redirectError) throwRedirectLookupError("転送（event_redirects）", redirectError);
 
   if (!redirect?.to_event_id) return;
 
-  const { data: target } = await service
+  const { data: target, error: targetError } = await service
     .from("events")
     .select("category, slug, status, publish_at")
     .eq("id", redirect.to_event_id)
     .maybeSingle();
+  if (targetError) throwRedirectLookupError("転送先の公演", targetError);
 
   // 転送先の公演が見つからないとき（削除済みは to_event_id が空になるので、ふつうは上で戻る）は
   // 今までどおり次の処理へ進む
@@ -260,7 +278,7 @@ const tryRedirect = async (category: string, slug: string) => {
   }
   // 転送先の今のURLがこのURLそのもの（A→B→A と戻して A→自分 の行が残っている、など）なら
   // 転送しない。キャッシュの状態しだいで同じURLへの 308 がくり返されないよう、呼び出し元の
-  // 次の処理（404・カテゴリ違いの公演への転送）へ進む。
+  // 次の処理（同じ slug の公演への転送・404）へ進む。
   if (target.category === category && target.slug === slug) {
     return;
   }
@@ -310,18 +328,20 @@ export default async function EventDetailPage({
   const slug = decodeRouteParam(resolvedParams.slug);
   const event = await getEventBySlug(category, slug);
 
+  // 解決順（categories＝2つ目からのカテゴリはURLを持たないタグとして扱う）:
+  //   1. 主カテゴリが一致する公演 → そのまま表示
+  //   2. event_redirects の (category, slug) → 転送先へ 308（出ない転送先は 404・自分のURLなら次へ）
+  //   3. 同じ slug の公演（categories にこのカテゴリを含む公演が先）→ その公演の正式URLへ 308
+  //   4. どれも無ければ 404
+  // 公演の検索・転送の読み取りが失敗したときは、どの段も「無い」と扱わずに例外（Next のエラー）にする。
   if (!event) {
     await tryRedirect(category, slug);
     notFound();
   }
   if (event.category !== category) {
-    // 主カテゴリが一致する公演が無いとき（pickMatchedEvent は主カテゴリの一致を先に返す）。
-    // 選ばれたのは categories で一致した公演か、スラッグだけが同じカテゴリ違いの公演。
-    // 解決順は「主カテゴリ一致 → 有効な転送（event_redirects）→ categories 一致 → 一致しない候補」
-    // なので、どちらの場合も先に転送を見る（例: drama/old → drama/new に変えた公演の旧URLが、
-    // categories に drama を入れた別の公演 comedy/old に吸い込まれないようにする）。
-    // 転送が無い・転送先が削除済みのときは今までどおりその公演へ転送する。転送先の公演が
-    // 今は公開ページに出ないときは tryRedirect が 404 にする。
+    // 主カテゴリが一致する公演が無く、同じ slug の公演（3）があるとき。先に転送（2）を見る
+    // （例: drama/old → drama/new に変えた公演の旧URLが、categories に drama を入れた
+    // 別の公演 comedy/old に吸い込まれないようにする）。
     await tryRedirect(category, slug);
     permanentRedirect(
       `/events/${encodeURIComponent(event.category)}/${encodeURIComponent(

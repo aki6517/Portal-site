@@ -52,6 +52,116 @@ const getInviteStatusCopy = (status: string) => {
   }
 };
 
+// Supabase のログイン（メールのリンク・Google・ログアウト）の失敗を、劇団の人が読む日本語にする。
+// 決め手は error.code（@supabase/auth-js の ErrorCode）・status・name で、英語の error.message は
+// 画面に出さず console.error に残す。知らない失敗は、操作ごとの決まった文にする。
+// （app/theater/page.tsx と app/register/page.tsx で同じ内容）
+type AuthErrorLike =
+  | { name?: string; code?: string; status?: number; message?: string }
+  | null
+  | undefined;
+type AuthAction = "otp" | "oauth" | "signout";
+const AUTH_FALLBACK_MESSAGES: Record<AuthAction, string> = {
+  otp: "ログイン用のメールを送れませんでした。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。",
+  oauth:
+    "Googleでのログインを始められませんでした。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。",
+  signout: "ログアウトできませんでした。時間をおいてもう一度お試しください。",
+};
+const describeAuthError = (error: AuthErrorLike, action: AuthAction) => {
+  console.error(`[register] ログインの操作（${action}）に失敗`, {
+    name: error?.name,
+    code: error?.code,
+    status: error?.status,
+    message: error?.message,
+  });
+  const code = error?.code ?? "";
+  // 回数の制限（メールの送りすぎ・操作のしすぎ）
+  if (code === "over_email_send_rate_limit") {
+    return "ログイン用のメールを短い時間に送りすぎたため、いまは送れません。しばらく（数分〜1時間ほど）待ってから、もう一度お試しください。";
+  }
+  if (code === "over_request_rate_limit" || error?.status === 429) {
+    return "短い時間にログインの操作が続いたため、いまは受け付けられません。しばらく待ってから、もう一度お試しください。";
+  }
+  // 通信の失敗（auth-js は通信断・502〜504 を AuthRetryableFetchError にする）
+  if (error?.name === "AuthRetryableFetchError" || code === "request_timeout") {
+    return "通信に失敗しました。インターネットへのつながりを確かめて、もう一度お試しください。";
+  }
+  if (action === "otp") {
+    if (code === "email_address_invalid" || code === "validation_failed") {
+      return "メールアドレスの形が正しくありません。入力し直してください。";
+    }
+    if (code === "email_address_not_authorized") {
+      return "このメールアドレスには、いまログイン用のメールを送れません。福岡アクトポータル運営にお問い合わせください。";
+    }
+    if (code === "signup_disabled" || code === "otp_disabled" || code === "email_provider_disabled") {
+      return "いまはメールでのログイン・新規登録を受け付けていません。福岡アクトポータル運営にお問い合わせください。";
+    }
+  }
+  if (action === "oauth" && (code === "provider_disabled" || code === "oauth_provider_not_supported")) {
+    return "いまは Google でのログインを使えません。メールのリンクでログインしてください。";
+  }
+  if (code === "captcha_failed") {
+    return "確認に失敗しました。画面を読み込み直してから、もう一度お試しください。";
+  }
+  return AUTH_FALLBACK_MESSAGES[action];
+};
+
+// Google のログインやメールのリンクから、エラー付きで戻ってきたときの案内。
+// signInWithOAuth は遷移の時点では error: null を返すので、Google 側でのキャンセルなどの失敗は、
+// 戻り先の URL の error・error_code・error_description（クエリとハッシュの両方）に入る。
+// 拾ったら URL から消す（再読み込みで同じ案内が出続けないように）。英語の error_description は console.error に残す。
+// （app/theater/page.tsx と app/register/page.tsx で同じ内容）
+const AUTH_REDIRECT_KEYS = ["error", "error_code", "error_description"] as const;
+const takeAuthRedirectError = () => {
+  if (typeof window === "undefined") return null;
+  const url = new URL(window.location.href);
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+  const pick = (key: string) => url.searchParams.get(key) ?? hash.get(key);
+  const found = { error: pick("error"), code: pick("error_code"), description: pick("error_description") };
+  if (!found.error && !found.code && !found.description) return null;
+  for (const key of AUTH_REDIRECT_KEYS) {
+    url.searchParams.delete(key);
+    hash.delete(key);
+  }
+  const nextHash = hash.toString();
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${url.pathname}${url.search}${nextHash ? `#${nextHash}` : ""}`
+  );
+  return found;
+};
+const describeAuthRedirectError = (found: {
+  error: string | null;
+  code: string | null;
+  description: string | null;
+}) => {
+  console.error("[register] ログインの戻り先の URL にエラー", found);
+  const code = found.code ?? "";
+  if (code === "otp_expired") {
+    return "ログイン用のリンクの期限が切れているか、すでに使われています。もう一度ログイン用のメールを送ってください。";
+  }
+  if (["flow_state_expired", "flow_state_not_found", "bad_oauth_state", "bad_oauth_callback", "bad_code_verifier"].includes(code)) {
+    return "ログインの手続きの期限が切れたか、途中で止まりました。もう一度ログインしてください。";
+  }
+  if (code === "provider_disabled" || code === "oauth_provider_not_supported") {
+    return "いまは Google でのログインを使えません。メールのリンクでログインしてください。";
+  }
+  if (code === "signup_disabled") {
+    return "いまは新規登録を受け付けていません。福岡アクトポータル運営にお問い合わせください。";
+  }
+  if (code === "user_banned") {
+    return "このアカウントではログインできません。福岡アクトポータル運営にお問い合わせください。";
+  }
+  if (code === "over_request_rate_limit" || code === "over_email_send_rate_limit") {
+    return "短い時間にログインの操作が続いたため、いまは受け付けられません。しばらく待ってから、もう一度お試しください。";
+  }
+  if (found.error === "access_denied") {
+    return "Googleでのログインが完了しませんでした（キャンセルされたか、許可されませんでした）。もう一度お試しください。";
+  }
+  return "ログインできませんでした。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。";
+};
+
 export default function RegisterPage() {
   const supabase = createSupabaseBrowserClient();
   const [email, setEmail] = useState("");
@@ -87,6 +197,12 @@ export default function RegisterPage() {
     sns_instagram_url: "",
     sns_facebook_url: "",
   });
+
+  // ログインの戻り先の URL のエラー（Google でのキャンセルなど）を拾って案内する
+  useEffect(() => {
+    const found = takeAuthRedirectError();
+    if (found) setMessage(describeAuthRedirectError(found));
+  }, []);
 
   useEffect(() => {
     const refreshAuth = async () => {
@@ -168,7 +284,7 @@ export default function RegisterPage() {
       },
     });
     if (error) {
-      setMessage(error.message);
+      setMessage(describeAuthError(error, "oauth"));
     }
   };
 
@@ -182,7 +298,7 @@ export default function RegisterPage() {
       },
     });
     if (error) {
-      setMessage(error.message);
+      setMessage(describeAuthError(error, "otp"));
       setStatus("idle");
       return;
     }
@@ -197,18 +313,13 @@ export default function RegisterPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(onboardForm),
     });
-    const json = (await res.json()) as MeResponse & {
-      error?: { code: string; message: string };
-    };
+    // 本文が JSON でない応答（サーバーの前段のエラーページなど）でも止まらないようにする
+    const json = (await res.json().catch(() => null)) as
+      | (MeResponse & { error?: { code: string; message: string } })
+      | null;
     if (!res.ok) {
-      const detail = json.error?.message ?? "登録に失敗しました";
-      if (detail.includes("row-level security")) {
-        setOnboardMessage(
-          "ログイン状態が正しく反映されていない可能性があります。ログアウト→再ログイン後に再度お試しください。"
-        );
-      } else {
-        setOnboardMessage(detail);
-      }
+      // サーバーが場合ごとの日本語の文を返す（ログイン切れはログインし直しの案内、権限の問題は運営への問い合わせ）
+      setOnboardMessage(json?.error?.message ?? "登録に失敗しました。時間をおいてもう一度お試しください。");
       setOnboarding(false);
       return;
     }

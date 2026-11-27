@@ -326,19 +326,11 @@ const SLUG_LOOKUP_SELECT = "id, category, categories, slug, publish_at";
 
 type SlugCandidate = Pick<EventDetail, "id" | "category" | "categories" | "slug" | "publish_at">;
 
-// URLのカテゴリに一致する公演か（主カテゴリ category か、複数カテゴリ categories に含まれるか）。
-// 下の pickMatchedEvent で使う。
-export const matchesEventCategory = (
-  item: { category: string; categories?: string[] | null },
-  category: string
-) =>
-  item.category === category ||
-  (Array.isArray(item.categories) && item.categories.includes(category));
-
-// 選ぶ順: 主カテゴリが一致する公演 → categories が一致する公演 → 一致しない最初の公演。
-// 主カテゴリの一致を先にするのは、categories に同じカテゴリを入れた別の公演が、
-// その公演の今の正式URL（/events/{主カテゴリ}/{slug}）を並び順しだいで奪えないようにするため
-// （events の一意制約は (category, slug) だけで、categories は重なりうる）。
+// 同じ slug の公開中の候補から1件を選ぶ。公演のURLは /events/{主カテゴリ}/{slug} の1つだけで、
+// categories（2つ目からのカテゴリ）は一覧の絞り込み・表示に使うタグとして扱い、URLの持ち主は決めない。
+// - 主カテゴリがリクエストのカテゴリと一致する公演があればそれ（ページはそのまま表示する）
+// - 無ければ、categories にリクエストのカテゴリを含む公演を先に、それも無ければ今の並び順の先頭
+//   （ページは先に event_redirects を見て、転送が無ければこの公演の正式URLへ 308 する）
 const pickMatchedEvent = <T extends { category: string; categories?: string[] | null; publish_at?: string | null }>(
   rows: T[] | null | undefined,
   category: string
@@ -346,22 +338,34 @@ const pickMatchedEvent = <T extends { category: string; categories?: string[] | 
   const released = (rows ?? []).filter((item) => isReleased(item.publish_at));
   return (
     released.find((item) => item.category === category) ??
-    released.find((item) => matchesEventCategory(item, category)) ??
+    released.find(
+      (item) => Array.isArray(item.categories) && item.categories.includes(category)
+    ) ??
     released[0] ??
     null
   );
+};
+
+// 公演詳細の解決（候補の検索・詳細の取得）で読み取りが失敗したときは、「0件」として扱わずに例外にする。
+// 0件として返すと unstable_cache にその結果が入り、ページは転送の検索・404 に進んでしまう
+// （公演の検索だけが一時的に失敗し、転送の検索が成功すると、公開中の正式URLが別の公演へ 308 される）。
+// 例外にすれば unstable_cache は結果を保存せず（Next 16 の unstable_cache は、関数の完了を待ってから
+// 保存する）、ページは Next のエラーになる。
+const throwLookupError = (what: string, error: { code?: string; message?: string }) => {
+  throw new Error(`[lib/data/events] ${what}の読み込みに失敗しました（${error.code ?? "unknown"}: ${error.message ?? ""}）`);
 };
 
 const fetchEventIdBySlug = (slug: string) =>
   unstable_cache(
     async () => {
       const client = createSupabasePublicClient();
-      const { data } = await client
+      const { data, error } = await client
         .from("events")
         .select(SLUG_LOOKUP_SELECT)
         .eq("slug", slug)
         .eq("status", "published")
         .returns<SlugCandidate[]>();
+      if (error) throwLookupError("公演の候補（slug の検索）", error);
       return data ?? [];
     },
     ["event-id-by-slug", slug],
@@ -372,12 +376,13 @@ const fetchEventById = (id: string) =>
   unstable_cache(
     async () => {
       const client = createSupabasePublicClient();
-      const { data } = await client
+      const { data, error } = await client
         .from("events")
         .select("*")
         .eq("id", id)
         .eq("status", "published")
         .maybeSingle();
+      if (error) throwLookupError("公演の詳細", error);
       return data as EventDetail | null;
     },
     ["event-by-id", id],

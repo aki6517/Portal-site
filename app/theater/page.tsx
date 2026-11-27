@@ -36,6 +36,119 @@ const getEventStatusCopy = (status: string) => {
   }
 };
 
+// Supabase のログイン（メールのリンク・Google・ログアウト）の失敗を、劇団の人が読む日本語にする。
+// 決め手は error.code（@supabase/auth-js の ErrorCode）・status・name で、英語の error.message は
+// 画面に出さず console.error に残す。知らない失敗は、操作ごとの決まった文にする。
+// （app/theater/page.tsx と app/register/page.tsx で同じ内容）
+type AuthErrorLike =
+  | { name?: string; code?: string; status?: number; message?: string }
+  | null
+  | undefined;
+type AuthAction = "otp" | "oauth" | "signout";
+const AUTH_FALLBACK_MESSAGES: Record<AuthAction, string> = {
+  otp: "ログイン用のメールを送れませんでした。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。",
+  oauth:
+    "Googleでのログインを始められませんでした。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。",
+  signout: "ログアウトできませんでした。時間をおいてもう一度お試しください。",
+};
+const describeAuthError = (error: AuthErrorLike, action: AuthAction) => {
+  console.error(`[theater] ログインの操作（${action}）に失敗`, {
+    name: error?.name,
+    code: error?.code,
+    status: error?.status,
+    message: error?.message,
+  });
+  const code = error?.code ?? "";
+  // 回数の制限（メールの送りすぎ・操作のしすぎ）
+  if (code === "over_email_send_rate_limit") {
+    return "ログイン用のメールを短い時間に送りすぎたため、いまは送れません。しばらく（数分〜1時間ほど）待ってから、もう一度お試しください。";
+  }
+  if (code === "over_request_rate_limit" || error?.status === 429) {
+    return "短い時間にログインの操作が続いたため、いまは受け付けられません。しばらく待ってから、もう一度お試しください。";
+  }
+  // 通信の失敗（auth-js は通信断・502〜504 を AuthRetryableFetchError にする）
+  if (error?.name === "AuthRetryableFetchError" || code === "request_timeout") {
+    return "通信に失敗しました。インターネットへのつながりを確かめて、もう一度お試しください。";
+  }
+  if (action === "otp") {
+    if (code === "email_address_invalid" || code === "validation_failed") {
+      return "メールアドレスの形が正しくありません。入力し直してください。";
+    }
+    if (code === "email_address_not_authorized") {
+      return "このメールアドレスには、いまログイン用のメールを送れません。福岡アクトポータル運営にお問い合わせください。";
+    }
+    if (code === "signup_disabled" || code === "otp_disabled" || code === "email_provider_disabled") {
+      return "いまはメールでのログイン・新規登録を受け付けていません。福岡アクトポータル運営にお問い合わせください。";
+    }
+  }
+  if (action === "oauth" && (code === "provider_disabled" || code === "oauth_provider_not_supported")) {
+    return "いまは Google でのログインを使えません。メールのリンクでログインしてください。";
+  }
+  if (code === "captcha_failed") {
+    return "確認に失敗しました。画面を読み込み直してから、もう一度お試しください。";
+  }
+  return AUTH_FALLBACK_MESSAGES[action];
+};
+
+// Google のログインやメールのリンクから、エラー付きで戻ってきたときの案内。
+// signInWithOAuth は遷移の時点では error: null を返すので、Google 側でのキャンセルなどの失敗は、
+// 戻り先の URL の error・error_code・error_description（クエリとハッシュの両方）に入る。
+// 拾ったら URL から消す（再読み込みで同じ案内が出続けないように）。英語の error_description は console.error に残す。
+// （app/theater/page.tsx と app/register/page.tsx で同じ内容）
+const AUTH_REDIRECT_KEYS = ["error", "error_code", "error_description"] as const;
+const takeAuthRedirectError = () => {
+  if (typeof window === "undefined") return null;
+  const url = new URL(window.location.href);
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+  const pick = (key: string) => url.searchParams.get(key) ?? hash.get(key);
+  const found = { error: pick("error"), code: pick("error_code"), description: pick("error_description") };
+  if (!found.error && !found.code && !found.description) return null;
+  for (const key of AUTH_REDIRECT_KEYS) {
+    url.searchParams.delete(key);
+    hash.delete(key);
+  }
+  const nextHash = hash.toString();
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${url.pathname}${url.search}${nextHash ? `#${nextHash}` : ""}`
+  );
+  return found;
+};
+const describeAuthRedirectError = (found: {
+  error: string | null;
+  code: string | null;
+  description: string | null;
+}) => {
+  console.error("[theater] ログインの戻り先の URL にエラー", found);
+  const code = found.code ?? "";
+  if (code === "otp_expired") {
+    return "ログイン用のリンクの期限が切れているか、すでに使われています。もう一度ログイン用のメールを送ってください。";
+  }
+  if (["flow_state_expired", "flow_state_not_found", "bad_oauth_state", "bad_oauth_callback", "bad_code_verifier"].includes(code)) {
+    return "ログインの手続きの期限が切れたか、途中で止まりました。もう一度ログインしてください。";
+  }
+  if (code === "provider_disabled" || code === "oauth_provider_not_supported") {
+    return "いまは Google でのログインを使えません。メールのリンクでログインしてください。";
+  }
+  if (code === "signup_disabled") {
+    return "いまは新規登録を受け付けていません。福岡アクトポータル運営にお問い合わせください。";
+  }
+  if (code === "user_banned") {
+    return "このアカウントではログインできません。福岡アクトポータル運営にお問い合わせください。";
+  }
+  if (code === "over_request_rate_limit" || code === "over_email_send_rate_limit") {
+    return "短い時間にログインの操作が続いたため、いまは受け付けられません。しばらく待ってから、もう一度お試しください。";
+  }
+  if (found.error === "access_denied") {
+    return "Googleでのログインが完了しませんでした（キャンセルされたか、許可されませんでした）。もう一度お試しください。";
+  }
+  return "ログインできませんでした。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。";
+};
+
+const EVENTS_LOAD_FAILED_MESSAGE =
+  "読み込みに失敗しました。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。";
+
 const formatDate = (value?: string | null) => {
   if (!value) return "";
   const date = new Date(value);
@@ -62,6 +175,8 @@ export default function TheaterDashboardPage() {
   const [activeTheaterId, setActiveTheaterId] = useState<string | null>(null);
   const [switchingTheater, setSwitchingTheater] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
+  // 公演一覧の取得に失敗したとき（「まだ公演がありません」と見分けるため）
+  const [eventsError, setEventsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dashboardMessage, setDashboardMessage] = useState<string | null>(null);
@@ -74,6 +189,12 @@ export default function TheaterDashboardPage() {
   );
   const [loginMessage, setLoginMessage] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // ログインの戻り先の URL のエラー（Google でのキャンセルなど）を拾って案内する
+  useEffect(() => {
+    const found = takeAuthRedirectError();
+    if (found) setLoginMessage(describeAuthRedirectError(found));
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -95,14 +216,24 @@ export default function TheaterDashboardPage() {
       setActiveTheaterId(data?.active_theater_id ?? null);
       setAuthState("loggedIn");
 
-      const eventsRes = await fetch("/api/theater/events", {
-        cache: "no-store",
-      });
-      if (eventsRes.ok) {
-        const eventsJson = (await eventsRes.json()) as {
-          data?: { events: EventRow[] };
-        };
-        setEvents(eventsJson.data?.events ?? []);
+      try {
+        const eventsRes = await fetch("/api/theater/events", {
+          cache: "no-store",
+        });
+        if (eventsRes.ok) {
+          const eventsJson = (await eventsRes.json()) as {
+            data?: { events: EventRow[] };
+          };
+          setEvents(eventsJson.data?.events ?? []);
+        } else {
+          const eventsJson = (await eventsRes.json().catch(() => null)) as {
+            error?: { message?: string };
+          } | null;
+          setEventsError(eventsJson?.error?.message ?? EVENTS_LOAD_FAILED_MESSAGE);
+        }
+      } catch (err) {
+        console.error("[theater] 公演一覧の読み込みに失敗", err);
+        setEventsError(EVENTS_LOAD_FAILED_MESSAGE);
       }
       setLoading(false);
     };
@@ -153,7 +284,7 @@ export default function TheaterDashboardPage() {
       },
     });
     if (error) {
-      setLoginMessage(error.message);
+      setLoginMessage(describeAuthError(error, "oauth"));
     }
   };
 
@@ -167,7 +298,7 @@ export default function TheaterDashboardPage() {
       },
     });
     if (error) {
-      setLoginMessage(error.message);
+      setLoginMessage(describeAuthError(error, "otp"));
       setLoginStatus("idle");
       return;
     }
@@ -179,7 +310,7 @@ export default function TheaterDashboardPage() {
     setLoginMessage(null);
     const { error } = await supabase.auth.signOut();
     if (error) {
-      setLoginMessage(error.message);
+      setLoginMessage(describeAuthError(error, "signout"));
       setLoggingOut(false);
       return;
     }
@@ -325,6 +456,10 @@ export default function TheaterDashboardPage() {
             </button>
           </div>
         </div>
+        {/* ログアウトに失敗したときの文（ログイン後の画面には今まで出す場所が無かった） */}
+        {loginMessage && (
+          <p className="mt-4 text-xs text-red-700">エラー: {loginMessage}</p>
+        )}
       </div>
 
       {theaters.length > 1 && (
@@ -365,7 +500,11 @@ export default function TheaterDashboardPage() {
             {dashboardMessage}
           </div>
         )}
-        {events.length === 0 ? (
+        {eventsError ? (
+          <div className="rounded-2xl border-2 border-ink bg-surface p-6 text-sm text-red-700 shadow-hard-sm">
+            {eventsError}
+          </div>
+        ) : events.length === 0 ? (
           <div className="rounded-2xl border-2 border-ink bg-surface p-6 text-sm text-zinc-700 shadow-hard-sm">
             まだ公演がありません。「新規公演を作成」から追加できます。
           </div>
