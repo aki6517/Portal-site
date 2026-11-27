@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { isReleased, type CategorySummary } from "@/lib/data/events";
+import { throwIfSupabaseError } from "@/lib/data/supabaseError";
 import { resolveVenue, type VenueRow } from "@/lib/venues/normalize";
 
 // 「会場×週」番組表（/calendar）のデータ取得・組み立てを担うレイヤー。
@@ -185,6 +186,11 @@ const fetchWeekData = async (weekStartIso: string): Promise<FetchedWeekData> => 
       .select("id, name, icon, color, sort_order")
       .order("sort_order", { ascending: true }),
   ]);
+
+  // どれか1つでもエラーなら、空の週としてキャッシュせずに例外を投げる（lib/data/events.ts と同じ決まり）
+  throwIfSupabaseError("week-timetable (events)", eventsResult.error);
+  throwIfSupabaseError("week-timetable (venues)", venuesResult.error);
+  throwIfSupabaseError("week-timetable (categories)", categoriesResult.error);
 
   const events = (eventsResult.data ?? []) as WeekEventRow[];
   const venues: VenueInfo[] = (venuesResult.data ?? []).map((row) => ({

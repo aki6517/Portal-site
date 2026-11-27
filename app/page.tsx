@@ -175,7 +175,7 @@ export default async function Home() {
                   srcCandidates={featuredImageCandidates}
                   alt={featured?.title ?? "ピックアップ公演"}
                   fill
-                  priority
+                  preload
                   sizes="(min-width: 1024px) 50vw, 100vw"
                   className="object-cover transition-all duration-500"
                   fallback={

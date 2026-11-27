@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { throwIfSupabaseError } from "@/lib/data/supabaseError";
 import ContactRowActions from "./ContactRowActions";
 
 type ContactRow = {
@@ -22,7 +23,7 @@ const formatDate = (value: string) => {
 export default async function AdminContactPage({
   searchParams,
 }: {
-  searchParams?: { status?: string };
+  searchParams?: { status?: string } | Promise<{ status?: string }>;
 }) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -51,7 +52,8 @@ export default async function AdminContactPage({
     );
   }
 
-  const onlyNew = searchParams?.status === "new";
+  const resolvedSearchParams = await Promise.resolve(searchParams);
+  const onlyNew = resolvedSearchParams?.status === "new";
   let query = supabase
     .from("contact_messages")
     .select("id, name, email, message, status, created_at")
@@ -62,7 +64,9 @@ export default async function AdminContactPage({
     query = query.eq("status", "new");
   }
 
-  const { data } = await query;
+  const { data, error } = await query;
+  // 取得のエラーを「お問い合わせはまだありません」と見せない（エラー画面にする）
+  throwIfSupabaseError("admin-contact", error);
 
   const messages = (data ?? []) as ContactRow[];
 

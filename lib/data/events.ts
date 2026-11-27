@@ -3,12 +3,18 @@ import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { buildIlikeFilter } from "@/lib/search";
 import { getEffectiveEnd, isEnded, shouldNoindex } from "@/lib/events/lifecycle";
+import { throwIfSupabaseError } from "@/lib/data/supabaseError";
 
 // トップ・一覧・詳細ページのデータ取得を集約するレイヤー。
 // 公開ページからは cookie依存のクライアント（createSupabaseServerClient）を使わず、
 // ここで public クライアント（+ 一部 service クライアント）だけを使う。
 // 本番DBに docs/sql/005_events_publish_reservation.sql が適用済みである前提で、
 // 「publish_at列が無い場合の再クエリ」フォールバックは行わない。
+//
+// キャッシュされる関数の中で Supabase が error を返したら、空の値を返さずに例外を投げる
+// （throwIfSupabaseError）。例外は unstable_cache に保存されないので、一時的な通信エラーの
+// 「空の結果」がキャッシュに残らない。ページ側でも握りつぶさない（握りつぶすと、今度は
+// ページ単位のキャッシュに空のページが残る）。
 
 export type ScheduleTimeRow = {
   start_date?: string | null;
@@ -89,10 +95,11 @@ const sanitizeCategoryValue = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g
 
 const fetchCategories = async () => {
   const client = createSupabasePublicClient();
-  const { data } = await client
+  const { data, error } = await client
     .from("categories")
     .select("id, name, icon, color, sort_order")
     .order("sort_order", { ascending: true });
+  throwIfSupabaseError("categories", error);
   return (data ?? []) as CategorySummary[];
 };
 
@@ -116,10 +123,11 @@ const fetchViews30d = async (): Promise<ViewsRow[]> => {
   const since = new Date();
   since.setDate(since.getDate() - 30);
   const sinceDate = since.toISOString().slice(0, 10);
-  const { data } = await service
+  const { data, error } = await service
     .from("event_views_daily")
     .select("event_id, views")
     .gte("view_date", sinceDate);
+  throwIfSupabaseError("views-30d", error);
   return data ?? [];
 };
 
@@ -153,12 +161,13 @@ const fetchTrendingEvents = async (): Promise<EventSummary[]> => {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     // service_role未設定（ローカル等）: view集計に触れないため、直近開催順の
     // 先頭3件で代替する（トレンドではないがフォールバックとして妥当）。
-    const { data } = await publicClient
+    const { data, error } = await publicClient
       .from("events")
       .select(TRENDING_SELECT_FIELDS)
       .eq("status", "published")
       .order("start_date", { ascending: true })
       .limit(30);
+    throwIfSupabaseError("trending-events (no service key)", error);
     const rows = (data ?? []) as EventSummary[];
     return rows.filter((event) => isReleased(event.publish_at)).slice(0, 3);
   }
@@ -178,13 +187,15 @@ const fetchTrendingEvents = async (): Promise<EventSummary[]> => {
   } else {
     // RPC未適用（docs/sql/008は現時点でファイル作成のみ）、またはエラー時は
     // 従来ロジック（30日分の全行取得→JS集計）にフォールバックする。
+    // フォールバック先の取得がエラーなら、空として扱わずに例外を投げる。
     const since = new Date();
     since.setDate(since.getDate() - 30);
     const sinceDate = since.toISOString().slice(0, 10);
-    const { data: views } = await service
+    const { data: views, error: viewsError } = await service
       .from("event_views_daily")
       .select("event_id, views")
       .gte("view_date", sinceDate);
+    throwIfSupabaseError("trending-events (views fallback)", viewsError);
     const map = new Map<string, number>();
     (views ?? []).forEach((row) => {
       map.set(row.event_id, (map.get(row.event_id) ?? 0) + (row.views ?? 0));
@@ -200,11 +211,12 @@ const fetchTrendingEvents = async (): Promise<EventSummary[]> => {
   if (ranked.length === 0) return [];
 
   const ids = ranked.map((row) => row.event_id);
-  const { data: events } = await publicClient
+  const { data: events, error: eventsError } = await publicClient
     .from("events")
     .select(TRENDING_SELECT_FIELDS)
     .eq("status", "published")
     .in("id", ids);
+  throwIfSupabaseError("trending-events (events)", eventsError);
 
   const byId = new Map(
     ((events ?? []) as EventSummary[])
@@ -228,11 +240,18 @@ export const getTrendingEvents = () =>
 // 編集部おすすめ（トップのPICK UP固定枠）
 // featured_at が設定された公開中・未終演のイベントのうち featured_at が最新の
 // 1件を返す。無ければ null（トップは従来どおりトレンド1位を表示する）。
-// migrations/20260802100012 未適用のDBではエラーになるので null にフォールバック。
+// migrations/20260802100012 未適用のDB（featured_at 列が無い）ではエラーになるので null に
+// フォールバックする。null にするのは「featured_at の列が無い」エラーのときだけで、それ以外の
+// エラー（通信エラー・選んでいるほかの列が無い、など）は例外を投げる。
 // ---------------------------------------------------------------------------
 
 const FEATURED_SELECT_FIELDS =
   "id, title, category, slug, start_date, end_date, schedule_times, publish_at, reservation_start_at, reservation_label, ticket_url, image_url, flyer_url";
+
+// PostgreSQL の undefined_column。PostgREST は PostgreSQL のエラーをそのまま転送するので、
+// 存在しない列で絞り込み・並べ替えをすると PostgrestError.code がこの値になり、message は
+// 「column events.<列名> does not exist」の形になる。どの列が無いかは message で見分ける。
+const PG_UNDEFINED_COLUMN = "42703";
 
 const fetchFeaturedEvent = async (): Promise<EventSummary | null> => {
   const client = createSupabasePublicClient();
@@ -243,7 +262,8 @@ const fetchFeaturedEvent = async (): Promise<EventSummary | null> => {
     .not("featured_at", "is", null)
     .order("featured_at", { ascending: false })
     .limit(5);
-  if (error) return null;
+  if (error?.code === PG_UNDEFINED_COLUMN && error.message.includes("featured_at")) return null;
+  throwIfSupabaseError("featured-event", error);
   const rows = (data ?? []) as EventSummary[];
   return (
     rows.find((event) => isReleased(event.publish_at) && !isEnded(event)) ?? null
@@ -296,7 +316,8 @@ const fetchUpcomingEvents = async (
     if (filter) request = request.or(filter);
   }
 
-  const { data } = await request.order("start_date", { ascending: true }).limit(limit);
+  const { data, error } = await request.order("start_date", { ascending: true }).limit(limit);
+  throwIfSupabaseError("upcoming-events", error);
   const rows = (data ?? []) as EventSummary[];
   const now = new Date();
   return rows.filter((event) => isReleased(event.publish_at) && !isEnded(event, now));
@@ -413,7 +434,7 @@ export const getRelatedEvents = (category: string, excludeId: string) =>
   unstable_cache(
     async () => {
       const client = createSupabasePublicClient();
-      const { data } = await client
+      const { data, error } = await client
         .from("events")
         .select(RELATED_SELECT_FIELDS)
         .eq("category", category)
@@ -422,6 +443,7 @@ export const getRelatedEvents = (category: string, excludeId: string) =>
         .order("start_date", { ascending: true })
         .limit(10)
         .returns<RelatedEventSummary[]>();
+      throwIfSupabaseError("related-events", error);
       const rows = data ?? [];
       return rows.filter((item) => isReleased(item.publish_at)).slice(0, 3);
     },
@@ -453,12 +475,13 @@ export type SitemapEventRow = {
 
 const fetchSitemapEvents = async (): Promise<SitemapEventRow[]> => {
   const client = createSupabasePublicClient();
-  const { data } = await client
+  const { data, error } = await client
     .from("events")
     .select(SITEMAP_SELECT_FIELDS)
     .eq("status", "published")
     .limit(1000)
     .returns<SitemapEventRow[]>();
+  throwIfSupabaseError("sitemap-events", error);
   const rows = data ?? [];
   return rows.filter((event) => isReleased(event.publish_at) && !shouldNoindex(event));
 };
@@ -477,12 +500,13 @@ export const getSitemapEvents = () =>
 
 const fetchArchivedEvents = async (): Promise<EventSummary[]> => {
   const client = createSupabasePublicClient();
-  const { data } = await client
+  const { data, error } = await client
     .from("events")
     .select(UPCOMING_SELECT_FIELDS)
     .eq("status", "published")
     .order("start_date", { ascending: false })
     .limit(1000);
+  throwIfSupabaseError("archived-events", error);
   const rows = (data ?? []) as EventSummary[];
   const now = new Date();
   return rows

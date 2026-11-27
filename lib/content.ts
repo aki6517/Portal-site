@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import MarkdownIt from "markdown-it";
+import MarkdownIt, { type Token } from "markdown-it";
 
 type FrontMatter = {
   title?: string;
@@ -60,13 +60,7 @@ markdown.validateLink = (url: string) => {
 };
 
 const defaultLinkOpenRenderer = markdown.renderer.rules.link_open;
-markdown.renderer.rules.link_open = (
-  tokens: any[],
-  idx: number,
-  options: any,
-  env: any,
-  self: any,
-) => {
+markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   const href = tokens[idx].attrGet("href") ?? "";
   if (/^https?:\/\//i.test(href)) {
     tokens[idx].attrSet("target", "_blank");
@@ -80,13 +74,7 @@ markdown.renderer.rules.link_open = (
 };
 
 const defaultTableOpenRenderer = markdown.renderer.rules.table_open;
-markdown.renderer.rules.table_open = (
-  tokens: any[],
-  idx: number,
-  options: any,
-  env: any,
-  self: any,
-) => {
+markdown.renderer.rules.table_open = (tokens, idx, options, env, self) => {
   const tableOpen = defaultTableOpenRenderer
     ? defaultTableOpenRenderer(tokens, idx, options, env, self)
     : self.renderToken(tokens, idx, options);
@@ -94,24 +82,18 @@ markdown.renderer.rules.table_open = (
 };
 
 const defaultTableCloseRenderer = markdown.renderer.rules.table_close;
-markdown.renderer.rules.table_close = (
-  tokens: any[],
-  idx: number,
-  options: any,
-  env: any,
-  self: any,
-) => {
+markdown.renderer.rules.table_close = (tokens, idx, options, env, self) => {
   const tableClose = defaultTableCloseRenderer
     ? defaultTableCloseRenderer(tokens, idx, options, env, self)
     : self.renderToken(tokens, idx, options);
   return `${tableClose}</div>`;
 };
 
-markdown.core.ruler.after("inline", "auto_link_galapa_phrase", (state: any) => {
+markdown.core.ruler.after("inline", "auto_link_galapa_phrase", (state) => {
   for (const blockToken of state.tokens) {
     if (blockToken.type !== "inline" || !blockToken.children) continue;
 
-    const nextChildren: any[] = [];
+    const nextChildren: Token[] = [];
     let linkDepth = 0;
 
     for (const childToken of blockToken.children) {
