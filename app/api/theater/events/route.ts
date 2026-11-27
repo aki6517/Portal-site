@@ -42,6 +42,11 @@ type EventPayload = {
   status?: "draft" | "published" | "archived";
 };
 
+// 劇団が承認済み（approved）でないときに、公開（published）での作成を断るメッセージ。
+// EventForm は応答の error.message をそのまま表示する。
+const THEATER_NOT_APPROVED_MESSAGE =
+  "劇団の登録が承認済みではないため、公演を公開できません。下書きとして保存するか、福岡アクトポータル運営にお問い合わせください。";
+
 const normalizeTags = (tags?: string[] | string | null) => {
   if (!tags) return [];
   if (Array.isArray(tags)) return tags.filter(Boolean);
@@ -336,6 +341,23 @@ export async function POST(req: Request) {
     );
   }
 
+  // published での作成は、承認済み（approved）の劇団だけに許可する
+  // （docs/04_api.md「4. 劇団向け 公演CRUD」）。見るのは insert 先の劇団
+  // （下の theater_id に入れる theater.id ＝ resolveActiveTheater で決めた劇団）の status。
+  // draft（既定値）・archived での作成は、劇団の status に関係なく今までどおり許可する。
+  const insertStatus = payload.status ?? "draft";
+  if (insertStatus === "published" && theater.status !== "approved") {
+    return NextResponse.json(
+      {
+        error: {
+          code: "FORBIDDEN",
+          message: THEATER_NOT_APPROVED_MESSAGE,
+        },
+      },
+      { status: 403 }
+    );
+  }
+
   // venue_idが明示的に送られていればそれを優先し、無ければvenue文字列から
   // 自動解決する（EventFormはvenue_idを送らないため、通常はここで解決される）。
   const resolvedVenueId = payload.venue_id
@@ -374,7 +396,7 @@ export async function POST(req: Request) {
     "cast": payload.cast ?? [],
     ai_confidence:
       payload.ai_confidence !== undefined ? payload.ai_confidence : null,
-    status: payload.status ?? "draft",
+    status: insertStatus,
     categories,
   };
 

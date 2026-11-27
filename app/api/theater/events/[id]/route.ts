@@ -46,6 +46,11 @@ type EventUpdatePayload = {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// 劇団が承認済み（approved）でないときに、published への変更を断るメッセージ。
+// EventForm・EditEventScreen は応答の error.message をそのまま表示する。
+const THEATER_NOT_APPROVED_MESSAGE =
+  "劇団の登録が承認済みではないため、公演を公開できません。下書きとして保存するか、福岡アクトポータル運営にお問い合わせください。";
+
 const normalizeTags = (tags?: string[] | string | null) => {
   if (!tags) return undefined;
   if (Array.isArray(tags)) return tags.filter(Boolean);
@@ -357,6 +362,26 @@ export async function PATCH(
       }
       supersededByUpdate = raw;
     }
+  }
+
+  // published への変更は、承認済み（approved）の劇団だけに許可する
+  // （docs/04_api.md「4. 劇団向け 公演CRUD」）。見るのは対象公演が属する劇団の status。
+  // current は theater_id = resolved.activeTheaterId で引いているので、同じ id で引いた
+  // theater が対象公演の劇団になる。
+  // status を送らない編集や draft / archived への変更は、停止中などの劇団でも今までどおり
+  // 許可する（公開をやめる操作や下書きの編集はできるようにするため）。
+  // 公開中の公演を status: "published" のまま保存する場合も、送られた status が
+  // published なので 403 になる（EventForm は保存のたびに status を送る）。
+  if (payload.status === "published" && theater.status !== "approved") {
+    return NextResponse.json(
+      {
+        error: {
+          code: "FORBIDDEN",
+          message: THEATER_NOT_APPROVED_MESSAGE,
+        },
+      },
+      { status: 403 }
+    );
   }
 
   const update: Record<string, unknown> = {};
