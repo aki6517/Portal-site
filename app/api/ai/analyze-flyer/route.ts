@@ -23,11 +23,21 @@ const CATEGORY_IDS = new Set([
   "other",
 ]);
 
-const DEFAULT_MODEL_CANDIDATES = [
-  "gemini-3.0-pro",
-  "gemini-2.5-pro",
-  "gemini-2.5-flash",
-];
+// 先頭が本命。2番目は、本命が失敗したときの控え。
+// 控えは、以前の控え（gemini-2.5-pro）が 2026-12-01 の提供終了後に自動で転送される先と同じモデル。
+const DEFAULT_MODEL_CANDIDATES = ["gemini-4-hydrogen", "gemini-3.8-flash"];
+
+// Gemini 4 は思考の強さ（low / medium / high / xhigh）で質と速さを調整する。
+const GEMINI_4_THINKING_LEVEL = "high";
+
+// temperature などのサンプリング指定は、Gemini 3.6 以降で非推奨（Gemini 4 は範囲外だと 400）なので送らない。
+const buildGenerationConfig = (model: string) =>
+  model.startsWith("gemini-4")
+    ? {
+        response_mime_type: "application/json",
+        thinking_config: { thinking_level: GEMINI_4_THINKING_LEVEL },
+      }
+    : { response_mime_type: "application/json" };
 
 const getClientKey = (req: Request, userId: string) => {
   const forwarded = req.headers.get("x-forwarded-for") ?? "";
@@ -355,10 +365,7 @@ const callGemini = async ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts }],
-        generationConfig: {
-          temperature: 0.1,
-          response_mime_type: "application/json",
-        },
+        generationConfig: buildGenerationConfig(model),
       }),
     }
   );
@@ -369,10 +376,17 @@ const callGemini = async ({
   }
 
   const data = (await response.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: {
+      content?: { parts?: { text?: string; thought?: boolean }[] };
+    }[];
   };
 
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  // 思考の要約（thought）は本文ではないので除き、本文の text だけをつなぐ。
+  const responseParts = data.candidates?.[0]?.content?.parts;
+  const text = (Array.isArray(responseParts) ? responseParts : [])
+    .filter((part) => part && !part.thought && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("");
   if (!text) {
     throw new Error("GEMINI_EMPTY_RESPONSE");
   }
@@ -783,6 +797,11 @@ export async function POST(req: Request) {
         })) as Record<string, unknown>;
 
         const normalized = normalizeResult(raw, pageContext);
+        if (model !== models[0]) {
+          warnings.push(
+            `ふだんのAI（${models[0]}）が使えなかったため、控えのAI（${model}）で読み取りました。出演者名や日時を念入りにご確認ください`
+          );
+        }
         return NextResponse.json({
           data: {
             result: normalized,
