@@ -72,12 +72,16 @@ export default function EventEditBySlugPage() {
 
       const json = (await res.json()) as { data?: { events?: TheaterEvent[] } };
       const events = json.data?.events ?? [];
-      const matched = events.find(
-        (event) =>
-          event.slug === slug &&
-          (event.category === category ||
-            (Array.isArray(event.categories) && event.categories.includes(category)))
-      );
+      // 公開ページ（lib/data/events.ts の pickMatchedEvent）と同じ順に選ぶ:
+      // 主カテゴリが一致する公演を先に、無ければ categories が一致する公演。
+      const matched =
+        events.find((event) => event.slug === slug && event.category === category) ??
+        events.find(
+          (event) =>
+            event.slug === slug &&
+            Array.isArray(event.categories) &&
+            event.categories.includes(category)
+        );
 
       if (!matched) {
         setMessage("対象公演が見つかりません。");

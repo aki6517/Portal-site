@@ -51,6 +51,57 @@ const UUID_PATTERN =
 const THEATER_NOT_APPROVED_MESSAGE =
   "劇団の登録が承認済みではないため、公演を公開できません。下書きとして保存するか、福岡アクトポータル運営にお問い合わせください。";
 
+// 保存しようとしている公演のURL（/events/{category}/{slug}）が、ほかの公演の以前のURL
+// （event_redirects）として使われているときに、保存を断るメッセージ。
+// EventForm は応答の error.message をそのまま表示する。
+const SLUG_RESERVED_MESSAGE =
+  "このURLは、ほかの公演の以前のURLとして使われているため使えません。別の英字にしてください。";
+
+// 保存後の (category, slug) を別の公演がすでに使っているときの message。更新が events の一意制約
+// （docs/sql/001_init.sql の uniq_events_category_slug）にぶつかったときに PostgREST が返す message と
+// 同じにして、今までの 409（code: "DB_ERROR"）と同じ応答にする。
+const EVENT_URL_TAKEN_MESSAGE =
+  'duplicate key value violates unique constraint "uniq_events_category_slug"';
+
+// カテゴリID（categories 表の id）の形式。docs/sql の categories 表の id は TEXT で形式の制約は無く、
+// 入っている値（comedy・drama など）はすべて英小文字。公開ページの絞り込み
+// （lib/data/events.ts の sanitizeCategoryValue）が安全とみなす文字（英数字・_・-）に合わせ、
+// 長さは 64 文字までにする。app/api/theater/events/route.ts と同じ。
+const CATEGORY_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
+const CATEGORY_FORMAT_MESSAGE =
+  "カテゴリの指定が正しくありません。カテゴリを選び直してください。";
+
+// category・categories の型と形式を確かめ、trim した値を返す（app/api/theater/events/route.ts と同じ）。
+// - category: 無い（undefined・null）は undefined。文字列以外・形式に合わない値は不正
+// - categories: 無い（undefined・null）は undefined。配列以外は不正。要素は文字列以外なら不正、
+//   trim して空なら今までどおり捨てる、空でなく形式に合わなければ不正
+const parseCategoryInput = (
+  rawCategory: unknown,
+  rawCategories: unknown
+):
+  | { ok: true; category: string | undefined; categories: string[] | undefined }
+  | { ok: false } => {
+  let category: string | undefined;
+  if (rawCategory !== undefined && rawCategory !== null) {
+    if (typeof rawCategory !== "string") return { ok: false };
+    category = rawCategory.trim();
+    if (category && !CATEGORY_ID_PATTERN.test(category)) return { ok: false };
+  }
+  let categories: string[] | undefined;
+  if (rawCategories !== undefined && rawCategories !== null) {
+    if (!Array.isArray(rawCategories)) return { ok: false };
+    categories = [];
+    for (const item of rawCategories) {
+      if (typeof item !== "string") return { ok: false };
+      const trimmed = item.trim();
+      if (!trimmed) continue;
+      if (!CATEGORY_ID_PATTERN.test(trimmed)) return { ok: false };
+      categories.push(trimmed);
+    }
+  }
+  return { ok: true, category, categories };
+};
+
 const normalizeTags = (tags?: string[] | string | null) => {
   if (!tags) return undefined;
   if (Array.isArray(tags)) return tags.filter(Boolean);
@@ -154,6 +205,111 @@ const resolveVenueId = async (
   }
 };
 
+// 公開ページで、この公演が一致するカテゴリの一覧（主カテゴリ＋categories）。
+// lib/data/events.ts の matchesEventCategory と同じく、保存されている値のまま比べる。
+const toCategorySet = (primary: unknown, categories: unknown) => {
+  const list = [primary, ...(Array.isArray(categories) ? categories : [])];
+  return Array.from(
+    new Set(
+      list.filter((item): item is string => typeof item === "string" && item.length > 0)
+    )
+  );
+};
+
+// 保存しようとしている (カテゴリ, slug) の組が、ほかの公演への転送として event_redirects に
+// 登録されていないかを確かめる。
+// - 公開ページ（app/events/[category]/[slug]/page.tsx）は、カテゴリ（category か categories）が
+//   一致する公演を event_redirects より先に選ぶ。主カテゴリだけを確かめると、categories に入れた
+//   カテゴリ経由でほかの公演の旧URLを奪えるため、categories のカテゴリも確かめる
+// - to_event_id が空の行（転送先の公演が削除済み。ON DELETE SET NULL）は、どこにも転送されない
+//   ので、使われている扱いにしない
+// - selfId（この公演）への転送は、自分の旧URLに戻すだけなので許可する
+// - supabase-js の .in() は値の中の " や \ をエスケープしないので、.in() に渡すのは
+//   CATEGORY_ID_PATTERN（英数字・_・-）に合う値だけにする。合わない値は1件ずつ .eq() で引く
+//   （保存前の categories は DB の値で、この要求の形式検査を通っていないことがあるため）
+const findReservedRedirect = async (
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  slug: string,
+  categories: string[],
+  selfId: string
+) => {
+  const base = () =>
+    service
+      .from("event_redirects")
+      .select("from_category, to_event_id")
+      .eq("from_slug", slug);
+  const safe = categories.filter((item) => CATEGORY_ID_PATTERN.test(item));
+  const others = categories.filter((item) => !CATEGORY_ID_PATTERN.test(item));
+  const results = await Promise.all([
+    ...(safe.length > 0 ? [base().in("from_category", safe)] : []),
+    ...others.map((item) => base().eq("from_category", item)),
+  ]);
+  const failed = results.find((result) => result.error);
+  if (failed?.error) return { reserved: false, error: failed.error };
+  const reserved = results.some((result) =>
+    (result.data ?? []).some(
+      (row) => Boolean(row.to_event_id) && row.to_event_id !== selfId
+    )
+  );
+  return { reserved, error: null };
+};
+
+// この公演の旧URL（保存前の (カテゴリ, slug) の組）を、この公演への転送として event_redirects に登録する。
+// ほかの公演への転送として登録済みの組は上書きしない（その公演の旧URLを奪わないため）。
+// - 未登録: 登録する。ON CONFLICT DO NOTHING（ignoreDuplicates）で入れるので、確かめてから
+//   書くまでの間にほかの保存が同じ組を登録していても、そちらを残す
+// - 転送先が空（転送先の公演が削除済み。ON DELETE SET NULL）: この公演に向け直す。
+//   to_event_id が空のままの行だけを書き換えるので、その間にほかの公演へ向いた行は上書きしない
+// - この公演への転送・ほかの公演への転送: そのまま
+// 読み書きが DB エラーなら error を返す（呼び出し元は 500 にして events を更新しない）。
+const registerOldUrlRedirect = async (
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  fromCategory: string,
+  fromSlug: string,
+  eventId: string
+): Promise<{ error: { message: string } | null }> => {
+  const { data: existing, error } = await service
+    .from("event_redirects")
+    .select("to_event_id")
+    .eq("from_category", fromCategory)
+    .eq("from_slug", fromSlug)
+    .maybeSingle();
+  if (error) return { error };
+  if (!existing) {
+    const { error: insertError } = await service.from("event_redirects").upsert(
+      {
+        from_category: fromCategory,
+        from_slug: fromSlug,
+        to_event_id: eventId,
+      },
+      { onConflict: "from_category,from_slug", ignoreDuplicates: true }
+    );
+    return { error: insertError ?? null };
+  }
+  if (existing.to_event_id === null) {
+    const { error: repointError } = await service
+      .from("event_redirects")
+      .update({ to_event_id: eventId })
+      .eq("from_category", fromCategory)
+      .eq("from_slug", fromSlug)
+      .is("to_event_id", null);
+    return { error: repointError ?? null };
+  }
+  return { error: null };
+};
+
+// この状態（status・publish_at）の公演が、公開ページで一般に見られるか。保存前と保存後の両方に使う。
+// 公開ページ（lib/data/events.ts の fetchEventIdBySlug・fetchEventById・isReleased）が出すのは、
+// status が published で、publish_at が空か今より前（日付として読めない値も公開扱い）の公演だけ。
+// draft・archived と、公開日前の published は出ない。終演後でも published のままなら出る。
+const isPubliclyVisible = (event: { status?: string | null; publish_at?: string | null }) => {
+  if (event.status !== "published") return false;
+  if (!event.publish_at) return true;
+  const time = new Date(event.publish_at).getTime();
+  if (Number.isNaN(time)) return true;
+  return time <= Date.now();
+};
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -245,9 +401,12 @@ export async function PATCH(
     );
   }
 
+  // publish_at は「保存前のURLが一般に見られる状態だったか」（旧URLを登録するか）の判定に使う。
+  // 下の列が無いDB向けの読み直しには入れない（publish_at 列も無いDBで 404 にしないため。
+  // その場合 publish_at は undefined ＝公開日の指定なしとして扱われる）。
   let { data: current, error: currentError } = await service
     .from("events")
-    .select("id, category, slug, status, start_date, end_date, categories")
+    .select("id, category, slug, status, start_date, end_date, categories, publish_at")
     .eq("id", id)
     .eq("theater_id", resolved.activeTheaterId)
     .single();
@@ -312,6 +471,23 @@ export async function PATCH(
         slugUpdate = slugValidation.slug;
       }
     }
+  }
+
+  // category・categories: 文字列以外（数値・null の要素など）だと trim() で例外（500）になり、
+  // 形式外の値は event_redirects の確認にもそのまま渡るため、400で返す。
+  // category を送ったのに空（"" や " "）のときも400（そのまま保存すると空のカテゴリになるため）。
+  // category を送らない・null のときは今までどおり categories の先頭か現在値を使う。
+  const categoryInput = parseCategoryInput(payload.category, payload.categories);
+  if (!categoryInput.ok || categoryInput.category === "") {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: CATEGORY_FORMAT_MESSAGE,
+        },
+      },
+      { status: 400 }
+    );
   }
 
   // superseded_by（再演時の後継公演指定）: UUID形式・自分自身でないこと・
@@ -385,15 +561,13 @@ export async function PATCH(
   }
 
   const update: Record<string, unknown> = {};
-  const incomingCategory = payload.category?.trim();
+  const incomingCategory = categoryInput.category;
   const hasCategories = "categories" in payload;
   const hasCategory = "category" in payload;
   if (hasCategories || hasCategory) {
     const primary =
-      incomingCategory ??
-      (Array.isArray(payload.categories) ? payload.categories[0] : undefined) ??
-      current.category;
-    const normalized = normalizeCategories(payload.categories ?? null, primary);
+      incomingCategory ?? categoryInput.categories?.[0] ?? current.category;
+    const normalized = normalizeCategories(categoryInput.categories ?? null, primary);
     update.category = primary;
     update.categories = normalized;
   }
@@ -479,6 +653,142 @@ export async function PATCH(
     });
   }
 
+  // 保存前・保存後に、この公演が公開ページで一致する (カテゴリ, slug) の組。
+  // slug は1つなので、組は「カテゴリの一覧＋slug」で表す。
+  const newCategory = (update.category as string | undefined) ?? current.category;
+  const newSlug = (update.slug as string | undefined) ?? current.slug;
+  const newCategories = "categories" in update ? update.categories : current.categories;
+  const categoriesBefore = toCategorySet(current.category, current.categories);
+  const categoriesAfter = toCategorySet(newCategory, newCategories);
+  const slugChanged = newSlug !== current.slug;
+  const primaryPairChanged = slugChanged || newCategory !== current.category;
+  // 保存前は公開ページに出ていなかった公演が、この保存で出る状態（published かつ公開日が空か過去）に
+  // なるか（下書きの公開など）。status・publish_at を送らなければ保存前のまま。
+  const newStatus = (update.status as string | undefined) ?? current.status;
+  const newPublishAt =
+    "publish_at" in update ? (update.publish_at as string | null) : current.publish_at;
+  const becomesVisible =
+    !isPubliclyVisible(current) &&
+    isPubliclyVisible({ status: newStatus, publish_at: newPublishAt });
+
+  // 保存後に新しく一致するようになる組が、ほかの公演の以前のURL（event_redirects）として
+  // 使われていたら断る（POST と同じ理由）。
+  // - 保存前から一致していた組は確かめない（URLを変えない編集を、前からある組のせいで止めないため）
+  // - ただし保存後の主カテゴリの組が保存前と違うときは、その組を必ず確かめる。公開ページは
+  //   主カテゴリの一致を categories の一致より先に選ぶので、categories から主カテゴリへの
+  //   昇格でも、そのURLでの優先度が上がるため
+  // - 公開ページに出ていなかった公演がこの保存で出るようになるとき（URLを変えずに下書きを公開する、
+  //   など）は、保存後の組（主カテゴリ＋categories）をすべて確かめる。出ていなかった間は、
+  //   その組を公開ページで使っていなかったため
+  const addedCategories =
+    slugChanged || becomesVisible
+      ? [...categoriesAfter]
+      : categoriesAfter.filter((item) => !categoriesBefore.includes(item));
+  if (primaryPairChanged && !addedCategories.includes(newCategory)) {
+    addedCategories.push(newCategory);
+  }
+  if (addedCategories.length > 0) {
+    const reservation = await findReservedRedirect(
+      service,
+      newSlug,
+      addedCategories,
+      current.id
+    );
+    if (reservation.error) {
+      return NextResponse.json(
+        { error: { code: "DB_ERROR", message: reservation.error.message } },
+        { status: 500 }
+      );
+    }
+    if (reservation.reserved) {
+      return NextResponse.json(
+        { error: { code: "SLUG_RESERVED", message: SLUG_RESERVED_MESSAGE } },
+        { status: 409 }
+      );
+    }
+  }
+
+  // 保存後の主カテゴリの組 (category, slug) を、別の公演がすでに使っていないか（events の一意制約は
+  // (category, slug) だけ）。使っていれば下の更新は一意制約で 409 になるので、旧URLを登録する前に
+  // 同じ形の 409 を返して何も書かない（登録した行だけが残らないようにするため）。
+  // ここで確かめてから更新するまでの間に別の公演が同じ組を取ると、今までどおり更新が 409 になる。
+  if (primaryPairChanged) {
+    // (category, slug) は一意なので、引けるのは多くても1件
+    const { data: occupants, error: occupantError } = await service
+      .from("events")
+      .select("id")
+      .eq("category", newCategory)
+      .eq("slug", newSlug);
+    if (occupantError) {
+      return NextResponse.json(
+        { error: { code: "DB_ERROR", message: occupantError.message } },
+        { status: 500 }
+      );
+    }
+    if (Array.isArray(occupants) && occupants.some((row) => row.id !== current.id)) {
+      return NextResponse.json(
+        { error: { code: "DB_ERROR", message: EVENT_URL_TAKEN_MESSAGE } },
+        { status: 409 }
+      );
+    }
+  }
+
+  // 保存後に一致しなくなる組を、この公演の旧URLとして event_redirects に登録する。
+  // - 対象: 保存前に一致していた組（主カテゴリ＋categories）のうち保存後に一致しなくなる組と、
+  //   保存前の主カテゴリの組（保存後も categories で一致していても、主カテゴリの一致が無くなると
+  //   別の公演がその組を主カテゴリで取れて、優先して表示されてしまうため）
+  // - 保存前のこの公演のURLが一般に見られる状態だったときだけ（下書き・非公開・公開日前の公演は
+  //   旧URLが外に出ていないので、空いているURLを取り置かせない）
+  // - categories で一致していただけの組（主カテゴリではない組）が、別の公演の今の主カテゴリの組
+  //   （その公演自身のURL）なら登録しない。登録しても公開ページは主カテゴリが一致するその公演を
+  //   先に表示するので転送は使われず、その公演があとでURLを変えたときに、自分の旧URLとして
+  //   登録できなくなる（ほかの公演への行は上書きしないため）
+  // - events を更新する前に登録する。更新してから登録するまでの間に、ほかの保存がこの旧URLを
+  //   空きとして取れないようにするため（完全な直列化ではない）。登録が DB エラーなら 500 にして、
+  //   events は更新しない。登録のあとで更新が失敗しても、残るのは今のこの公演自身への転送行で、
+  //   主カテゴリの組はこの公演がそのまま表示され、categories の組はこの公演の正式URLへの転送に
+  //   なる（categories で一致したときと同じ）ため、表示は変わらない
+  const lostCategories = slugChanged
+    ? [...categoriesBefore]
+    : categoriesBefore.filter((item) => !categoriesAfter.includes(item));
+  if (primaryPairChanged && !lostCategories.includes(current.category)) {
+    lostCategories.push(current.category);
+  }
+  if (
+    lostCategories.length > 0 &&
+    isPubliclyVisible(current) &&
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  ) {
+    for (const fromCategory of lostCategories) {
+      if (fromCategory !== current.category) {
+        const { data: holders, error: holderError } = await service
+          .from("events")
+          .select("id")
+          .eq("category", fromCategory)
+          .eq("slug", current.slug);
+        if (holderError) {
+          return NextResponse.json(
+            { error: { code: "DB_ERROR", message: holderError.message } },
+            { status: 500 }
+          );
+        }
+        if (Array.isArray(holders) && holders.some((row) => row.id !== current.id)) continue;
+      }
+      const registered = await registerOldUrlRedirect(
+        service,
+        fromCategory,
+        current.slug,
+        current.id
+      );
+      if (registered.error) {
+        return NextResponse.json(
+          { error: { code: "DB_ERROR", message: registered.error.message } },
+          { status: 500 }
+        );
+      }
+    }
+  }
+
   let { data: updated, error: updateError } = await service
     .from("events")
     .update(update)
@@ -538,23 +848,6 @@ export async function PATCH(
     return NextResponse.json(
       { error: { code: "DB_ERROR", message: updateError?.message } },
       { status }
-    );
-  }
-
-  const newCategory = (update.category as string | undefined) ?? current.category;
-  const newSlug = (update.slug as string | undefined) ?? current.slug;
-
-  if (
-    (newCategory !== current.category || newSlug !== current.slug) &&
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  ) {
-    await service.from("event_redirects").upsert(
-      {
-        from_category: current.category,
-        from_slug: current.slug,
-        to_event_id: current.id,
-      },
-      { onConflict: "from_category,from_slug" }
     );
   }
 

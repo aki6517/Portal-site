@@ -47,6 +47,51 @@ type EventPayload = {
 const THEATER_NOT_APPROVED_MESSAGE =
   "劇団の登録が承認済みではないため、公演を公開できません。下書きとして保存するか、福岡アクトポータル運営にお問い合わせください。";
 
+// 保存しようとしている公演のURL（/events/{category}/{slug}）が、ほかの公演の以前のURL
+// （event_redirects）として使われているときに、保存を断るメッセージ。
+// EventForm は応答の error.message をそのまま表示する。
+const SLUG_RESERVED_MESSAGE =
+  "このURLは、ほかの公演の以前のURLとして使われているため使えません。別の英字にしてください。";
+
+// カテゴリID（categories 表の id）の形式。docs/sql の categories 表の id は TEXT で形式の制約は無く、
+// 入っている値（comedy・drama など）はすべて英小文字。公開ページの絞り込み
+// （lib/data/events.ts の sanitizeCategoryValue）が安全とみなす文字（英数字・_・-）に合わせ、
+// 長さは 64 文字までにする。
+const CATEGORY_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
+const CATEGORY_FORMAT_MESSAGE =
+  "カテゴリの指定が正しくありません。カテゴリを選び直してください。";
+
+// category・categories の型と形式を確かめ、trim した値を返す。
+// - category: 無い（undefined・null）は undefined。文字列以外・形式に合わない値は不正
+// - categories: 無い（undefined・null）は undefined。配列以外は不正。要素は文字列以外なら不正、
+//   trim して空なら今までどおり捨てる、空でなく形式に合わなければ不正
+const parseCategoryInput = (
+  rawCategory: unknown,
+  rawCategories: unknown
+):
+  | { ok: true; category: string | undefined; categories: string[] | undefined }
+  | { ok: false } => {
+  let category: string | undefined;
+  if (rawCategory !== undefined && rawCategory !== null) {
+    if (typeof rawCategory !== "string") return { ok: false };
+    category = rawCategory.trim();
+    if (category && !CATEGORY_ID_PATTERN.test(category)) return { ok: false };
+  }
+  let categories: string[] | undefined;
+  if (rawCategories !== undefined && rawCategories !== null) {
+    if (!Array.isArray(rawCategories)) return { ok: false };
+    categories = [];
+    for (const item of rawCategories) {
+      if (typeof item !== "string") return { ok: false };
+      const trimmed = item.trim();
+      if (!trimmed) continue;
+      if (!CATEGORY_ID_PATTERN.test(trimmed)) return { ok: false };
+      categories.push(trimmed);
+    }
+  }
+  return { ok: true, category, categories };
+};
+
 const normalizeTags = (tags?: string[] | string | null) => {
   if (!tags) return [];
   if (Array.isArray(tags)) return tags.filter(Boolean);
@@ -148,6 +193,40 @@ const resolveVenueId = async (
   } catch {
     return null;
   }
+};
+
+// 新しく作る公演の (カテゴリ, slug) の組が、ほかの公演への転送として event_redirects に
+// 登録されていないかを確かめる。
+// - 公開ページ（app/events/[category]/[slug]/page.tsx）は、カテゴリ（category か categories）が
+//   一致する公演を event_redirects より先に選ぶ。主カテゴリだけを確かめると、categories に入れた
+//   カテゴリ経由でほかの公演の旧URLを奪えるため、保存する categories（主カテゴリを含む）を全部確かめる
+// - to_event_id が空の行（転送先の公演が削除済み。ON DELETE SET NULL）は、どこにも転送されない
+//   ので、使われている扱いにしない
+// - supabase-js の .in() は値の中の " や \ をエスケープしないので、.in() に渡すのは
+//   CATEGORY_ID_PATTERN（英数字・_・-）に合う値だけにする。合わない値は1件ずつ .eq() で引く
+//   （POST の値は上で形式検査済みなので、ふつうは .in() の1回だけ）
+const findReservedRedirect = async (
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  slug: string,
+  categories: string[]
+) => {
+  const base = () =>
+    service
+      .from("event_redirects")
+      .select("from_category, to_event_id")
+      .eq("from_slug", slug);
+  const safe = categories.filter((item) => CATEGORY_ID_PATTERN.test(item));
+  const others = categories.filter((item) => !CATEGORY_ID_PATTERN.test(item));
+  const results = await Promise.all([
+    ...(safe.length > 0 ? [base().in("from_category", safe)] : []),
+    ...others.map((item) => base().eq("from_category", item)),
+  ]);
+  const failed = results.find((result) => result.error);
+  if (failed?.error) return { reserved: false, error: failed.error };
+  const reserved = results.some((result) =>
+    (result.data ?? []).some((row) => Boolean(row.to_event_id))
+  );
+  return { reserved, error: null };
 };
 
 export async function GET() {
@@ -272,8 +351,23 @@ export async function POST(req: Request) {
     );
   }
 
-  const category = payload.category?.trim() ?? "";
-  const categories = normalizeCategories(payload.categories ?? null, category);
+  // category・categories が文字列以外（数値・null の要素など）だと下の trim() で例外（500）になり、
+  // 形式外の値は event_redirects の確認にもそのまま渡るため、先に400で返す。
+  // category が無い・空のときは、下の既存の必須チェックに任せる。
+  const categoryInput = parseCategoryInput(payload.category, payload.categories);
+  if (!categoryInput.ok) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: CATEGORY_FORMAT_MESSAGE,
+        },
+      },
+      { status: 400 }
+    );
+  }
+  const category = categoryInput.category ?? "";
+  const categories = normalizeCategories(categoryInput.categories ?? null, category);
   const slug = payload.slug?.trim();
   const title = payload.title?.trim();
   const playwright = normalizeOptionalText(payload.playwright);
@@ -355,6 +449,23 @@ export async function POST(req: Request) {
         },
       },
       { status: 403 }
+    );
+  }
+
+  // 保存しようとしているURLが、ほかの公演の以前のURL（event_redirects）として使われていたら断る。
+  // 使えてしまうと、公開ページはカテゴリが一致するこの公演を転送より先に選ぶため、
+  // ほかの公演の旧URL（検索結果やSNSに残っているリンク）を奪えてしまう。
+  const reservation = await findReservedRedirect(service, slug, categories);
+  if (reservation.error) {
+    return NextResponse.json(
+      { error: { code: "DB_ERROR", message: reservation.error.message } },
+      { status: 500 }
+    );
+  }
+  if (reservation.reserved) {
+    return NextResponse.json(
+      { error: { code: "SLUG_RESERVED", message: SLUG_RESERVED_MESSAGE } },
+      { status: 409 }
     );
   }
 

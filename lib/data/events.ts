@@ -326,17 +326,29 @@ const SLUG_LOOKUP_SELECT = "id, category, categories, slug, publish_at";
 
 type SlugCandidate = Pick<EventDetail, "id" | "category" | "categories" | "slug" | "publish_at">;
 
+// URLのカテゴリに一致する公演か（主カテゴリ category か、複数カテゴリ categories に含まれるか）。
+// 下の pickMatchedEvent で使う。
+export const matchesEventCategory = (
+  item: { category: string; categories?: string[] | null },
+  category: string
+) =>
+  item.category === category ||
+  (Array.isArray(item.categories) && item.categories.includes(category));
+
+// 選ぶ順: 主カテゴリが一致する公演 → categories が一致する公演 → 一致しない最初の公演。
+// 主カテゴリの一致を先にするのは、categories に同じカテゴリを入れた別の公演が、
+// その公演の今の正式URL（/events/{主カテゴリ}/{slug}）を並び順しだいで奪えないようにするため
+// （events の一意制約は (category, slug) だけで、categories は重なりうる）。
 const pickMatchedEvent = <T extends { category: string; categories?: string[] | null; publish_at?: string | null }>(
   rows: T[] | null | undefined,
   category: string
 ) => {
   const released = (rows ?? []).filter((item) => isReleased(item.publish_at));
   return (
-    released.find(
-      (item) =>
-        item.category === category ||
-        (Array.isArray(item.categories) && item.categories.includes(category))
-    ) ?? released[0] ?? null
+    released.find((item) => item.category === category) ??
+    released.find((item) => matchesEventCategory(item, category)) ??
+    released[0] ??
+    null
   );
 };
 

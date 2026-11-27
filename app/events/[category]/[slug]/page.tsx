@@ -249,7 +249,19 @@ const tryRedirect = async (category: string, slug: string) => {
     .eq("id", redirect.to_event_id)
     .maybeSingle();
 
-  if (!target || target.status !== "published" || !isReleased(target.publish_at)) {
+  // 転送先の公演が見つからないとき（削除済みは to_event_id が空になるので、ふつうは上で戻る）は
+  // 今までどおり次の処理へ進む
+  if (!target) return;
+  // 転送先の公演はあるが、今は公開ページに出ない（下書き・非公開・公開日前）とき。
+  // このURLはその公演の旧URLなので、同じスラッグの別の公演（categories の一致・カテゴリ違い）へは
+  // 回さず 404 にする
+  if (target.status !== "published" || !isReleased(target.publish_at)) {
+    notFound();
+  }
+  // 転送先の今のURLがこのURLそのもの（A→B→A と戻して A→自分 の行が残っている、など）なら
+  // 転送しない。キャッシュの状態しだいで同じURLへの 308 がくり返されないよう、呼び出し元の
+  // 次の処理（404・カテゴリ違いの公演への転送）へ進む。
+  if (target.category === category && target.slug === slug) {
     return;
   }
   permanentRedirect(
@@ -303,6 +315,14 @@ export default async function EventDetailPage({
     notFound();
   }
   if (event.category !== category) {
+    // 主カテゴリが一致する公演が無いとき（pickMatchedEvent は主カテゴリの一致を先に返す）。
+    // 選ばれたのは categories で一致した公演か、スラッグだけが同じカテゴリ違いの公演。
+    // 解決順は「主カテゴリ一致 → 有効な転送（event_redirects）→ categories 一致 → 一致しない候補」
+    // なので、どちらの場合も先に転送を見る（例: drama/old → drama/new に変えた公演の旧URLが、
+    // categories に drama を入れた別の公演 comedy/old に吸い込まれないようにする）。
+    // 転送が無い・転送先が削除済みのときは今までどおりその公演へ転送する。転送先の公演が
+    // 今は公開ページに出ないときは tryRedirect が 404 にする。
+    await tryRedirect(category, slug);
     permanentRedirect(
       `/events/${encodeURIComponent(event.category)}/${encodeURIComponent(
         event.slug
