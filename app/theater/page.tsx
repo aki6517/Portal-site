@@ -398,6 +398,9 @@ export default function TheaterDashboardPage() {
           /register
         </Link>{" "}
         から登録してください。
+        <p className="mt-2 text-xs text-zinc-700">
+          福岡アクトポータルにすでに載っている劇団の場合も、/register で劇団名を入れて送ると「引き継ぎ」を申し込めます（運営が確認してから、あなたをその劇団の代表として登録します）。
+        </p>
       </div>
     );
   }

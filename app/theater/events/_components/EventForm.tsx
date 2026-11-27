@@ -77,7 +77,6 @@ type FormState = {
   flyer_url: string;
   analysis_flyer_url: string;
   image_url: string;
-  analyze_page_url: string;
   ai_confidence: string;
   status: "draft" | "published" | "archived";
   superseded_by: string;
@@ -330,9 +329,6 @@ const normalizeAiReservationLinks = (value: unknown) => {
     .filter((item) => item.label || item.url);
 };
 
-const hasReservationValue = (links: ReservationLink[]) =>
-  links.some((item) => normalizeText(item.label) || normalizeText(item.url));
-
 const normalizeAiTicketTypes = (value: unknown) => {
   if (!Array.isArray(value)) return [];
   return value
@@ -390,7 +386,6 @@ const buildInitialState = (data?: EventData | null): FormState => ({
   flyer_url: data?.flyer_url ?? "",
   analysis_flyer_url: data?.analysis_flyer_url ?? "",
   image_url: data?.image_url ?? "",
-  analyze_page_url: data?.ticket_url ?? "",
   ai_confidence:
     data?.ai_confidence !== null && data?.ai_confidence !== undefined
       ? String(data.ai_confidence)
@@ -586,9 +581,8 @@ export default function EventForm({
   const displayPreview = useMemo(() => form.image_url, [form.image_url]);
   const flyerUrlForAnalysis =
     normalizeText(form.analysis_flyer_url) || normalizeText(form.flyer_url);
-  const canAnalyze = Boolean(
-    flyerUrlForAnalysis || normalizeText(form.analyze_page_url)
-  );
+  // AI解析はチラシ画像だけで行う（app/api/ai/analyze-flyer は公演ページURLを読まない: PAGE_URL_FETCH_ENABLED = false）
+  const canAnalyze = Boolean(flyerUrlForAnalysis);
   const effectiveEventId = useMemo(
     () => eventId ?? createdId,
     [eventId, createdId]
@@ -820,11 +814,8 @@ export default function EventForm({
   };
 
   const runAnalyze = async () => {
-    const pageUrl = normalizeText(form.analyze_page_url);
-    if (!flyerUrlForAnalysis && !pageUrl) {
-      setMessage(
-        "AI解析用または公開用のチラシ画像、もしくは公演ページURLを入力してください"
-      );
+    if (!flyerUrlForAnalysis) {
+      setMessage("AI解析用または公開用のチラシ画像をアップロードしてください");
       return;
     }
     setAnalyzing(true);
@@ -834,10 +825,8 @@ export default function EventForm({
       const res = await fetch("/api/ai/analyze-flyer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          flyer_url: flyerUrlForAnalysis || undefined,
-          page_url: pageUrl || undefined,
-        }),
+        // page_url は送らない（公演ページURLの欄は無くした。サーバーは page_url が無くてもチラシだけで解析する）
+        body: JSON.stringify({ flyer_url: flyerUrlForAnalysis }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -860,17 +849,8 @@ export default function EventForm({
         const aiReservationLinks = normalizeAiReservationLinks(
           result.reservation_links
         );
-        const pageFallbackLinks = pageUrl
-          ? [{ label: "公式公演ページ", url: pageUrl }]
-          : [];
         const nextReservationLinks =
-          aiReservationLinks.length > 0
-            ? aiReservationLinks
-            : hasReservationValue(prev.reservation_links)
-              ? prev.reservation_links
-              : pageFallbackLinks.length > 0
-                ? pageFallbackLinks
-                : prev.reservation_links;
+          aiReservationLinks.length > 0 ? aiReservationLinks : prev.reservation_links;
         const aiTicketTypes = normalizeAiTicketTypes(result.ticket_types);
         const legacyTicketTypes = [
           result.price_general !== null && result.price_general !== undefined
@@ -1205,7 +1185,7 @@ export default function EventForm({
         {mode === "create" ? "新規公演作成" : "公演編集"}
       </h2>
       <p className="mt-2 text-sm text-zinc-700">
-        チラシ画像 / 公演ページURLの解析 → 内容確認の流れです。
+        チラシ画像のAI解析 → 内容確認の流れです。
       </p>
       {form.ai_confidence && (
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
@@ -1290,18 +1270,6 @@ export default function EventForm({
                 {analyzing ? "AI解析中..." : "AI解析を実行"}
               </button>
             </div>
-            <label className="text-xs font-black tracking-wide text-zinc-700">
-              公演ページURL（AI解析用・任意）
-            </label>
-            <input
-              className="input-retro"
-              placeholder="https://example.com/event"
-              value={form.analyze_page_url}
-              onChange={(e) => updateField("analyze_page_url", e.target.value)}
-            />
-            <p className="text-xs text-zinc-600">
-              チラシだけで不足する場合、公式の公演ページURLから販売所・予約URL・OGP画像も補助的に抽出します。
-            </p>
             {uploadNotice && (
               <p
                 className={`rounded-lg border-2 px-3 py-2 text-xs ${

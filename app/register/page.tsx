@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type MeResponse = {
@@ -18,6 +18,96 @@ type MeResponse = {
     pendingInvite?: { id: string; theater_id: string } | null;
   };
   error?: { code: string; message: string };
+};
+
+// 劇団の引き継ぎの申し込み（app/api/theater/claims）
+type ClaimSummary = {
+  id: string;
+  theater_id: string;
+  theater_name: string | null;
+  status: string;
+  created_at: string;
+};
+type ClaimTarget = { id: string; name: string; message: string };
+
+const CLAIMABLE_FALLBACK_MESSAGE =
+  "この劇団は、福岡アクトポータル運営がすでに情報を載せています。下の『引き継ぎを申し込む』から申し込むと、運営が確認してから、あなたのアカウントをこの劇団の代表としてつなぎます。";
+const CLAIM_SENT_MESSAGE =
+  "申し込みを受け付けました。運営が確認してから、ご登録のメールアドレスにお知らせします（ふだんは数日以内）。";
+const CLAIM_ALREADY_PENDING_MESSAGE =
+  "この劇団の引き継ぎは、すでに申し込み済みです。運営の確認をお待ちください。";
+const CLAIM_FAILED_MESSAGE =
+  "申し込みに失敗しました。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。";
+const CLAIM_UNCONFIRMED_MESSAGE =
+  "申し込みを受け付けたかどうかを確かめられませんでした。画面を読み込み直して、上に「申し込み中です」と出ているか確かめてください。";
+const CLAIM_CANCELLED_MESSAGE = "引き継ぎの申し込みを取り消しました。";
+const CLAIM_CANCEL_FAILED_MESSAGE =
+  "取り消しに失敗しました。時間をおいてもう一度お試しください。続く場合は福岡アクトポータル運営にお問い合わせください。";
+const CLAIM_NETWORK_MESSAGE =
+  "通信に失敗しました。インターネットへのつながりを確かめて、もう一度お試しください。";
+
+const formatClaimDate = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "日付不明";
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "Asia/Tokyo",
+  }).format(date);
+};
+
+// 劇団登録（app/api/theater/onboard）の 409 THEATER_CLAIMABLE の data.theater を取り出す
+const readClaimableTheater = (json: unknown) => {
+  const theater = (json as { data?: { theater?: { id?: unknown; name?: unknown } } } | null)?.data?.theater;
+  return typeof theater?.id === "string" && typeof theater?.name === "string"
+    ? { id: theater.id, name: theater.name }
+    : null;
+};
+
+// 申し込み 1 件の形を確かめる（サーバーの応答は unknown として受けて、形が違う行は使わない）
+const readClaimSummary = (value: unknown): ClaimSummary | null => {
+  const v = value as Partial<Record<keyof ClaimSummary, unknown>> | null;
+  if (
+    typeof v !== "object" || v === null ||
+    typeof v.id !== "string" || typeof v.theater_id !== "string" ||
+    typeof v.status !== "string" || typeof v.created_at !== "string" ||
+    !(v.theater_name === null || v.theater_name === undefined || typeof v.theater_name === "string")
+  ) {
+    return null;
+  }
+  return {
+    id: v.id,
+    theater_id: v.theater_id,
+    theater_name: typeof v.theater_name === "string" ? v.theater_name : null,
+    status: v.status,
+    created_at: v.created_at,
+  };
+};
+
+// 自分の確認待ちの申し込みを読む（GET /api/theater/claims の data.pending）。読めなかったら null（画面には出さず、ログに残す）
+const fetchMyClaims = async (): Promise<ClaimSummary[] | null> => {
+  try {
+    const res = await fetch("/api/theater/claims", { cache: "no-store" });
+    if (!res.ok) {
+      console.error("[register] 引き継ぎの申し込みの読み込みに失敗", { status: res.status });
+      return null;
+    }
+    const json: unknown = await res.json().catch(() => null);
+    const pending = (json as { data?: { pending?: unknown } } | null)?.data?.pending;
+    if (!Array.isArray(pending)) {
+      console.error("[register] 引き継ぎの申し込みの一覧の形が違う");
+      return null;
+    }
+    const rows = pending.map(readClaimSummary);
+    if (rows.some((row) => row === null)) {
+      console.error("[register] 引き継ぎの申し込みの一覧に形が違う行がある（その行は出さない）");
+    }
+    return rows.filter((row): row is ClaimSummary => row !== null && row.status === "pending");
+  } catch (err) {
+    console.error("[register] 引き継ぎの申し込みの読み込みに失敗", err);
+    return null;
+  }
 };
 
 const getTheaterStatusCopy = (status: string) => {
@@ -197,6 +287,37 @@ export default function RegisterPage() {
     sns_instagram_url: "",
     sns_facebook_url: "",
   });
+  // 劇団の引き継ぎの申し込み
+  const [myClaims, setMyClaims] = useState<ClaimSummary[]>([]);
+  // 申し込みの一覧の取得の番号（世代）。取得を始めるとき・取り消しが成功したときに進め、最新の番号の応答だけを反映する
+  // （古い応答があとから届いて、確認待ちが消えたり、取り消した行が戻ったりしないように）
+  const claimsLoadSeq = useRef(0);
+  // 劇団名の入力欄の今の値（劇団登録の応答が返ったときに、送ったときの名前と比べる）
+  const onboardNameRef = useRef("");
+  const [claimTarget, setClaimTarget] = useState<ClaimTarget | null>(null);
+  const [claimForm, setClaimForm] = useState({
+    applicant_name: "",
+    role_note: "",
+    message: "",
+  });
+  // 申し込みの送信中・送信済み・失敗を、劇団の id ごとに持つ（劇団 A の応答が遅れて返っても、劇団 B の欄には出さない）
+  const [claimResults, setClaimResults] = useState<
+    Record<string, { status: "loading" | "sent" | "error"; message: string | null }>
+  >({});
+  const setClaimResult = (
+    theaterId: string,
+    value: { status: "loading" | "sent" | "error"; message: string | null } | null
+  ) =>
+    setClaimResults((prev) => {
+      const next = { ...prev };
+      if (value) next[theaterId] = value;
+      else delete next[theaterId];
+      return next;
+    });
+  const [cancelingClaimId, setCancelingClaimId] = useState<string | null>(null);
+  const [claimNotice, setClaimNotice] = useState<
+    { tone: "ok" | "error"; text: string } | null
+  >(null);
 
   // ログインの戻り先の URL のエラー（Google でのキャンセルなど）を拾って案内する
   useEffect(() => {
@@ -229,6 +350,11 @@ export default function RegisterPage() {
           : { ...prev, contact_email: user.email ?? "" }
       );
       setAuthState("loggedIn");
+      // 確認待ちの引き継ぎの申し込みがあれば、登録フォームの上に出す（読めなくても画面は止めない）
+      const loadSeq = ++claimsLoadSeq.current;
+      void fetchMyClaims().then((claims) => {
+        if (claims && loadSeq === claimsLoadSeq.current) setMyClaims(claims);
+      });
 
       try {
         const res = await fetch("/api/theater/me", { cache: "no-store" });
@@ -306,8 +432,11 @@ export default function RegisterPage() {
   };
 
   const submitOnboarding = async () => {
+    // 送ったときの劇団名。応答が返るまでに入力欄の名前を変えたら、その応答は画面に反映しない
+    const sentName = onboardForm.name.trim();
     setOnboarding(true);
     setOnboardMessage(null);
+    setClaimTarget(null);
     const res = await fetch("/api/theater/onboard", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -317,6 +446,25 @@ export default function RegisterPage() {
     const json = (await res.json().catch(() => null)) as
       | (MeResponse & { error?: { code: string; message: string } })
       | null;
+    if (onboardNameRef.current.trim() !== sentName) {
+      setOnboarding(false);
+      return;
+    }
+    // 運営が先に載せた劇団（メンバーが 0 人）と同じ名前: 引き継ぎの申し込み欄を出す
+    const claimable =
+      res.status === 409 && json?.error?.code === "THEATER_CLAIMABLE"
+        ? readClaimableTheater(json)
+        : null;
+    if (claimable) {
+      setClaimTarget({
+        ...claimable,
+        message: json?.error?.message ?? CLAIMABLE_FALLBACK_MESSAGE,
+      });
+      // 前に失敗していたら、もう一度申し込めるように戻す（送信中・送信済みはそのまま）
+      if (claimResults[claimable.id]?.status === "error") setClaimResult(claimable.id, null);
+      setOnboarding(false);
+      return;
+    }
     if (!res.ok) {
       // サーバーが場合ごとの日本語の文を返す（ログイン切れはログインし直しの案内、権限の問題は運営への問い合わせ）
       setOnboardMessage(json?.error?.message ?? "登録に失敗しました。時間をおいてもう一度お試しください。");
@@ -335,7 +483,94 @@ export default function RegisterPage() {
       sns_instagram_url: "",
       sns_facebook_url: "",
     });
+    onboardNameRef.current = "";
     setOnboarding(false);
+  };
+
+  const submitClaim = async () => {
+    if (!claimTarget) return;
+    // 送ったときの劇団。応答はこの劇団の欄にだけ反映する
+    const targetId = claimTarget.id;
+    setClaimResult(targetId, { status: "loading", message: null });
+    setClaimNotice(null);
+    try {
+      const res = await fetch("/api/theater/claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          theater_id: targetId,
+          applicant_name: claimForm.applicant_name,
+          role_note: claimForm.role_note,
+          message: claimForm.message,
+        }),
+      });
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        const errorMessage = (json as { error?: { message?: unknown } } | null)?.error?.message;
+        setClaimResult(targetId, {
+          status: "error",
+          message: typeof errorMessage === "string" ? errorMessage : CLAIM_FAILED_MESSAGE,
+        });
+        return;
+      }
+      const data = (json as { data?: { claim?: unknown; already_pending?: unknown } } | null)?.data;
+      const claim = readClaimSummary(data?.claim);
+      if (!claim || claim.theater_id !== targetId || claim.status !== "pending") {
+        // 受け付けられたかを確かめられない。申し込み中の表示（一覧の読み直し）で確かめてもらう
+        console.error("[register] 引き継ぎの申し込みの応答の形が違う");
+        setClaimResult(targetId, { status: "error", message: CLAIM_UNCONFIRMED_MESSAGE });
+      } else {
+        setClaimResult(targetId, {
+          status: "sent",
+          message: data?.already_pending === true ? CLAIM_ALREADY_PENDING_MESSAGE : CLAIM_SENT_MESSAGE,
+        });
+      }
+      const loadSeq = ++claimsLoadSeq.current;
+      const claims = await fetchMyClaims();
+      if (claims && loadSeq === claimsLoadSeq.current) setMyClaims(claims);
+    } catch (err) {
+      console.error("[register] 引き継ぎの申し込みの通信に失敗", err);
+      setClaimResult(targetId, { status: "error", message: CLAIM_NETWORK_MESSAGE });
+    }
+  };
+
+  const cancelClaim = async (claim: ClaimSummary) => {
+    if (
+      !confirm(
+        `『${claim.theater_name ?? "この劇団"}』の引き継ぎの申し込みを取り消します。よろしいですか？`
+      )
+    ) {
+      return;
+    }
+    setCancelingClaimId(claim.id);
+    setClaimNotice(null);
+    try {
+      const res = await fetch("/api/theater/claims", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claim_id: claim.id }),
+      });
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        const errorMessage = (json as { error?: { message?: unknown } } | null)?.error?.message;
+        setClaimNotice({
+          tone: "error",
+          text: typeof errorMessage === "string" ? errorMessage : CLAIM_CANCEL_FAILED_MESSAGE,
+        });
+      } else {
+        // 取り消す前に始まった一覧の取得の応答は使わない（取り消した行が戻らないように）
+        claimsLoadSeq.current += 1;
+        setMyClaims((prev) => prev.filter((item) => item.id !== claim.id));
+        setClaimNotice({ tone: "ok", text: CLAIM_CANCELLED_MESSAGE });
+        // 取り消した劇団の申し込み欄を開いていたら、もう一度申し込めるように戻す
+        setClaimResult(claim.theater_id, null);
+      }
+    } catch (err) {
+      console.error("[register] 引き継ぎの申し込みの取り消しの通信に失敗", err);
+      setClaimNotice({ tone: "error", text: CLAIM_NETWORK_MESSAGE });
+    } finally {
+      setCancelingClaimId(null);
+    }
   };
 
   const submitInvite = async () => {
@@ -450,6 +685,14 @@ export default function RegisterPage() {
   const limitReached =
     me?.stats?.totalAllowed !== undefined &&
     totalInUse >= me.stats.totalAllowed;
+  const pendingClaims = myClaims.filter((claim) => claim.status === "pending");
+  // 開いている申し込み欄（劇団）の送信の状態
+  const currentClaimResult = claimTarget ? claimResults[claimTarget.id] : undefined;
+  const claimStatus = currentClaimResult?.status ?? "idle";
+  const claimMessage = currentClaimResult?.message ?? null;
+  const canSubmitClaim =
+    claimForm.applicant_name.trim().length > 0 &&
+    claimForm.role_note.trim().length > 0;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-10">
@@ -700,6 +943,38 @@ export default function RegisterPage() {
         </div>
       )}
 
+      {authState === "loggedIn" && (pendingClaims.length > 0 || claimNotice) && (
+        <div className="card-retro space-y-3 bg-secondary p-5 text-sm text-zinc-800">
+          {pendingClaims.map((claim) => (
+            <div
+              key={claim.id}
+              className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <p>
+                『{claim.theater_name ?? "劇団"}』の引き継ぎを申し込み中です（{formatClaimDate(claim.created_at)}）。運営の確認をお待ちください。
+              </p>
+              <button
+                type="button"
+                onClick={() => cancelClaim(claim)}
+                disabled={cancelingClaimId === claim.id}
+                className="self-start text-xs text-red-700 underline disabled:opacity-50 sm:self-center"
+              >
+                {cancelingClaimId === claim.id ? "取り消し中..." : "申し込みを取り消す"}
+              </button>
+            </div>
+          ))}
+          {claimNotice && (
+            <p
+              className={`text-xs ${
+                claimNotice.tone === "error" ? "text-red-700" : "text-green-700"
+              }`}
+            >
+              {claimNotice.text}
+            </p>
+          )}
+        </div>
+      )}
+
       {authState === "loggedIn" && (
         <div className="card-retro p-6">
           <h2 className="font-display text-lg">劇団情報の登録 / 追加</h2>
@@ -712,9 +987,12 @@ export default function RegisterPage() {
               className="input-retro"
               placeholder="劇団名"
               value={onboardForm.name}
-              onChange={(e) =>
-                setOnboardForm({ ...onboardForm, name: e.target.value })
-              }
+              onChange={(e) => {
+                setOnboardForm({ ...onboardForm, name: e.target.value });
+                onboardNameRef.current = e.target.value;
+                // 劇団名を変えたら、前の名前の引き継ぎの申し込み欄は閉じる
+                setClaimTarget(null);
+              }}
             />
             <input
               className="input-retro"
@@ -759,6 +1037,66 @@ export default function RegisterPage() {
           </button>
           {onboardMessage && (
             <p className="mt-2 text-xs text-zinc-700">{onboardMessage}</p>
+          )}
+          {claimTarget && (
+            <div className="mt-4 rounded-2xl border-2 border-ink bg-surface-muted p-4 text-sm shadow-hard-sm">
+              <div className="text-sm font-black">
+                「{claimTarget.name}」の引き継ぎを申し込む
+              </div>
+              {claimStatus !== "sent" && (
+                <p className="mt-1 text-xs text-zinc-700">{claimTarget.message}</p>
+              )}
+              {claimStatus === "sent" ? (
+                <p className="mt-3 text-xs text-green-700">{claimMessage}</p>
+              ) : (
+                <>
+                  <div className="mt-3 space-y-3">
+                    <input
+                      className="input-retro"
+                      placeholder="お名前"
+                      maxLength={100}
+                      value={claimForm.applicant_name}
+                      onChange={(e) =>
+                        setClaimForm({ ...claimForm, applicant_name: e.target.value })
+                      }
+                    />
+                    <input
+                      className="input-retro"
+                      placeholder="劇団での立場（例：主宰、制作）"
+                      maxLength={100}
+                      value={claimForm.role_note}
+                      onChange={(e) =>
+                        setClaimForm({ ...claimForm, role_note: e.target.value })
+                      }
+                    />
+                    <textarea
+                      className="textarea-retro"
+                      placeholder="ひとこと（任意）"
+                      maxLength={1000}
+                      value={claimForm.message}
+                      onChange={(e) =>
+                        setClaimForm({ ...claimForm, message: e.target.value })
+                      }
+                    />
+                  </div>
+                  <button
+                    onClick={submitClaim}
+                    disabled={claimStatus === "loading" || !canSubmitClaim}
+                    className="btn-retro btn-ink mt-3 w-full disabled:opacity-50"
+                  >
+                    {claimStatus === "loading" ? "送信中..." : "引き継ぎを申し込む"}
+                  </button>
+                  {!canSubmitClaim && (
+                    <p className="mt-2 text-xs text-zinc-600">
+                      お名前と劇団での立場を入れると、申し込めます。
+                    </p>
+                  )}
+                  {claimStatus === "error" && claimMessage && (
+                    <p className="mt-2 text-xs text-red-700">{claimMessage}</p>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
       )}

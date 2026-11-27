@@ -27,6 +27,7 @@
 | `theaters` | 劇団（状態を含む） | 50-300件 |
 | `theater_members` | 劇団メンバー（auth.usersとの紐づけ） | theaters × 1-2 |
 | `theater_invites` | 劇団メンバーの招待（2人目のメール） | theaters × 0-1 |
+| `theater_claims` | 劇団の引き継ぎの申し込み（メンバー0人の劇団の代表になりたい人） | 申し込みごとに1行 |
 | `user_settings` | 利用者ごとの選択中の劇団 | 劇団ユーザー数 |
 | `admins` | 運営者アカウント | 数名 |
 | `events` | 公演情報 | 100-500件/年 |
@@ -48,6 +49,7 @@
 erDiagram
     THEATERS ||--o{ THEATER_MEMBERS : has
     THEATERS ||--o{ THEATER_INVITES : invites
+    THEATERS ||--o{ THEATER_CLAIMS : claimed_by
     THEATERS ||--o{ EVENTS : owns
 
     CATEGORIES ||--o{ EVENTS : categorizes
@@ -105,6 +107,20 @@ erDiagram
       text status
       timestamptz created_at
       timestamptz updated_at
+    }
+
+    THEATER_CLAIMS {
+      uuid id PK
+      uuid theater_id FK
+      uuid user_id FK
+      text email
+      text applicant_name
+      text role_note
+      text message
+      text status
+      timestamptz created_at
+      timestamptz decided_at
+      uuid decided_by
     }
 
     EVENTS {
@@ -265,11 +281,12 @@ CREATE UNIQUE INDEX uniq_theaters_name_ci ON theaters (lower(name));
 | カラム名 | 型 | NULL | デフォルト | 制約 | 説明 |
 |----------|-------|------|------------|------|------|
 | `theater_id` | UUID | NO | - | PK, FK → theaters.id | 劇団ID |
-| `user_id` | UUID | NO | - | PK（auth.users参照） | ユーザーID |
+| `user_id` | UUID | NO | - | PK, FK → auth.users.id（ON DELETE CASCADE。`20261127160022`） | ユーザーID |
 | `role` | TEXT | NO | `'owner'` | CHECK | 権限（`owner`＝劇団を登録した人, `editor`＝招待で入った人） |
 | `created_at` | TIMESTAMPTZ | NO | `NOW()` | | 登録日時 |
 
-- 1人が複数の劇団に所属できる。所属を足すのは劇団登録（`owner`）と招待の受諾（`editor`）で、どちらも service_role
+- 1人が複数の劇団に所属できる。所属を足すのは劇団登録（`owner`）・招待の受諾（`editor`）・引き継ぎの承認（`owner`。関数 `approve_theater_claim`）で、どれも service_role
+- `user_id` → `auth.users(id)` の外部キー（ON DELETE CASCADE）は `20261127160022` で足した（それまでは `theater_id` → `theaters` の1本だけで、アカウントを消すと所属だけ残り、メンバー0人の判定＝引き継ぎを塞いでいた）。足すときは同じ向きの外部キーが無いときだけ足し、今の行も確かめる
 
 **インデックス**:
 ```sql
@@ -536,6 +553,36 @@ CREATE INDEX idx_theater_invites_email ON theater_invites (lower(email));
 
 ---
 
+### 4.12.1 `theater_claims` テーブル（劇団の引き継ぎの申し込み）
+
+`supabase/migrations/20261127160022_theater_claims.sql`（写し `docs/sql/022_theater_claims.sql`）で追加。運営が先に載せた劇団（`theaters.origin = 'scout'` など、メンバーが0人の劇団）の代表になりたい人が申し込み、運営が承認すると `theater_members` に `owner` が入る。
+
+| カラム名 | 型 | NULL | デフォルト | 制約 | 説明 |
+|----------|-------|------|------------|------|------|
+| `id` | UUID | NO | `gen_random_uuid()` | PRIMARY KEY | 申し込みID |
+| `theater_id` | UUID | NO | - | FK → theaters.id（ON DELETE CASCADE） | 申し込み先の劇団 |
+| `user_id` | UUID | NO | - | FK → auth.users.id（ON DELETE CASCADE） | 申し込んだ人 |
+| `email` | TEXT | NO | - | | 申し込んだときのログインのメール（結果のお知らせの宛先） |
+| `applicant_name` | TEXT | YES | - | CHECK（`char_length` 100以下） | お名前 |
+| `role_note` | TEXT | YES | - | CHECK（100以下） | 劇団での立場 |
+| `message` | TEXT | YES | - | CHECK（1000以下） | ひとこと |
+| `status` | TEXT | NO | `'pending'` | CHECK | `pending`（確認待ち）・`approved`・`rejected`（見送り）・`cancelled`（本人が取り消し） |
+| `created_at` | TIMESTAMPTZ | NO | `now()` | | 申し込んだ日時 |
+| `decided_at` | TIMESTAMPTZ | YES | - | | 承認・見送り・取り消しの日時 |
+| `decided_by` | UUID | YES | - | | 承認・見送りした運営者（取り消しは NULL） |
+
+```sql
+CREATE UNIQUE INDEX uniq_theater_claims_pending ON theater_claims (theater_id, user_id) WHERE status = 'pending';
+CREATE INDEX idx_theater_claims_user_created ON theater_claims (user_id, created_at DESC);
+CREATE INDEX idx_theater_claims_status_created ON theater_claims (status, created_at);
+CREATE INDEX idx_theater_claims_theater ON theater_claims (theater_id);
+```
+
+- 作るのは関数 `create_theater_claim`、承認は関数 `approve_theater_claim`（6.1.2・6.1.3）。見送り（`rejected`）と取り消し（`cancelled`）は、API が pending のときだけ更新する1文の UPDATE
+- 1人が同時に持てる確認待ちは3件（関数の引数 `p_pending_limit`）。同じ人・同じ劇団の確認待ちは1件（部分一意索引）
+
+---
+
 ### 4.13 そのほかのテーブル
 
 | テーブル | 定義 | 内容 |
@@ -561,9 +608,9 @@ CREATE INDEX idx_theater_invites_email ON theater_invites (lower(email));
 ### 6.0 方針
 - アプリのDBへの書き込みは、ほぼすべて **service_role**（`lib/supabase/service.ts`）で行い、ログイン・所属・権限・入力の形はAPIの中で確かめる。service_role はRLSの影響を受けない
 - RLSは、公開されている anon キーとログイン（誰でもできる）だけでブラウザから PostgREST を直接叩いたときに、書き込めないようにする **最後の守り**。そのため劇団メンバー向けの書き込みポリシーは置かず、書き込みは運営者（`is_admin()`）だけにしている
-- ログイン中の利用者のクライアント（`lib/supabase/server.ts`）で書いているのは、運営者向けAPI（`app/api/admin/theaters`・`events`・`contact`）だけで、`is_admin()` のポリシーを通る
+- ログイン中の利用者のクライアント（`lib/supabase/server.ts`）で書いているのは、運営者向けAPI（`app/api/admin/theaters`・`events`・`contact`）だけで、`is_admin()` のポリシーを通る。運営者向けでも、引き継ぎの申し込みの承認・見送り（`app/api/admin/claims/[id]`）は、運営者の確認だけをログイン中のクライアントで行い、書き込みは service_role（関数 `approve_theater_claim`）
 - 公開ページの読み取りは anon キー（`lib/supabase/public.ts`）で、公開ポリシーが許すデータだけを読む
-- 下の内容は `docs/sql/001`・`003`・`004` と `supabase/migrations/`（`20261127120018`・`130019`・`140020`・`150021` を含む）を順に流した結果。`001_init.sql` にあって、あとで消したポリシーは書いていない
+- 下の内容は `docs/sql/001`・`003`・`004` と `supabase/migrations/`（`20261127120018`・`130019`・`140020`・`150021`・`160022` を含む）を順に流した結果。`001_init.sql` にあって、あとで消したポリシーは書いていない
 
 ### 6.1 関数
 
@@ -575,6 +622,9 @@ CREATE INDEX idx_theater_invites_email ON theater_invites (lower(email));
 | `update_updated_at_column()` | `001_init.sql` | `updated_at` の自動更新トリガー |
 | `trending_events(days int DEFAULT 30, max_rows int DEFAULT 20)` | `supabase/migrations/20260712130008_trending_rpc.sql` | 公開中の公演の直近N日PVの合計を多い順に返す。SECURITY DEFINER・`search_path = public`。`lib/data/events.ts` が service_role で呼ぶ |
 | `record_event_view(p_event_id uuid, p_view_date date, p_viewer_hash text, p_ip_hash text, p_ip_limit integer)` | `supabase/migrations/20261127150021_event_view_dedupe.sql` | 下の 6.1.1 |
+| `theater_claim_name_is_reserved(p_name text, p_reserved_names text[])` | `supabase/migrations/20261127160022_theater_claims.sql` | 劇団名が運営用の劇団の名前の一覧に入っているか（NFKC・前後の空白・大文字小文字の違いは同じとみなす）。IMMUTABLE・SECURITY INVOKER・`search_path = ''`。一覧は呼ぶ側（`lib/theater/claims.ts` の `RESERVED_THEATER_NAMES`）が渡す |
+| `create_theater_claim(p_theater_id uuid, p_user_id uuid, p_email text, p_applicant_name text, p_role_note text, p_message text, p_reserved_names text[], p_pending_limit integer, p_notify_cooldown_hours integer)` | `20261127160022` | 下の 6.1.2 |
+| `approve_theater_claim(p_claim_id uuid, p_decided_by uuid, p_reserved_names text[])` | `20261127160022` | 下の 6.1.3 |
 
 #### 6.1.1 `record_event_view`
 閲覧を1回数える。数えたら `true`、数えなければ `false`。`POST /api/views` が service_role で1回呼ぶ（`p_ip_limit` は5）。
@@ -587,6 +637,27 @@ CREATE INDEX idx_theater_invites_email ON theater_invites (lower(email));
 
 - SECURITY INVOKER・`search_path = public`
 - `REVOKE ALL … FROM PUBLIC, anon, authenticated`・`GRANT EXECUTE … TO service_role`（service_role 以外は呼べない）
+
+#### 6.1.2 `create_theater_claim`
+引き継ぎの申し込みを作る。`POST /api/theater/claims` が service_role で1回呼ぶ（上限3件・24時間）。結果は `jsonb` の `result` で返し、断るときは何も書かない（例外にしない）。
+1. 引数が足りない・上限が1未満などは例外（22023）
+2. 同じ利用者の呼び出しを `pg_advisory_xact_lock(hashtextextended('create_theater_claim|' || p_user_id, 0))` で1本ずつにする
+3. 劇団の行を `FOR SHARE` でロック（承認の `FOR UPDATE` と1本ずつになる）。無ければ `theater_not_found`
+4. 運営用の劇団なら `theater_reserved`、本人がメンバーなら `already_member`、メンバーがいれば `theater_has_members`
+5. 同じ人・同じ劇団の確認待ちがあれば `already_pending`（その申し込みを返す）
+6. この人の確認待ちが `p_pending_limit` 件以上なら `too_many_pending`
+7. 同じ人・同じ劇団の申し込み（状態は問わない）が `p_notify_cooldown_hours` 時間以内にあったかを見てから INSERT し、`created`（`should_notify` = それが無かったとき true。API は true のときだけ運営へメールを送る）
+
+#### 6.1.3 `approve_theater_claim`
+引き継ぎの申し込みを承認する。`PATCH /api/admin/claims/{id}`（`action: approve`）が service_role で1回呼ぶ。結果は `jsonb` の `result`。
+1. 申し込みの劇団を読む（無ければ `claim_not_found`）
+2. 劇団の行を `FOR UPDATE` でロック（無ければ `theater_not_found`）。同じ劇団の承認・申し込みの作成と、`theater_members` への INSERT（外部キーの確認の `FOR KEY SHARE`）は、この確定を待つ
+3. 申し込みの行を `FOR UPDATE` で読み直す。`pending` でなければ `not_pending`（今の状態も返す）
+4. `p_decided_by` が `admins` に無ければ `not_admin`、運営用の劇団なら `theater_reserved`、メンバーがいれば `theater_has_members`
+5. `theater_members` に `owner` を入れ、申し込みを `approved`（`decided_at`・`decided_by`）、同じ劇団のほかの確認待ちを `rejected` にして `approved`（見送りにした人のメールの一覧も返す）。途中で失敗すれば全部取り消される
+
+- 3つとも SECURITY INVOKER・`search_path = ''`（中では `public.`・`pg_catalog.` を付けて書く）
+- 3つとも `REVOKE ALL … FROM PUBLIC, anon, authenticated`・`GRANT EXECUTE … TO service_role`
 
 ### 6.2 `admins`（運営者）
 
@@ -614,7 +685,7 @@ CREATE INDEX idx_theater_invites_email ON theater_invites (lower(email));
 | Members can view own membership | SELECT | authenticated | `user_id = auth.uid() OR is_admin()`（`003`） |
 | Admins can add theater members | INSERT | authenticated | `is_admin()`（`20261127120018`） |
 
-- 所属の追加は運営者だけ。劇団登録（`owner`）・招待の受諾（`editor`）・メンバーの削除は、APIが service_role で行う
+- 所属の追加は運営者だけ。劇団登録（`owner`）・招待の受諾（`editor`）・引き継ぎの承認（`owner`・関数 `approve_theater_claim`）・メンバーの削除は、APIが service_role で行う
 - UPDATE・DELETE のポリシーは無い（ブラウザからは変えられない）
 
 ### 6.5 `theater_invites`（招待）
@@ -624,6 +695,14 @@ CREATE INDEX idx_theater_invites_email ON theater_invites (lower(email));
 | Admins can manage invites | ALL | authenticated | USING / WITH CHECK `is_admin()`（`20261127130019`） |
 
 - 招待の作成・削除（`owner` だけ・定員2件）と受諾は、APIが service_role で行う。ブラウザから直接は読み書きできない
+
+### 6.5.1 `theater_claims`（引き継ぎの申し込み）
+
+| ポリシー | 操作 | 対象 | 条件 |
+|----------|------|------|------|
+| なし（RLS有効） | - | - | 表の権限も `REVOKE ALL … FROM PUBLIC, anon, authenticated`・`GRANT SELECT, INSERT, UPDATE, DELETE … TO service_role` |
+
+- 申し込み（`/api/theater/claims`）・管理画面（`/admin/claims`）・承認と見送り（`/api/admin/claims/{id}`）は、どれも service_role で読み書きする
 
 ### 6.6 `events`（公演）
 

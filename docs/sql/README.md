@@ -16,7 +16,7 @@
 5. `docs/sql/006_events_multivalue_fields.sql`・`docs/sql/007_events_staff_fields.sql`（`supabase/migrations/` に無いので手で流す）
 6. `supabase/migrations/` を古い順にすべて（`supabase db push` か、SQL Editor でファイル名の順に）
 
-`docs/sql/` の `005`・`008`〜`011`・`018`〜`021` は `supabase/migrations/` の写しなので、6 で流れる（二重に流す必要はない）。
+`docs/sql/` の `005`・`008`〜`011`・`018`〜`022` は `supabase/migrations/` の写しなので、6 で流れる（二重に流す必要はない）。
 
 **リポジトリの SQL では作られないもの**（空の DB では別に用意が要る）:
 - `user_settings` 表（選択中の劇団。`lib/theater/activeTheater.ts` が読み書きする）
@@ -48,6 +48,7 @@
 | 019 | `019_theater_invites_admin_only.sql`（写し） | `20261127130019_theater_invites_admin_only.sql` |
 | 020 | `020_events_writes_admin_only.sql`（写し） | `20261127140020_events_writes_admin_only.sql` |
 | 021 | `021_event_view_dedupe.sql`（写し） | `20261127150021_event_view_dedupe.sql` |
+| 022 | `022_theater_claims.sql`（写し。劇団の引き継ぎの申し込みの表 `theater_claims`・関数 `create_theater_claim`・`approve_theater_claim`・`theater_claim_name_is_reserved`・`theater_members.user_id` → `auth.users` の外部キー） | `20261127160022_theater_claims.sql` |
 
 ### 3.1 写しの無い番号（`supabase/migrations/` にだけある）
 - `012`・`014`・`015`・`016`・`017`（中身は `supabase/migrations/` のファイルを見る）

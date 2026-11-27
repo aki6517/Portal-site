@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import TheaterStatusActions from "./TheaterStatusActions";
 
 type TheaterRow = {
@@ -94,6 +95,23 @@ export default async function AdminTheatersPage({
 
   const theaters = (data ?? []) as TheaterRow[];
 
+  // 引き継ぎの申し込み（確認待ち）の件数。theater_claims は service_role だけが読める（運営者の確認は上で済んでいる）。
+  // 読めなかったら件数を出さずに入口だけ出す
+  const { count: pendingClaimCount, error: claimCountError } = await createSupabaseServiceClient()
+    .from("theater_claims")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending");
+  if (claimCountError) {
+    console.error("[admin/theaters] Failed to count pending theater claims", {
+      code: claimCountError.code,
+      message: claimCountError.message,
+    });
+  }
+  const claimLinkLabel =
+    !claimCountError && typeof pendingClaimCount === "number"
+      ? `引き継ぎの申し込み（${pendingClaimCount}件）`
+      : "引き継ぎの申し込み";
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="text-2xl font-bold">劇団ステータス管理</h1>
@@ -125,6 +143,12 @@ export default async function AdminTheatersPage({
             {getStatusLabel(status)}
           </Link>
         ))}
+        <Link
+          href="/admin/claims"
+          className="rounded-full border border-zinc-200 px-3 py-1 text-zinc-600"
+        >
+          {claimLinkLabel}
+        </Link>
         <Link
           href="/admin/contact"
           className="rounded-full border border-zinc-200 px-3 py-1 text-zinc-600"

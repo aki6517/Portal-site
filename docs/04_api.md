@@ -33,7 +33,7 @@
   - 招待・メンバーの一覧と削除は `owner` だけ
   - 公演の作成・編集・削除と劇団情報の編集は、所属メンバーなら役割を問わない
 - 運営者: `admins` テーブルで判定（DB関数 `is_admin()`）
-- **service_role**: 劇団向けAPIの書き込み、PV集計、旧URLの登録、問い合わせの保存などのサーバー内部処理で使用。運営者向けAPI（`/api/admin/*`）は、`site-tags` 以外はログイン中の利用者のクライアントで書き、RLS の `is_admin()` を通る
+- **service_role**: 劇団向けAPIの書き込み、PV集計、旧URLの登録、問い合わせの保存などのサーバー内部処理で使用。運営者向けAPI（`/api/admin/*`）は、`site-tags`・`claims` 以外はログイン中の利用者のクライアントで書き、RLS の `is_admin()` を通る（`claims` は運営者の確認だけをログイン中のクライアントで行い、書き込みは service_role。8.3）
 
 ### 2.3 レスポンス形式（JSON）
 成功（`data` の中身はAPIごと）:
@@ -52,7 +52,8 @@
 - 劇団向けのAPI（`/api/theater/*`・`/api/ai/*`・`/api/storage/flyers`）の `message` は、劇団の人が読んで次に何をすればいいか分かる **日本語の文**。画面（`EventForm`・`EditEventScreen`・`/theater`・`/theater/settings`・`/register`）はそのまま表示する
 - DBのエラー文は応答に出さず、サーバーのログ（`console.error`）に code・message を残す
 - プログラムが分岐に使うのは `error.code` と HTTPステータス。`message` の文言では分岐しない（文言は変わることがある）
-- 劇団向け以外のAPI（`/api/views`・`/api/contact`・`/api/admin/*`）の `message` は日本語にそろえていない（英語の文や、DBのエラー文をそのまま返すものがある）
+- 劇団向け以外のAPI（`/api/views`・`/api/contact`・`/api/admin/*`）の `message` は日本語にそろえていない（英語の文や、DBのエラー文をそのまま返すものがある）。ただし `/api/admin/claims/{id}` は日本語
+- 例外として、劇団登録の `409` `THEATER_CLAIMABLE` は `error` と一緒に `data.theater`（`{ id, name }`）を返す（3.1）
 
 ### 2.4 ステータスコード
 - `200` OK
@@ -77,7 +78,15 @@
 | `NOT_FOUND` | 404 | 公演が見つからない |
 | `SLUG_RESERVED` | 409 | 保存しようとしたURLが、ほかの公演の以前のURL（`event_redirects`） |
 | `DB_ERROR` | 409 / 500 | 409 は公演のURL `(category, slug)` をほかの公演が使っている。500 はそれ以外の読み書きの失敗 |
-| `THEATER_NAME_EXISTS` | 409 | 同じ名前の劇団がある |
+| `THEATER_NAME_EXISTS` | 409 | 同じ名前の劇団があり、メンバーがいる（劇団登録）。同時の登録で劇団名の一意索引にぶつかったときも |
+| `THEATER_CLAIMABLE` | 409 | 同じ名前の劇団があり、メンバーが0人（劇団登録。引き継ぎを申し込める。3.1） |
+| `THEATER_NAME_RESERVED` | 409 | 劇団名が運営用の劇団の名前（劇団登録） |
+| `THEATER_NOT_CLAIMABLE` | 403 / 409 | 運営用の劇団への引き継ぎ（申し込みは 403・承認は 409） |
+| `THEATER_HAS_MEMBERS` | 409 | 引き継ぎの申し込み・承認で、劇団にもうメンバーがいる |
+| `ALREADY_MEMBER` | 409 | 引き継ぎの申し込みで、本人がもうその劇団のメンバー |
+| `TOO_MANY_PENDING_CLAIMS` | 409 | 確認待ちの引き継ぎの申し込みが3件ある |
+| `ALREADY_DECIDED` | 409 | 承認・見送りしようとした申し込みが、もう確認待ちでない |
+| `EMAIL_REQUIRED` | 400 | ログインしているアカウントにメールが無い（引き継ぎの申し込み） |
 | `LIMIT_REACHED` | 409 | 劇団に登録できるメール（所属＋保留中の招待）が2件に達している |
 | `ALREADY_EXISTS` | 409 | 同じメールの招待がその劇団にもうある |
 | `RATE_LIMITED` | 429 | レート制限（`Retry-After` ヘッダー付き） |
@@ -95,6 +104,7 @@ URLの重複は `code` が `DB_ERROR` でステータスが 409 になる。`cod
 | `POST /api/storage/flyers` | 10回 | ユーザー×IP |
 | `POST /api/views` | 60回 | IP×公演 |
 | `POST /api/contact` | 5回 | IP |
+| `POST /api/theater/claims` | 5回 | ユーザー |
 
 ---
 
@@ -141,7 +151,16 @@ URLの重複は `code` が `DB_ERROR` でステータスが 409 になる。`cod
 **エラー例**:
 - `400` `VALIDATION_ERROR`（劇団名・連絡先メールが無い、メールの形が違う、項目が文字列でない）
 - `401` `UNAUTHORIZED`
-- `409` `THEATER_NAME_EXISTS`（同じ名前の劇団がすでにある。大文字小文字は区別しない）
+- `409` は3つに分かれる（同じ名前かは「前後の空白を除いて小文字にした完全一致」。`%`・`_`・`*` はワイルドカードにしない）
+  - `THEATER_NAME_RESERVED`: 運営用の劇団の名前（`lib/theater/claims.ts` の `RESERVED_THEATER_NAMES`。全角・半角の違いも同じとみなす）。その劇団がまだ無くても使えない
+  - `THEATER_CLAIMABLE`: 同じ名前の劇団があり、メンバーが0人（運営が先に載せた劇団など）。`data.theater` に `{ id, name }` を返す。画面はこの劇団の「引き継ぎを申し込む」欄を出す（3.7）
+  - `THEATER_NAME_EXISTS`: 同じ名前の劇団があり、メンバーがいる（文は「劇団の代表の方に『メンバー管理』の『ログイン可能メールを追加』から追加してもらってください」）。作る時点で一意索引 `uniq_theaters_name_ci` にぶつかったときも
+```json
+{
+  "error": { "code": "THEATER_CLAIMABLE", "message": "この劇団は、福岡アクトポータル運営がすでに情報を載せています。…" },
+  "data": { "theater": { "id": "uuid", "name": "劇団〇〇" } }
+}
+```
 - `500` `DB_ERROR`
 
 ### 3.2 自分の劇団の状態取得（招待の受諾を含む）
@@ -223,6 +242,21 @@ URLの重複は `code` が `DB_ERROR` でステータスが 409 になる。`cod
 - `DELETE`: Request `{ "userId": "uuid" }`。自分（`owner`）は消せない（403）。Response `{ "data": { "deleted": true } }`
 
 **エラー例**: `400` `VALIDATION_ERROR`／`401`／`403` `FORBIDDEN`／`500` `DB_ERROR`
+
+### 3.7 劇団の引き継ぎの申し込み
+
+`POST /api/theater/claims` / `GET /api/theater/claims` / `DELETE /api/theater/claims`
+
+**権限**: 認証必須（authenticated）。表 `theater_claims` は service_role だけが読み書きする
+
+- `POST`: Request `{ "theater_id": "uuid", "applicant_name": "お名前", "role_note": "主宰", "message": "ひとこと" }`（`theater_id` 以外は任意。前後の空白を除き、空は NULL。文字数はお名前・立場100・ひとこと1000）
+  - 回数制限（1分5回・ユーザーごと）のあと、DB の関数 `create_theater_claim` を1回呼ぶ（確かめてから作るまで1トランザクション。`docs/03_database.md` 6.1.2）
+  - `201`: `{ "data": { "claim": { "id", "theater_id", "theater_name", "status": "pending", "created_at", … }, "already_pending": false } }`
+  - `200`: 同じ人・同じ劇団の確認待ちがもうある（二重に作らない）。`already_pending: true` と今の申し込み
+  - 作ったときは、応答を返したあと（`next/server` の `after`）に運営へメール（宛先 `CONTACT_TO_EMAIL`。本文の先頭に管理画面のURL、申し込んだ人が書いた欄は「> 」の引用）。同じ人・同じ劇団の申し込みが24時間以内に作られていたら送らない（取り消して出し直したとき）。メールが送れなくても申し込みは成功
+  - エラー: `400` `INVALID_JSON`・`VALIDATION_ERROR`・`EMAIL_REQUIRED`／`401`（未ログイン・確かめたあとにアカウントが消えた）／`403` `THEATER_NOT_CLAIMABLE`（運営用の劇団）／`404` `NOT_FOUND`（劇団が無い）／`409` `ALREADY_MEMBER`・`THEATER_HAS_MEMBERS`・`TOO_MANY_PENDING_CLAIMS`／`429` `RATE_LIMITED`／`500` `DB_ERROR`
+- `GET`: `{ "data": { "pending": [...], "recent": [...] } }`。`pending` は自分の確認待ち全部（3件まで）、`recent` は処理済み（承認・見送り・取り消し）の新しい5件。どちらも新しい順で、`theater_name` 付き。画面（`/register`）は `pending` だけを使う
+- `DELETE`: Request `{ "claim_id": "uuid" }`。自分の確認待ちだけを `cancelled` にする（`decided_at` も入れる）。無い・自分のでない・確認待ちでないは `404`
 
 ---
 
@@ -579,6 +613,21 @@ URLの重複は `code` が `DB_ERROR` でステータスが 409 になる。`cod
 | `GET`・`PATCH /api/admin/site-tags` | サイト全体に入れるタグ（`site_settings`）の読み書き（service_role） |
 
 公開側の `GET /api/site-tags` は、`site_settings` のタグを返す（ログイン不要）。
+
+### 8.3 劇団の引き継ぎの申し込みの承認・見送り
+
+`PATCH /api/admin/claims/{id}`（管理画面 `/admin/claims` から呼ぶ）
+
+**権限**: 運営者のみ（`admins`。ログイン中のクライアントで確かめる）。書き込みは service_role  
+**Request body**: `{ "action": "approve" }` か `{ "action": "reject" }`
+
+- `approve`: DB の関数 `approve_theater_claim` を1回呼ぶ（劇団の行をロックして、確かめる → `owner` を入れる → `approved` → 同じ劇団のほかの確認待ちを `rejected` を1トランザクションで。`docs/03_database.md` 6.1.3）
+  - Response `{ "data": { "claim": { "id", "status": "approved" }, "superseded": 1, "notification": "scheduled" } }`
+  - `superseded` は見送りにしたほかの申し込みの数。`notification` は「お知らせのメールを送る予定か」（`scheduled`＝応答のあとに送る／`not_configured`＝メールの設定が無いので送らない）。送れたかどうかは応答に入らない（失敗はサーバーのログ）
+  - 応答のあと（`after`）に、承認した人へ「引き継ぎが完了しました」（劇団の画面のURLとログインのしかた）、見送りにしたほかの人へ「ほかの方の申し込みで代表の登録が済んだ」お知らせ
+  - エラー: `404` `NOT_FOUND`（申し込み・劇団が無い）／`409` `ALREADY_DECIDED`（確認待ちでない）・`THEATER_HAS_MEMBERS`・`THEATER_NOT_CLAIMABLE`（運営用の劇団）／`403` `FORBIDDEN`／`500` `DB_ERROR`
+- `reject`: 確認待ちのときだけ `rejected` にする1文の更新（確かめたあとに承認・取り消しがあれば `409` `ALREADY_DECIDED`）。Response `{ "data": { "claim": { "id", "status": "rejected" }, "notification": "scheduled" } }`。応答のあとに見送りのお知らせ
+- 応答の `message` は日本語
 
 ---
 
