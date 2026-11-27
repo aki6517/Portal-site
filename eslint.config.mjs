@@ -13,6 +13,10 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "prototype/**",
+    // TinaCMS のビルド生成物（管理画面のバンドルと自動生成コード）。
+    // 対象に入ると ESLint がメモリ不足で落ちる。
+    "public/admin/**",
+    "tina/__generated__/**",
   ]),
   {
     rules: {

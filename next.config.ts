@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Next.js 16.3 以降は `next dev` が AGENTS.md に自前の案内ブロックを書き足す。
+  // AGENTS.md はこのプロジェクトの指示書として人が管理しているので、書き足させない。
+  agentRules: false,
   images: {
     remotePatterns: [
       {
