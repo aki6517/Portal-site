@@ -11,6 +11,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  buildGeminiGenerationConfig,
+  extractGeminiText,
   getGeminiModels,
   extractJsonPayload,
   isValidDateStr,
@@ -84,10 +86,11 @@ const callGeminiForCalendar = async ({ base64Pdf, year, month, models, apiKey })
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            // API キーは URL に載せず、ヘッダーで送る（URL がエラー文やログに残っても漏れないように）。
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
             body: JSON.stringify({
               contents: [
                 {
@@ -98,7 +101,7 @@ const callGeminiForCalendar = async ({ base64Pdf, year, month, models, apiKey })
                   ],
                 },
               ],
-              generationConfig: { temperature: 0.1, response_mime_type: "application/json" },
+              generationConfig: buildGeminiGenerationConfig(model),
             }),
           }
         );
@@ -109,8 +112,8 @@ const callGeminiForCalendar = async ({ base64Pdf, year, month, models, apiKey })
         }
 
         const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) throw new Error("GEMINI_EMPTY_RESPONSE");
+        const text = extractGeminiText(data);
+        if (!text.trim()) throw new Error("GEMINI_EMPTY_RESPONSE");
 
         const items = extractJsonPayload(text);
         return { items, model };

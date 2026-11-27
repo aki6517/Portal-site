@@ -362,7 +362,30 @@ export const shortHash = (input, length = 6) => sha256Hex(input).slice(0, length
 // Gemini呼び出し（app/api/ai/analyze-flyer/route.tsと同じ環境変数・パターン）
 // ---------------------------------------------------------------------------
 
-export const DEFAULT_GEMINI_MODELS = ["gemini-3.0-pro", "gemini-2.5-pro", "gemini-2.5-flash"];
+// 先頭が本命。2番目は、本命が失敗したときの控え（app/api/ai/analyze-flyer/route.ts と同じ並び）。
+export const DEFAULT_GEMINI_MODELS = ["gemini-4-hydrogen", "gemini-3.8-flash"];
+
+// Gemini 4 は思考の強さ（low / medium / high / xhigh）で質と速さを調整する。
+const GEMINI_4_THINKING_LEVEL = "high";
+
+/** モデルごとの generationConfig。
+ * temperature などのサンプリング指定は、Gemini 3.6 以降で非推奨（Gemini 4 は範囲外だと 400）なので送らない。 */
+export const buildGeminiGenerationConfig = (model) =>
+  /^gemini-4-/.test(model)
+    ? {
+        response_mime_type: "application/json",
+        thinking_config: { thinking_level: GEMINI_4_THINKING_LEVEL },
+      }
+    : { response_mime_type: "application/json" };
+
+/** 応答から本文を取り出す。思考の要約（thought）は本文ではないので除き、text だけをつなぐ。 */
+export const extractGeminiText = (data) => {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  return (Array.isArray(parts) ? parts : [])
+    .filter((part) => part && !part.thought && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("");
+};
 
 export const getGeminiModels = () => {
   const fromEnv = (process.env.GEMINI_ANALYZE_MODELS ?? "")
