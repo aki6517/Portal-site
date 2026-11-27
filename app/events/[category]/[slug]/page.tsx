@@ -16,6 +16,9 @@ import { buildMetadata, getSiteUrl } from "@/lib/seo";
 
 export const revalidate = 600;
 
+// JSON-LD の </script> 突破を防ぐため < をエスケープ（app/calendar/page.tsxと同じパターン）
+const toJsonLd = (data: unknown) => JSON.stringify(data).replace(/</g, "\\u003c");
+
 type EventRecord = EventDetail;
 
 const CATEGORY_COPY: Record<string, { label: string; icon: string }> = {
@@ -420,11 +423,11 @@ export default async function EventDetailPage({
       <ViewCounter category={event.category} slug={event.slug} />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLd(jsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLd(breadcrumbJsonLd) }}
       />
 
       <nav className="text-xs">
