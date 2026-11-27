@@ -63,15 +63,21 @@ git push -u origin main
    - **Pricing Plan**: **Free** (初期は無料プラン)
 
 #### Step 2: データベース初期化
-1. Supabase Dashboard → **SQL Editor**
-2. 以下のマイグレーションスクリプトを実行:
+1. Supabase Dashboard → **SQL Editor** で、DBの土台を順に実行:
 
 ```sql
--- docs/03_database.md の Migration Scripts を参照
--- supabase/migrations/001_initial_schema.sql
--- supabase/migrations/002_updated_at_trigger.sql
--- supabase/migrations/003_fulltext_search.sql
+-- docs/sql/001_init.sql
+-- docs/sql/002_seed_sample.sql（任意：サンプルデータ）
+-- docs/sql/003_update_theater_rules.sql
+-- docs/sql/004_site_settings.sql
+-- docs/sql/006_events_multivalue_fields.sql（supabase/migrations に無い）
+-- docs/sql/007_events_staff_fields.sql（supabase/migrations に無い）
 ```
+
+2. `supabase/migrations/` を古い順にすべて流す（`supabase link` したうえで `supabase db push --linked`。`005` から）
+3. `user_settings` 表と、`categories` の `action`・`drama`・`serious` の行は、リポジトリのSQLでは作られないので別に用意する
+
+番号ごとの対応・写しの無い番号は `docs/sql/README.md` を参照。
 
 #### Step 3: APIキー取得
 1. **Settings** → **API**
@@ -340,6 +346,8 @@ Vercel Dashboard → **Settings** → **Environment Variables**:
 | `TINA_TOKEN` | `xxx...` | Production, Preview |
 | `NEXT_PUBLIC_TINA_CLIENT_ID` | `xxx...` | Production, Preview |
 | `NEXT_PUBLIC_SITE_URL` | `https://fukuoka-stage.com` | Production |
+| `VIEW_HASH_SECRET` | 任意（無ければ `SUPABASE_SERVICE_ROLE_KEY` をPVの閲覧者の印の鍵に使う） | Production（秘密鍵） |
+| `GEMINI_ANALYZE_MODELS` | 任意（チラシ解析のモデル。カンマ区切り） | Production, Preview |
 
 ---
 
@@ -360,7 +368,7 @@ Vercel Dashboard → **Settings** → **Environment Variables**:
 - [ ] RLSポリシーが正しく動作する
 
 #### AI機能
-- [ ] チラシ画像アップロードができる（`/register`）
+- [ ] チラシ画像アップロードができる（`/theater/events/new`）
 - [ ] Gemini APIでチラシ解析ができる
 - [ ] SNS宣伝文が生成される
 
@@ -453,12 +461,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 #### 公演情報追加（劇団ダッシュボード）
 ```bash
 1. https://fukuoka-stage.com/register にアクセス（ログイン/オンボーディング）
-2. 劇団承認が完了していない場合は「承認待ち」状態（公開は不可、下書き作成は可）
+2. 劇団登録すると承認済み（approved）で作られる。運営者が停止（suspended）などにした劇団は、公開は不可・下書き作成は可
 3. https://fukuoka-stage.com/theater にアクセス（劇団ダッシュボード）
 4. 新規公演を作成（チラシ画像アップロード → AI自動解析 → 内容確認・修正）
 5. 保存（draft / published / archived）
-   - published は「劇団が承認済み」の場合のみ可能
-6. category/slug を変更してURLが変わる場合は、旧URL→新URLの301が自動作成される前提
+   - published は「劇団が承認済み」の場合のみ可能（それ以外は 403 で理由を表示）
+6. 公開中の公演の主カテゴリ（1つ目のカテゴリ）か英字（slug）を変えてURLが変わる場合は、旧URLが `event_redirects` に登録され、旧URLは新URLへ 308 で転送される
 ```
 
 ---
@@ -537,7 +545,7 @@ supabase db dump -f backup_$(date +%Y%m%d).sql
 ### 9.2 デプロイ後
 - [ ] SSL/TLS証明書が有効（HTTPS）
 - [ ] Cloudflare Proxy が有効（CDN + DDoS対策）
-- [ ] Rate Limiting が設定されている（Vercel Middleware）
+- [ ] Rate Limiting が効いている（各APIのメモリ上の制限。AI・画像アップロード・PV・問い合わせ。`docs/04_api.md` の「2.6」）
 - [ ] CORS設定が正しい（Supabase）
 - [ ] セキュリティヘッダーが設定されている（Next.js）
 
@@ -562,5 +570,6 @@ supabase db dump -f backup_$(date +%Y%m%d).sql
 ---
 
 **作成日**: 2026-01-31
-**バージョン**: 1.0
+**最終更新日**: 2026-11-27
+**バージョン**: 1.1
 **作成者**: Claude Code (AI Assistant)

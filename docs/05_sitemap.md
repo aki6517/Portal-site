@@ -35,10 +35,11 @@
 - パラメータは最小限
 
 ### 2.2 `/events/[category]/[slug]` の仕様
-- `category` は `categories.id`（例: `comedy`, `musical`）
-- `slug` は公演タイトルから生成（例: `nights-coffee`）
-- `(category, slug)` が一意になるように運用（競合時は `-2` などで回避）
-- `category` または `slug` を変更してURLが変わる場合は **旧URL→新URLへ301** を作成する
+- `category` は主カテゴリの `categories.id`（例: `comedy`, `musical`）。`events.categories`（2つ目からのカテゴリ）はURLを持たないタグで、一覧の絞り込みにだけ使う
+- `slug` は劇団が公演フォームで入力する英字（例: `nights-coffee`）。英小文字・数字・ハイフンだけ、1〜80文字、先頭・末尾のハイフンと連続は不可（`lib/event-slug.ts`。画面とAPIで同じ検査）
+- `(category, slug)` は一意（`uniq_events_category_slug`）。ほかの公演と重なる値・ほかの公演の旧URL（`event_redirects`）と重なる値は、APIが 409 で断る（自動で `-2` などは付けない）
+- 公開中の公演の `category` または `slug` を変更してURLが変わる場合は、旧URLを `event_redirects` に登録し、**旧URL→新URLへ308** で転送する
+- `/events/{2つ目からのカテゴリ}/{slug}` で開かれたときは、そのURLの転送（`event_redirects`）が無ければ、主カテゴリのURLへ308で送る
 
 ### 2.3 URL例
 
@@ -103,11 +104,11 @@ TOP > 公演を探す > コメディ > 夜明けのコーヒー
 
 ### 4.1 方針
 - Next.js（App Router）の `app/sitemap.ts` で生成
-- 更新頻度は **日次で十分**：`revalidate = 86400`（24h）
+- 更新頻度は **1時間ごと**：`revalidate = 3600`（`app/sitemap.ts`）
 - 生成対象は公開ページのみ
   - 公演一覧 `/events/`
   - カテゴリー別一覧 `/events/[category]/`
-  - 公演詳細 `/events/[category]/[slug]/`（`status = 'published'` のみ）
+  - 公演詳細 `/events/[category]/[slug]/`（`status = 'published'` で、公開日が来ていて、noindex でないもの。URLは主カテゴリ）
   - ブログ `/blog/` `/blog/[slug]/`（TinaCMSのコンテンツ）
   - 固定ページ（/about, /contact, /privacy-policy）
 
@@ -117,7 +118,7 @@ TOP > 公演を探す > コメディ > 夜明けのコーヒー
 // app/sitemap.ts
 import type { MetadataRoute } from 'next'
 
-export const revalidate = 86400
+export const revalidate = 3600
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 1) categories を取得（Supabase）
@@ -225,6 +226,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 ---
 
 **作成日**: 2026-01-31  
-**最終更新日**: 2026-01-31  
-**バージョン**: 2.0  
+**最終更新日**: 2026-11-27  
+**バージョン**: 2.1  
 **作成者**: Claude Code (AI Assistant)

@@ -1,7 +1,7 @@
 -- Trending events RPC: event_views_daily の直近N日集計をSQL側で行い、
 -- 全行をJSに転送してから集計する現行ロジックを置き換える。
--- ファイル作成のみ（Phase 1ではDB適用しない）。適用はSupabase SQL Editorで
--- このファイルをそのまま実行するだけ（既存オブジェクトへの副作用なし）。
+-- 本番には supabase/migrations/20260712130008_trending_rpc.sql として適用済み（このファイルはその写し）。
+-- 再実行しても既存オブジェクトへの副作用はない（CREATE OR REPLACE）。
 --
 -- 注意（プランからの差分）: event_views_daily はRLSで service_role のみ
 -- SELECT可能（docs/sql/001_init.sql「Service role can manage daily views」）。

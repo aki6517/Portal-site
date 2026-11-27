@@ -57,7 +57,7 @@ category: 舞台
 
 ## 技術スタック
 - Next.js 16 + React 19
-- TinaCMS 3.3.2（簡単な修正用）
+- TinaCMS 3.15.2（簡単な修正用）
 - Tailwind CSS v4
 - Vercel デプロイ（main ブランチ push で自動）
 - markdown-it でHTML変換（表・リンク・FAQ抽出対応済み）

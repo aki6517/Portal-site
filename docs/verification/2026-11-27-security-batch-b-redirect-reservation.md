@@ -88,3 +88,4 @@ ship（西山くん「上から順に改善する」）。Codex gpt-6.2-sol xhig
 - 本番 DB：dry-run で対象1本を確認して `supabase db push --linked`。適用後の events は INSERT/UPDATE/DELETE が運営者だけ、SELECT の2本は従来どおり。promotions は運営者だけ
 - 今後の選択肢（西山くんに相談）：副カテゴリの URL を「本物の URL」ではなく「タグ」として扱う（副カテゴリの URL は主カテゴリの URL へ転送するだけにする）と、URL の重なりの問題がほぼ無くなる。サイト内のリンクは主カテゴリの URL を使っている
 - ハーネス：scratchpad/batch-b/harness（run-routes 29・run-page 15・run-r2 60・run-r3 33・run-edit-page 4、すべて ALL OK）。前回までのハーネス（スラッグ検査・承認済み劇団の公開制限）も同じ結果
+- 追記（2026-11-27）：この文書の categories の組の扱いは、2026-11-27-category-tags.md で主カテゴリだけに変わった
