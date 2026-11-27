@@ -4,6 +4,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { resolveActiveTheater } from "@/lib/theater/activeTheater";
 import { resolveVenue, type VenueRow } from "@/lib/venues/normalize";
+import {
+  EVENT_SLUG_ERROR_MESSAGES,
+  validateEventSlug,
+} from "@/lib/event-slug";
 
 type EventUpdatePayload = {
   category?: string;
@@ -265,6 +269,46 @@ export async function PATCH(
     );
   }
 
+  // slug: キーが無ければ現状維持。送られてきたら文字列以外は400。
+  // 現在値と完全に同じなら形式検査をせず、更新にも含めない（同じ値を書き戻さない）。
+  //  - 過去の公演に残る形式外のスラッグ（百年桃・mime_faust など）のままでも、
+  //    劇団がほかの項目を編集できるようにするため（EventFormの編集時の扱いと同じ）
+  //  - 同時編集で、ほかの人が直したスラッグを古い値で上書きしないため
+  // 違う値のときだけ trim → 形式検査 → 更新に入れる（"" や " " も400）。
+  let slugUpdate: string | undefined;
+  if (payload.slug !== undefined) {
+    const rawSlug: unknown = payload.slug;
+    if (typeof rawSlug !== "string") {
+      return NextResponse.json(
+        {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: EVENT_SLUG_ERROR_MESSAGES.format,
+          },
+        },
+        { status: 400 }
+      );
+    }
+    if (rawSlug !== current.slug) {
+      const slugValidation = validateEventSlug(rawSlug);
+      if (!slugValidation.ok) {
+        return NextResponse.json(
+          {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: slugValidation.message,
+            },
+          },
+          { status: 400 }
+        );
+      }
+      // trimした結果が現在値と同じなら、書き戻さない
+      if (slugValidation.slug !== current.slug) {
+        slugUpdate = slugValidation.slug;
+      }
+    }
+  }
+
   // superseded_by（再演時の後継公演指定）: UUID形式・自分自身でないこと・
   // 同じ劇団（theater_id）の公演であることをserviceクライアントで検証する。
   // undefinedのまま＝ペイロードに無ければ更新しない（他フィールドと同じ規約）。
@@ -328,7 +372,7 @@ export async function PATCH(
     update.category = primary;
     update.categories = normalized;
   }
-  if (payload.slug) update.slug = payload.slug.trim();
+  if (slugUpdate !== undefined) update.slug = slugUpdate;
   if (payload.title) update.title = payload.title.trim();
   if ("description" in payload) update.description = payload.description ?? null;
   if ("playwright" in payload) {
@@ -393,6 +437,22 @@ export async function PATCH(
     update.ai_confidence = payload.ai_confidence ?? null;
   if (supersededByUpdate !== undefined) update.superseded_by = supersededByUpdate;
   if (payload.status) update.status = payload.status;
+
+  // 更新する項目が無い（送られたslugが現在値と同じだけ、など）ときは、空のupdateを
+  // 送ると0行になり .single() がエラー（DB_ERROR 500）になるため、DB更新・転送登録・
+  // 再検証を省いて現在の公演を返す（下の通常応答と同じ形・同じ列）。
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({
+      data: {
+        event: {
+          id: current.id,
+          category: current.category,
+          slug: current.slug,
+          status: current.status,
+        },
+      },
+    });
+  }
 
   let { data: updated, error: updateError } = await service
     .from("events")

@@ -4,6 +4,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { resolveActiveTheater } from "@/lib/theater/activeTheater";
 import { resolveVenue, type VenueRow } from "@/lib/venues/normalize";
+import {
+  EVENT_SLUG_ERROR_MESSAGES,
+  validateEventSlug,
+} from "@/lib/event-slug";
 
 type EventPayload = {
   category?: string;
@@ -248,6 +252,21 @@ export async function POST(req: Request) {
     );
   }
 
+  // slugが文字列以外（数値・オブジェクト・true など）だと下の trim() で例外になるため
+  // 先に400で返す。無い（undefined・null）・空のときは、下の既存の必須チェックに任せる。
+  const rawSlug: unknown = payload.slug;
+  if (rawSlug !== undefined && rawSlug !== null && typeof rawSlug !== "string") {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: EVENT_SLUG_ERROR_MESSAGES.format,
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   const category = payload.category?.trim() ?? "";
   const categories = normalizeCategories(payload.categories ?? null, category);
   const slug = payload.slug?.trim();
@@ -270,6 +289,21 @@ export async function POST(req: Request) {
         error: {
           code: "VALIDATION_ERROR",
           message: "category, slug, title, start_date are required",
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  // slugは公開URL（/events/{category}/{slug}）とサイトマップにそのまま使われる。
+  // 公式サイトのURLなどが入らないよう、EventFormと同じ関数で形式を検査する。
+  const slugValidation = validateEventSlug(slug);
+  if (!slugValidation.ok) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: slugValidation.message,
         },
       },
       { status: 400 }

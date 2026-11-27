@@ -1,8 +1,12 @@
 "use client";
 
 import NextImage from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ImageWithFallback from "@/app/_components/ImageWithFallback";
+import {
+  EVENT_SLUG_LEGACY_UNCHANGED_NOTE,
+  validateEventSlug,
+} from "@/lib/event-slug";
 
 const CATEGORY_OPTIONS = [
   { id: "comedy", label: "コメディ" },
@@ -27,6 +31,8 @@ const STATUS_OPTIONS = [
 
 const FLYER_BUCKET = "flyers-public";
 const CREATE_STEPS = ["画像", "基本", "日程・会場", "詳細・公開"] as const;
+// スラッグ欄があるステップ（CREATE_STEPS の「基本」）
+const SLUG_STEP_INDEX = 1;
 
 type CastMember = {
   name: string;
@@ -510,6 +516,10 @@ export default function EventForm({
   );
   const [analyzing, setAnalyzing] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [createdPath, setCreatedPath] = useState<{
+    category: string;
+    slug: string;
+  } | null>(null);
   const [promotionPlatforms, setPromotionPlatforms] = useState<string[]>([
     "twitter",
     "instagram",
@@ -565,6 +575,44 @@ export default function EventForm({
     () => eventId ?? createdId,
     [eventId, createdId]
   );
+
+  // スラッグ（公開URLに使う英字）の形式検査。編集時にスラッグが読み込んだときの
+  // 値と完全に同じ（trim前の生の値で比較）なら「変わっていない」扱いにし、
+  // 形式外の古いスラッグ（百年桃・mime_faust など）でも送信を止めない。
+  // このときは送信データにslugを含めない（APIのPATCHはキーが無ければ現状維持。
+  // 同時編集でほかの人が直したスラッグを古い値で上書きしないため）。
+  const loadedSlug = mode === "edit" ? initialData?.slug ?? null : null;
+  const slugUnchangedFromLoaded =
+    loadedSlug !== null && form.slug === loadedSlug;
+  const slugValidation = validateEventSlug(form.slug);
+  // 空欄は既存の必須チェックで扱うので、入力中のエラーは出さない
+  const slugHasFormatIssue =
+    !slugValidation.ok && slugValidation.reason !== "empty";
+  const slugInputError =
+    slugHasFormatIssue && !slugUnchangedFromLoaded
+      ? slugValidation.message
+      : null;
+  const showLegacySlugNote = slugHasFormatIssue && slugUnchangedFromLoaded;
+  // 新規作成ウィザードで、最終ステップからの送信がスラッグの形式違反で止まったとき、
+  // スラッグ欄のあるステップへ戻してから欄にフォーカスする（描画後に行うためeffectで）
+  const slugInputRef = useRef<HTMLInputElement>(null);
+  const [slugFocusRequest, setSlugFocusRequest] = useState(0);
+  useEffect(() => {
+    if (slugFocusRequest === 0) return;
+    slugInputRef.current?.focus();
+  }, [slugFocusRequest]);
+  // スラッグの形式違反で画面下に出したメッセージを覚えておき、スラッグが有効な値
+  // （または空）に直ったらそのメッセージだけ消す（ほかの理由のメッセージは残す）
+  const [slugMessage, setSlugMessage] = useState<string | null>(null);
+  const showSlugMessage = (text: string) => {
+    setMessage(text);
+    setSlugMessage(text);
+  };
+  useEffect(() => {
+    if (slugInputError || slugMessage === null) return;
+    setMessage((prev) => (prev === slugMessage ? null : prev));
+    setSlugMessage(null);
+  }, [slugInputError, slugMessage]);
 
   const updateField = (key: TextFieldKey, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -893,7 +941,17 @@ export default function EventForm({
       return;
     }
     if (!form.slug.trim() || !form.title.trim()) {
-      setMessage("URL用英字名と公演タイトルは必須です。");
+      setMessage("公演ページのURLに使う英字と公演タイトルは必須です。");
+      return;
+    }
+    if (!slugValidation.ok && !slugUnchangedFromLoaded) {
+      showSlugMessage(slugValidation.message);
+      // ウィザードでは上部のステップボタンから最終ステップへ直接来られるので、
+      // スラッグ欄のある「基本」ステップへ戻して欄にフォーカスする
+      if (mode === "create") {
+        setCreateStep(SLUG_STEP_INDEX);
+        setSlugFocusRequest((prev) => prev + 1);
+      }
       return;
     }
 
@@ -956,11 +1014,13 @@ export default function EventForm({
     setUploadNotice(null);
     setMessage(null);
     setCreatedId(null);
+    setCreatedPath(null);
 
     const payload = {
       category: primaryCategory,
       categories: normalizedCategories,
-      slug: form.slug.trim(),
+      // 編集時に読み込んだ値から変わっていなければslugを送らない（上のコメント参照）
+      ...(slugUnchangedFromLoaded ? {} : { slug: form.slug.trim() }),
       title: form.title.trim(),
       publish_at: form.publish_at ? toJstIso(form.publish_at) : null,
       start_date: scheduleTimes[0].start_date,
@@ -1011,8 +1071,15 @@ export default function EventForm({
       return;
     }
     if (mode === "create") {
-      const id = json?.data?.event?.id;
+      const created = json?.data?.event;
+      const id = created?.id;
       setCreatedId(id ?? null);
+      // 作成後の編集パスは、APIが返した保存済みのカテゴリとスラッグで組み立てる
+      setCreatedPath(
+        typeof created?.category === "string" && typeof created?.slug === "string"
+          ? { category: created.category, slug: created.slug }
+          : null
+      );
       setMessage("公演を作成しました。");
     } else {
       setMessage("更新しました。");
@@ -1079,8 +1146,10 @@ export default function EventForm({
   const canContinueStep = (() => {
     if (!isWizard) return true;
     if (createStep === 1) {
-      return Boolean(
-        form.slug.trim() && form.title.trim() && form.categories.length > 0
+      return (
+        Boolean(
+          form.slug.trim() && form.title.trim() && form.categories.length > 0
+        ) && !slugInputError
       );
     }
     if (createStep === 2) {
@@ -1302,16 +1371,36 @@ export default function EventForm({
             </div>
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
-              URL用英字名（スラッグ）
+              公演ページのURLに使う英字（必須）
             </label>
             <input
+              ref={slugInputRef}
               className="input-retro"
-              placeholder="nights-coffee"
+              placeholder="kemonohito"
               value={form.slug}
               onChange={(e) => updateField("slug", e.target.value)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
             />
+            {slugInputError && (
+              <p className="rounded-lg border-2 border-red-500 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {slugInputError}
+              </p>
+            )}
+            {showLegacySlugNote && (
+              <p className="text-xs text-zinc-600">
+                {EVENT_SLUG_LEGACY_UNCHANGED_NOTE}
+              </p>
+            )}
             <p className="text-xs text-zinc-600">
-              公開URL: /events/{primaryCategory}/{form.slug || "your-slug"}
+              福岡アクトポータルでの公演ページのURLになります。英小文字・数字・ハイフン（-）で入力してください。例：kemonohito → /events/drama/kemonohito
+            </p>
+            <p className="text-xs text-zinc-600">
+              劇団の公式サイトや予約ページのURLは、ここではなく「販売所・予約窓口」の欄に入れてください。
+            </p>
+            <p className="text-xs text-zinc-600">
+              公開URL: /events/{primaryCategory}/{form.slug.trim() || "your-slug"}
             </p>
 
             <label className="text-xs font-black tracking-wide text-zinc-700">
@@ -1759,7 +1848,11 @@ export default function EventForm({
               type="button"
               onClick={() => {
                 if (!canContinueStep) {
-                  setMessage("必須項目を入力してから次へ進んでください。");
+                  if (createStep === 1 && slugInputError) {
+                    showSlugMessage(slugInputError);
+                  } else {
+                    setMessage("必須項目を入力してから次へ進んでください。");
+                  }
                   return;
                 }
                 setMessage(null);
@@ -1785,7 +1878,10 @@ export default function EventForm({
 
       {createdId && (
         <p className="mt-2 text-xs text-zinc-700">
-          作成後の編集はこちら: /events/{primaryCategory}/{form.slug}/edit
+          作成後の編集はこちら:{" "}
+          {`/events/${createdPath?.category ?? primaryCategory}/${
+            createdPath?.slug ?? form.slug.trim()
+          }/edit`}
         </p>
       )}
       {message && (!isWizard || createStep !== 0) && (
