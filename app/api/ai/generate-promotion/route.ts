@@ -155,7 +155,7 @@ export async function POST(req: Request) {
   const { data: event, error: eventError } = await supabase
     .from("events")
     .select(
-      "id, title, slug, category, description, company, start_date, end_date, venue, price_general, price_student"
+      "id, theater_id, title, slug, category, description, company, start_date, end_date, venue, price_general, price_student"
     )
     .eq("id", eventId)
     .single();
@@ -164,6 +164,52 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Event not found" } },
       { status: 404 }
+    );
+  }
+
+  // 公開公演は RLS で誰でも読めるため、取得できただけでは自劇団の公演とは限らない。
+  // 外部 AI を呼ぶ前・promotions に書く前に、公演の劇団（アクティブかどうかは問わない）の所属メンバーかを確かめる。
+  // resolveActiveTheater は user_settings に書き込むことがあり、取得エラーも空扱いになるため使わず、直接引く。
+  let service: ReturnType<typeof createSupabaseServiceClient>;
+  let isEventTheaterMember = false;
+  try {
+    service = createSupabaseServiceClient();
+    const { data: membership, error: membershipError } = await service
+      .from("theater_members")
+      .select("theater_id")
+      .eq("user_id", user.id)
+      .eq("theater_id", event.theater_id)
+      .maybeSingle();
+
+    if (membershipError) {
+      return NextResponse.json(
+        { error: { code: "DB_ERROR", message: membershipError.message } },
+        { status: 500 }
+      );
+    }
+    isEventTheaterMember = Boolean(membership);
+  } catch {
+    // 鍵の未設定などでクライアントの生成が例外を投げたとき。例外の文言は返さない（設定値などを応答に混ぜない）
+    return NextResponse.json(
+      {
+        error: {
+          code: "DB_ERROR",
+          message: "所属の確認に失敗しました。時間をおいてもう一度お試しください。",
+        },
+      },
+      { status: 500 }
+    );
+  }
+
+  if (!isEventTheaterMember) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "FORBIDDEN",
+          message: "この公演の宣伝文は、公演の劇団のメンバーだけが作成できます。",
+        },
+      },
+      { status: 403 }
     );
   }
 
@@ -240,7 +286,6 @@ JSONのみを出力し、説明文は不要です。
       );
     }
 
-    const service = createSupabaseServiceClient();
     const { error: insertError } = await service.from("promotions").insert(
       promotions.map((promotion) => ({
         event_id: event.id,
